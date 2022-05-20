@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="{{ url_for('static', filename= 'css/style.css') }}">
+    <title>provenance_reporter</title>
+</head>
+<body>
+   
+   <table style="width=100%; font-family: Arial, Helvetica, sans-serif; bottom-margin:50px">
+   <tr>
+     <td style="width: 40%; padding: 3px; text-align: left"><img src="{{ url_for('static', filename='images/OICR_Logo_RGB_ENGLISH.png') }}" alt="OICR_logo" title="OICR_logo" style="padding-right: 8px; padding-left:0px; width:10; height:10"></td>
+     <td style="width: 60%; padding: 3px; text-align: left"><p style="text-align: center; color: black; font-size:45px; font-family: Arial, Verdana, sans-serif; font-weight:bold">Genome Sequence Informatics<br><br>Provenance Reporter</p></td>
+   </tr>
+   </table>
+   
+   
+
+   <table id="project_table">
+   <tr>
+     <th>Project</th>
+     <th>Description</th>
+     <th>Pipeline</th>     
+     <th>Status</th>
+   </tr>     
+   {% for i in projects %}
+     <tr>
+        <td>{{ i['name'] }}</td>
+        <td>{{ i['description'] }}</td>
+        <td>{{ i['pipeline'] }}</td>
+        <td>{{ i['active'] }}</td>
+     </tr>
+   {% endfor %}
+   </table>
+</body>
+</html>

@@ -1,0 +1,36 @@
+h1 {
+    border: 2px #eee solid;
+    color: black;
+    text-align: center;
+    padding: 10px;
+}
+
+img {
+  width: 80%;
+}
+
+
+#project_table {
+  margin-left: auto;
+  margin-right: auto;
+  margin-top: 60px;
+  font-family: Arial, Helvetica, sans-serif;
+  border-collapse: collapse;
+  width: 80%;
+}
+#project_table td, #project_table th {
+  border: 1px solid #ddd;
+  padding: 8px;
+}
+#project_table tr:nth-child(even){background-color: #f2f2f2;}
+#project_table tr:hover {background-color: #cc99ff;color: white}
+#project_table th {
+  padding-top: 12px;
+  padding-bottom: 12px;
+  text-align: left;
+  background-color: #00b300;
+  color: white;
+}
+
+
+
