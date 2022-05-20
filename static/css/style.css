@@ -33,4 +33,28 @@ img {
 }
 
 
+.search_bar input[type=text] {
+  float: left;  
+  padding: 6px;
+  font-size: 17px;
+  border: 1px solid grey;
+  width: 70%;
+  background: #f1f1f1;
+  box-sizing: border-box
+}
+.search_bar button {
+  width: 30%;
+  padding: 6px;
+  background: #C0C0C0;
+  color: white;
+  font-size: 17px;
+  border: 1px solid grey;
+  border-left: none;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+.search_bar button:hover {
+  background: #A0A0A0;
+}
+
 
