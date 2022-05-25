@@ -38,7 +38,7 @@ def extract_project_info(project_provenance = 'http://pinery.gsi.oicr.on.ca/samp
             name = i['name']
             assert name not in D
             D[name] = {'name': name}
-            for j in ['pipeline', 'description', 'active']:
+            for j in ['pipeline', 'description', 'active', 'contact_name', 'contact_email']:
                 if j in i:
                     D[name][j] = i[j] 
                 else:
@@ -200,3 +200,8 @@ def index():
     projects = extract_project_info()
     return render_template('index.html', projects=projects)
 
+@app.route('/<project_name>')
+def project(project_name):
+    projects = extract_project_info()
+    project = [i for i in projects if i['name'] == project_name][0]
+    return render_template('project.html', project=project)

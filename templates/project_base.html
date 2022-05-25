@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="{{ url_for('static', filename= 'css/style.css') }}">
+  <title>{% block title %} {% endblock %}</title>
+</head>
+<body>
+    
+  <div class="topnav">
+    <a class="active" href="{{ url_for('index')}}">Home</a>
+    <a href="#Sequencing">Sequencing</a>
+    <a href="#WGS">WGS</a>
+    <a href="#sWGS">sWGS</a>    
+    <a href="#WT">WT</a>
+    <a href="#cfMeDIP">cfMeDIP</a>
+    <a href="#Targeted Sequencing">Targeted Sequencing</a>
+</div>
+
+  
+  {% block content %} {% endblock %}
+  
+
+
+    
+</body>
+</html>

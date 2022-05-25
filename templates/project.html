@@ -1,0 +1,26 @@
+{% extends 'project_base.html' %}
+
+{% block content %}
+   <div class="project_title">
+     <p>{% block title %}{{ project['name'] }} {% endblock %}</p>
+   </div>    
+   <div class="project_info">
+     <p><span style="color:#A8A8A8">Project name:</span> {{ project['name'] }}</p>   
+     {% if project['description'] %}     
+       <p><span style="color:#A8A8A8">Project description:</span> {{ project['description'] }}</p>
+     {% else %}
+       <p><span style="color:#A8A8A8">Project description:</span> Not provided</p>     
+     {% endif %}     
+     {% if project['contact_name'] %}     
+       <p><span style="color:#A8A8A8">Contact name:</span> {{ project['contact_name'] }}</p>
+     {% else %}
+       <p><span style="color:#A8A8A8">Contact name:</span> Not provided</p>
+     {% endif %}     
+     {% if project['contact_email'] %}     
+       <p><span style="color:#A8A8A8">Contact email:</span> {{ project['contact_email'] }}</p>
+     {% else %}
+       <p><span style="color:#A8A8A8">Contact name:</span> Not provided</p>   
+     {% endif %}
+
+</div>
+{% endblock %}
