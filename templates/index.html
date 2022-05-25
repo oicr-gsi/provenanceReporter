@@ -27,7 +27,11 @@
    </tr>     
    {% for i in projects %}
      <tr>
-        <td>{{ i['name'] }}</td>
+        <td>
+          <a href="{{ url_for('project', project_name=i['name']) }}">
+            {{ i['name'] }}
+          </a>
+        </td>
         <td>{{ i['description'] }}</td>
         <td>{{ i['pipeline'] }}</td>
         <td>{{ i['active'] }}</td>
