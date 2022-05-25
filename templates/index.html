@@ -28,13 +28,17 @@
    {% for i in projects %}
      <tr>
         <td>
-          <a href="{{ url_for('project', project_name=i['name']) }}">
-            {{ i['name'] }}
-          </a>
+          <a class="project_links" href="{{ url_for('project', project_name=i['name']) }}">{{ i['name'] }}</a>
         </td>
-        <td>{{ i['description'] }}</td>
-        <td>{{ i['pipeline'] }}</td>
-        <td>{{ i['active'] }}</td>
+        <td>
+          <a class="project_links" href="{{ url_for('project', project_name=i['name']) }}">{{ i['description'] }}</a>
+        </td>        
+        <td>
+          <a class="project_links" href="{{ url_for('project', project_name=i['name']) }}">{{ i['pipeline'] }}</a>
+        </td>
+        <td>
+          <a class="project_links" href="{{ url_for('project', project_name=i['name']) }}">{{ i['active'] }}</a>
+        </td>
      </tr>
    {% endfor %}
    </table>

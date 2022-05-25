@@ -24,6 +24,7 @@ img {
 }
 #project_table tr:nth-child(even){background-color: #f2f2f2;}
 #project_table tr:hover {background-color: #cc99ff;color: white}
+#project_table tr:hover a {background-color: #cc99ff;color: white}
 #project_table th {
   padding-top: 12px;
   padding-bottom: 12px;
@@ -31,6 +32,13 @@ img {
   background-color: #00b300;
   color: white;
 }
+
+
+
+
+
+
+
 
 
 .search_bar input[type=text] {
@@ -71,7 +79,13 @@ img {
 
 
 
-
+.project_links {
+  color: black;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size:16px;
+  text-align: left;
+  text-decoration:none;
+}
 
 
 .topnav {
