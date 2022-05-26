@@ -218,7 +218,17 @@ def project(project_name):
 def sequencing(project_name):
     projects = extract_project_info()
     project = [i for i in projects if i['name'] == project_name][0]
-    return render_template('sequencing.html', project=project)
+    
+    
+    infile = open('TGL01MOH.json')
+    data = json.load(infile)
+    infile.close()
+
+    sequences = add_lims_info_to_sequence_data(data)
+    
+    
+    
+    return render_template('sequencing.html', project=project, sequences=sequences)
 
 
 
