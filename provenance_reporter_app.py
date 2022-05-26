@@ -205,3 +205,16 @@ def project(project_name):
     projects = extract_project_info()
     project = [i for i in projects if i['name'] == project_name][0]
     return render_template('project.html', project=project)
+
+
+
+@app.route('/<project_name>/sequencing')
+def sequencing(project_name):
+    projects = extract_project_info()
+    project = [i for i in projects if i['name'] == project_name][0]
+    return render_template('sequencing.html', project=project)
+
+
+
+
+
