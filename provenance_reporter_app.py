@@ -68,6 +68,7 @@ def collect_sequence_info(data):
     
     for i in data['pipeline']['workflows']:
         if i['info']['wf'].lower() in ['casava', 'bcl2fastq', 'fileimportforanalysis', 'fileimport']:
+            workflow = i['info']['wf'] + '_' + i['info']['wfv']
             assert len(i['libraries']) == 1
             case = i['libraries'][0]['id']
             lib = i['libraries'][0]['lib']
@@ -84,7 +85,7 @@ def collect_sequence_info(data):
             if lane not in D[case][lib][run]:
                 D[case][lib][run][lane] = []
             for j in i['files']:
-                D[case][lib][run][lane].append([j['path'], j['fid'].split('.')[1], read_count])
+                D[case][lib][run][lane].append([j['path'], j['fid'].split('.')[1], read_count, workflow])
             D[case][lib][run][lane].sort()
             assert len(D[case][lib][run][lane]) == 2
     return D
@@ -148,8 +149,8 @@ def add_lims_info_to_sequence_data(data):
     D = {}
     
     
-    # {case: {library: {run: lane: [[file_path, file_id, read_count]]}}}
-    # create dict {case: {library: group_id, 'ext_id': exit_id}}
+    # {case: {library: {run: lane: [[file_path, file_id, read_count, workflow]]}}}
+    # create dict {case: {sample: {library: group_id, 'ext_id': exit_id}}}
     
     for case in S:
         sample = case + '_' + L[case]['ext_id']   
@@ -160,22 +161,29 @@ def add_lims_info_to_sequence_data(data):
                      run = run_id + '_' + lane
                      files = []
                      file_id = []
+                     workflow = []
+                     read_count = []
+                     release_status = []
                      for file in S[case][library][run_id][lane]:
                          files.append(file[0])
                          file_id.append(file[1])
                          read_count = file[2]
+                         workflow = file[3]
                          release_status = R[file[0]][-1]
                          assert file[1] == R[file[0]][0]
                      assert len(files) == 2
                      assert len(file_id) == 2
                      
-                     if sample not in D:
-                         D[sample] = {}
-                     if lib not in D[sample]:
-                         D[sample][lib] = {}
                      
-                     assert run not in D[sample][lib]
-                     D[sample][lib][run] = {'files': files, 'file_id': file_id, 'release': release_status, 'read_count': read_count}
+                     if case not in D:
+                         D[case] = {}
+                     if sample not in D[case]:
+                         D[case][sample] = {}
+                     if lib not in D[case][sample]:
+                         D[case][sample][lib] = {}
+                     
+                     assert run not in D[case][sample][lib]
+                     D[case][sample][lib][run] = {'files': sorted(files), 'file_id': file_id, 'release': release_status, 'read_count': read_count, 'workflow': workflow}
                      
     return D            
             
@@ -205,8 +213,6 @@ def project(project_name):
     projects = extract_project_info()
     project = [i for i in projects if i['name'] == project_name][0]
     return render_template('project.html', project=project)
-
-
 
 @app.route('/<project_name>/sequencing')
 def sequencing(project_name):
