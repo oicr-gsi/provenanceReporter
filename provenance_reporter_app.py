@@ -456,15 +456,23 @@ def extract_workflow_info(project, fpr):
             if file_attributes:
                 file_attributes = file_attributes.split(';')
                 file_attributes = {k.split('=')[0]: k.split('=')[1] for k in file_attributes}
-                if 'read_count' in file_attributes and 'read_number' in file_attributes:
-                    read_count = file_attributes['read_count']
-                    read_number = file_attributes['read_number']
-                else:
-                    read_count, read_number = '', ''
-                    
-            #### check other workflows for information captured. read count and read number may not be needed in other workflows
+            else:
+                file_attributes = {}
             
-            D[project][workflow][sample][workflow_run]['libraries'] = [{'lane': lane, 'run': run, 'limskey': limskey, 'id': sample, 'lib': library}]
+            # get workflow info
+            info = i[37]
+            if info:
+                info = info.split(';')
+                info = {k.split('=')[0]: k.split('=')[1] for k in info if k.split('=')[0] not in ['cromwell-workflow-id', 'major_olive_version']}
+            else:
+                info = {}                
+                    
+            if 'libraries' not in D[project][workflow][sample][workflow_run]:
+                D[project][workflow][sample][workflow_run]['libraries'] = []
+            lib_info = {'lane': lane, 'run': run, 'limskey': limskey, 'id': sample, 'lib': library}
+            if lib_info not in D[project][workflow][sample][workflow_run]['libraries']:
+                D[project][workflow][sample][workflow_run]['libraries'].append(lib_info)
+                        
             if 'files' not in D[project][workflow][sample][workflow_run]:
                 D[project][workflow][sample][workflow_run]['files'] = []
             file_info = {'md5sum': md5sum, 'wfrunid': 'wf.' + workflow_run, 'path': file,
@@ -473,13 +481,15 @@ def extract_workflow_info(project, fpr):
                 D[project][workflow][sample][workflow_run]['files'].append(file_info)
                 
             D[project][workflow][sample][workflow_run]['wfrunid'] = 'wf.' + workflow_run    
-            
-            ####### what is wfinput_string
-            D[project][workflow][sample][workflow_run]['info'] = {'read_number': read_number,
-                                                                  'wfv': workflow_version,
-                                                                  'wf': workflow,
-                                                                  'read_count': read_count,
-                                                                  'wfinput_string': ''}
+
+            D[project][workflow][sample][workflow_run]['info'] = {}
+            for k in file_attributes:
+                D[project][workflow][sample][workflow_run]['info'][k] = file_attributes[k]
+            for k in info:
+                D[project][workflow][sample][workflow_run]['info'][k] = info[k]
+            D[project][workflow][sample][workflow_run]['info']['wfv'] = workflow_version
+            D[project][workflow][sample][workflow_run]['info']['wf'] = workflow
+                        
             # get information about children workflows
             children_workflows_info = []
             if workflow_run in children[project]:
@@ -495,7 +505,6 @@ def extract_workflow_info(project, fpr):
             D[project][workflow][sample][workflow_run]['parents'] = {'workflows': parent_workflows_info}
 
     return D            
-
 
 
 def extract_project_data(project, fpr, nabu_api='http://gsi-dcc.oicr.on.ca:3000', sample_provenance='http://pinery.gsi.oicr.on.ca/provenance/v9/sample-provenance'):
