@@ -277,17 +277,265 @@ def add_file_info_to_qc(qc_info, file_info):
         
 
 
-def extract_file_info(fpr):
+def extract_file_info(project, fpr, nabu_api = 'http://gsi-dcc.oicr.on.ca:3000'):
+    '''
+    (str, str, str) -> dict
+    
+    Returns a dictionary with QC and file information for all files in project
+    
+    Parameters
+    ----------
+    - project (str): name of project of interest
+    - fpr (str): Path to the File Provenance Reporter 
+    - nabu_api (str): URL of the Nabu api
+    '''
+    # extract file information from File Provenance Report
+    file_info = collect_file_info_from_fpr(project, fpr)    
+    # extract QC information from Nabu
+    qc_info = extract_qc_status_from_nabu(project, nabu_api)
+    # add file info to qc info
+    add_file_info_to_qc(qc_info, file_info)
+    
+    return qc_info
+
+
+def get_parent_workflows(project, fpr):
+    '''
+    (str, str) -> (dict, dict, dict)
+
+    Returns a tuple with dictionaries with worklow information, parent file ids for each workflow,
+    and workflow id for each file and project of interest
+    
+    Parameters
+    ----------
+    - project (str): Project name of interest
+    - fpr (str): Path to the File Provenance Report
+    '''
+
+    F, P, W = {}, {}, {}
+
+    records = get_FPR_records(project, fpr)
+    
+    for i in records:
+        # get project name
+        project = i[1]
+        # get workflow, workflow version and workflow run accession
+        workflow, workflow_version, workflow_run = i[30], i[31], i[36]
+        # get file path, md5sum and file id
+        file, md5sum, file_swid = i[46], i[47], i[44]
+        input_files = i[38]
+        if input_files:
+            input_files = sorted(input_files.split(';'))
+        else:
+            input_files = []
+        
+        if project not in P:
+            P[project] = {}
+        
+        if workflow_run in P[project]:
+            assert P[project][workflow_run] == input_files
+        else:
+            P[project][workflow_run] = input_files
+                
+        if project not in W:
+            W[project] = {}
+        if workflow_run in W[project]:
+            assert W[project][workflow_run] == {'wfrun_id': 'wf.' + workflow_run, 'wfv': workflow_version, 'wf': workflow}
+        else:
+            W[project][workflow_run] = {'wfrun_id': 'wf.' + workflow_run, 'wfv': workflow_version, 'wf': workflow}
+        
+        if project not in F:
+            F[project] = {}
+        if file_swid in F[project]:
+            assert F[project][file_swid] == workflow_run
+        else:
+            F[project][file_swid] = workflow_run
+
+    return W, P, F        
+        
+
+
+def identify_parent_children_workflows(W, P, F):
+    '''
+    (dict, dict, dict) -> (dict, dict)     
+    
+    Returns a tuple with dictionaries of parents: children workflows, and children: parents
+    workflows relationsips for a given project
+        
+    Parameters
+    ----------
+    - W (dict): Dictionary with workflow information for each workflow run id
+    - P (dict): Input file ids for each workflow run id
+    - F (dict): Map of file id and workflow id
     '''
     
+    parents, children = {}, {}
     
+    for project in P:
+        if project not in parents:
+            parents[project] = {}
+        for workflow in P[project]:
+            parent_workflows = sorted(list(set([F[project][i] for i in P[project][workflow]])))
+            parents[project][workflow] = parent_workflows
     
+    for project in parents:
+        if project not in children:
+            children[project] = {}
+        for workflow in parents[project]:
+            for parent_workflow in parents[project][workflow]:
+                if parent_workflow not in children[project]:
+                    children[project][parent_workflow] = [workflow]
+                else:
+                    children[project][parent_workflow].append(workflow)
+    
+    for project in children:
+        for workflow in children[project]:
+            children[project][workflow] = sorted(list(set(children[project][workflow])))
+    
+    return parents, children
+        
+
+
+
+def extract_workflow_info(project, fpr):
+    '''
+    (str, str) -> dict
+    
+    Returns a dictionary with information about all workflows in project
+    
+    Parameters
+    ----------
+    - project (str): Project name of interest
+    - fpr (str): Path to the File Provenance Report
+    '''
+
+
+    # get information about workflows, worklow input files and maps of file and workflows
+    W, P, F = get_parent_workflows(project, fpr)
+    # identify parents, children workflow relationships
+    parents, children = identify_parent_children_workflows(W, P, F)
+
+    D = {}
+
+    records = get_FPR_records(project, fpr)
+    
+    for i in records:
+        
+        #if i[30] == 'bcl2fastq':
+        if i[30]:
+            # get project name
+            project = i[1]
+            # get sample name
+            sample = i[7]
+            # get workflow and workflow version
+            workflow, workflow_version = i[30], i[31]
+            # get workflow run accession
+            workflow_run = i[36]
+        
+            if project not in D:
+                D[project] = {}
+            if workflow not in D[project]:
+                D[project][workflow] = {}
+            if sample not in D[project][workflow]:
+                D[project][workflow][sample] = {}
+            if workflow_run not in D[project][workflow][sample]:
+                D[project][workflow][sample][workflow_run] = {}
+            
+        
+            # get file path, md5sum and file id
+            file, md5sum, file_swid = i[46], i[47], i[44]
+            # get lane and run
+            run, lane = i[18], i[24]            
+            # get library and limskey
+            library, limskey  = i[13], i[56]
+            # get file attributes
+            file_attributes = i[45]
+            if file_attributes:
+                file_attributes = file_attributes.split(';')
+                file_attributes = {k.split('=')[0]: k.split('=')[1] for k in file_attributes}
+                if 'read_count' in file_attributes and 'read_number' in file_attributes:
+                    read_count = file_attributes['read_count']
+                    read_number = file_attributes['read_number']
+                else:
+                    read_count, read_number = '', ''
+                    
+            #### check other workflows for information captured. read count and read number may not be needed in other workflows
+            
+            D[project][workflow][sample][workflow_run]['libraries'] = [{'lane': lane, 'run': run, 'limskey': limskey, 'id': sample, 'lib': library}]
+            if 'files' not in D[project][workflow][sample][workflow_run]:
+                D[project][workflow][sample][workflow_run]['files'] = []
+            file_info = {'md5sum': md5sum, 'wfrunid': 'wf.' + workflow_run, 'path': file,
+             'fid': 'f.' + file_swid, 'wfv': workflow_version, 'wf': workflow}
+            if file_info not in D[project][workflow][sample][workflow_run]['files']:
+                D[project][workflow][sample][workflow_run]['files'].append(file_info)
+                
+            D[project][workflow][sample][workflow_run]['wfrunid'] = 'wf.' + workflow_run    
+            
+            ####### what is wfinput_string
+            D[project][workflow][sample][workflow_run]['info'] = {'read_number': read_number,
+                                                                  'wfv': workflow_version,
+                                                                  'wf': workflow,
+                                                                  'read_count': read_count,
+                                                                  'wfinput_string': ''}
+            # get information about children workflows
+            children_workflows_info = []
+            if workflow_run in children[project]:
+                for k in children[project][workflow_run]:
+                    children_workflows_info.append(W[project][k])
+            D[project][workflow][sample][workflow_run]['children'] = {'workflows': children_workflows_info}
+            
+            # get information about parent workflows
+            parent_workflows_info = []
+            if workflow_run in parents[project]:
+                for k in parents[project][workflow_run]:
+                    parent_workflows_info.append(W[project][k])
+            D[project][workflow][sample][workflow_run]['parents'] = {'workflows': parent_workflows_info}
+
+    return D            
+
+
+def extract_projects(fpr):
+    '''
+    (str) -> list
+
+    Returns a list of projects present in File Provenance Report
+
+    Parameters
+    ----------
+    - fpr (str): Path to the File Provenance Report    
     '''
     
-    pass    
+    infile = open_fpr(fpr)
+    projects = set()
+    for line in infile:
+        projects.add(line.rstrip().split('\t')[1])
+    infile.close()
+    projects = sorted(list(projects))
+    return projects
 
 
 
+def validate_projects(pinery_projects, fpr_projects):
+    '''
+    (list, list) -> list
+    
+    Returns a list of projects present both in File Provenance Report and in Pinery
+    
+    Parameters
+    ----------
+    - pinery_projects (list): List of projects defined in Pinery
+    - fpr_projects (list): List of projects recorded in File Provenance Report
+    '''
+
+    valid_projects = set(pinery_projects).intersection(set(fpr_projects))
+    valid_projects = sorted(list(valid_projects))
+    return valid_projects
+
+    
+
+
+
+####################################
 
 def extract_project_info(project_provenance = 'http://pinery.gsi.oicr.on.ca/sample/projects'):
     '''
@@ -350,7 +598,10 @@ def collect_sequence_info(data):
             lib = i['libraries'][0]['lib']
             run = i['libraries'][0]['run']
             lane = i['libraries'][0]['lane']
-            read_count = i['info']['read_count']
+            if 'read_count' in i['info']:
+                read_count = i['info']['read_count']
+            else:
+                read_count = ''
             assert len(i['files']) == 2
             if case not in D:
                 D[case] = {}
@@ -464,14 +715,14 @@ def add_lims_info_to_sequence_data(data):
     return D            
             
 
-# infile = open('TGL01MOH.json')
-# data = json.load(infile)
-# infile.close()
+infile = open('TGL01MOH.json')
+data = json.load(infile)
+infile.close()
 
-# S = collect_sequence_info(data)
-# L = collect_lims_info(data)
-# R = collect_release_status(data)
-# D = add_lims_info_to_sequence_data(data)
+S = collect_sequence_info(data)
+L = collect_lims_info(data)
+R = collect_release_status(data)
+D = add_lims_info_to_sequence_data(data)
 
 
 
