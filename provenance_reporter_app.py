@@ -138,7 +138,7 @@ def extract_qc_status_from_nabu(project, nabu_api = 'http://gsi-dcc.oicr.on.ca:3
     else:
         L = []
     
-    D = {}
+    D = {project: {}}
     
     if L:
         for i in L:
@@ -148,8 +148,8 @@ def extract_qc_status_from_nabu(project, nabu_api = 'http://gsi-dcc.oicr.on.ca:3
             d['qc'] = qc
             d['fid'] = 'f.' + str(i['fileswid'])
             d['filepath'] = filepath
-            assert filepath not in D
-            D[filepath] = d 
+            assert filepath not in D[project]
+            D[project][filepath] = d 
     
     return D
 
@@ -235,7 +235,7 @@ def collect_file_info_from_fpr(project, fpr):
 
     records = get_FPR_records(project, fpr)
     
-    D = {}
+    D = {project: {}}
     
     
     for i in records:
@@ -252,7 +252,7 @@ def collect_file_info_from_fpr(project, fpr):
         # get workflow run accession
         workflow_run = i[36]
         # collect file info
-        D[file] = {'md5sum': md5sum, 'fid': file_swid, 'wf': workflow, 'wfv': version,
+        D[project][file] = {'md5sum': md5sum, 'fid': file_swid, 'wf': workflow, 'wfv': version,
                    'wfrunid': workflow_run, 'file': file}
 
     return D
@@ -270,10 +270,13 @@ def add_file_info_to_qc(qc_info, file_info):
     - file_info (dict): Dictionary with file info generated collect_file_info_from_fpr
     '''
 
-    for file in file_info:
-        assert file in qc_info
-        for i in ['md5sum', 'wfrunid', 'wfv', 'wf']:
-            qc_info[file][i] = file_info[file][i]
+    for project in file_info:
+        for file in file_info[project]:
+            if file not in qc_info[project]:
+                print(file)
+            assert file in qc_info[project]
+            for i in ['md5sum', 'wfrunid', 'wfv', 'wf']:
+                qc_info[project][file][i] = file_info[project][file][i]
         
 
 
@@ -492,6 +495,42 @@ def extract_workflow_info(project, fpr):
             D[project][workflow][sample][workflow_run]['parents'] = {'workflows': parent_workflows_info}
 
     return D            
+
+
+
+def extract_project_data(project, fpr, nabu_api='http://gsi-dcc.oicr.on.ca:3000', sample_provenance='http://pinery.gsi.oicr.on.ca/provenance/v9/sample-provenance'):
+    '''
+    (str, str, str, str) -> dict
+
+    Returns a dictionary with workflow, file and sample information for a given project    
+        
+    Parameters
+    ----------
+    - project (str): Name of project of interest
+    - fpr (str): Path to the File Provenance Report
+    - nabu_api (str): URL address of the Nabu API
+    - sample_provenance (str): URL address of the Pinery sample provenance API
+    '''
+
+    # extract information about workflows
+    workflow_info = extract_workflow_info(project, fpr)
+    # extract qc and file information
+    file_info = extract_file_info(project, fpr, nabu_api)
+    # extract sample info
+    lims = extract_lims(sample_provenance)
+
+    data ={project: {'workflows': [], 'files': [], 'lims': []}}
+
+    for workflow in workflow_info[project]:
+        data[project]['workflows'].append({workflow: workflow_info[project][workflow]})
+            
+    for file in file_info[project]:
+        data[project]['files'].append(file_info[project][file])
+    
+    for sample in lims[project]:
+        data[project]['lims'].append({'id': sample, 'libraries': lims[project][sample]})
+    
+    return data
 
 
 def extract_projects(fpr):
