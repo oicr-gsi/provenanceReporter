@@ -125,17 +125,25 @@ img {
 
 
 
-.project_info {
+.project_info_table {
   font-family: Arial, Helvetica, sans-serif;
   color: black;
   text-align: left;
   padding-left: 16px;
+  padding-right: 16px;
   font-size: 20px;
   margin-left: 100px;
   margin-right: 100px;
   background-color: #ffffe6;
   border: 1.5px #D8D8D8 solid;
 }
-
+.project_info_table th {
+  color:#A8A8A8;
+  font-weight:normal;
+  padding-right: 20px;
+}
+.project_info_table th, td {
+  padding-bottom:16px;
+}
 
 
