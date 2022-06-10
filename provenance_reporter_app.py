@@ -245,6 +245,9 @@ def collect_file_info_from_fpr(project, fpr):
         md5sum = i[47]
         # get file_swid
         file_swid = i[44]
+        
+        d = collect_info({k.split('=')[0]:k.split('=')[1] for k in i[17].split(';')},
+                         ['geo_library_source_template_type'], ['library_type'])
         # get workflow
         workflow = i[30]
         # get workflow version
@@ -253,7 +256,7 @@ def collect_file_info_from_fpr(project, fpr):
         workflow_run = i[36]
         # collect file info
         D[project][file] = {'md5sum': md5sum, 'fid': file_swid, 'wf': workflow, 'wfv': version,
-                   'wfrunid': workflow_run, 'file': file}
+                   'wfrunid': workflow_run, 'file': file, 'library_type': d['library_type']}
 
     return D
 
@@ -277,7 +280,7 @@ def add_file_info_to_qc(qc_info, file_info):
                 qc_info[project][file] = {'qc': {'skip': '', 'user': '', 'date': '',
                                           'status': '', 'ref': '', 'fresh': ''},
                                           'fid': '', 'filepath': file}
-            for i in ['md5sum', 'wfrunid', 'wfv', 'wf']:
+            for i in ['md5sum', 'wfrunid', 'wfv', 'wf', 'library_type']:
                 qc_info[project][file][i] = file_info[project][file][i]
             
 
@@ -463,10 +466,14 @@ def extract_workflow_info(project, fpr):
                 info = {k.split('=')[0]: k.split('=')[1] for k in info if k.split('=')[0] not in ['cromwell-workflow-id', 'major_olive_version']}
             else:
                 info = {}                
+        
+            # get library type
+            d = collect_info({k.split('=')[0]:k.split('=')[1] for k in i[17].split(';')},
+                             ['geo_library_source_template_type'], ['library_type'])
                     
             if 'libraries' not in D[project][workflow][sample][workflow_run]:
                 D[project][workflow][sample][workflow_run]['libraries'] = []
-            lib_info = {'lane': lane, 'run': run, 'limskey': limskey, 'id': sample, 'lib': library}
+            lib_info = {'lane': lane, 'run': run, 'limskey': limskey, 'id': sample, 'lib': library, 'library_type': d['library_type']}
             if lib_info not in D[project][workflow][sample][workflow_run]['libraries']:
                 D[project][workflow][sample][workflow_run]['libraries'].append(lib_info)
                         
