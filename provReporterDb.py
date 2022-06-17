@@ -112,7 +112,7 @@ def extract_qc_status_from_nabu(project, database, file_table = 'Files', nabu_ap
     # QC may not be available for all files
     # retrieve file swids from database instead of prasing again fpr
     # add empty values to qc fields if qc not available
-    conn = sqlite3.connection(database)
+    conn = sqlite3.connect(database)
     cur = conn.cursor()
     cur.execute('SELECT {0}.file_swid FROM {0} WHERE {0}.project_id = \"{1}\"'.format(file_table, project))
     records = cur.fetchall()
@@ -610,7 +610,7 @@ def initiate_db(database):
     '''
     
     # check if table exists
-    conn = sqlite3.connection(database)
+    conn = sqlite3.connect(database)
     cur = conn.cursor()
     cur.execute('SHOW TABLES')
     tables = [i[0] for i in cur]
@@ -634,7 +634,7 @@ def add_project_info_to_db(database, table = 'Projects', project_provenance = 'h
     '''
 
     # connect to db
-    conn = sqlite3.connection(database)
+    conn = sqlite3.connect(database)
     cur = conn.cursor()
             
     # get project info
@@ -682,7 +682,7 @@ def add_workflows(workflows, database, table = 'Workflows'):
     '''
        
     # connect to db
-    conn = sqlite3.connection(database)
+    conn = sqlite3.connect(database)
     cur = conn.cursor()
     
     #get existing records
@@ -729,7 +729,7 @@ def add_workflows(workflows, database, table = 'Workflows'):
 #     '''
     
 #     # connect to db
-#     conn = sqlite3.connection(database)
+#     conn = sqlite3.connect(database)
 #     cur = conn.cursor()
     
 #     #get existing records
@@ -775,7 +775,7 @@ def add_workflow_relationships(D, database, table):
     '''
     
     # connect to db
-    conn = sqlite3.connection(database)
+    conn = sqlite3.connect(database)
     cur = conn.cursor()
     
     #get existing records
@@ -874,7 +874,7 @@ def add_file_info_to_db(database, table, fpr, file_table = 'Files', project_prov
         D = collect_file_info_from_fpr(fpr)
        
     # connect to db
-    conn = sqlite3.connection(database)
+    conn = sqlite3.connect(database)
     cur = conn.cursor()
         
     # get existing records
@@ -930,7 +930,7 @@ def add_library_info_to_db(database, table = 'Libraries', sample_provenance='htt
     lims = collect_lims_info(sample_provenance)
     
     # connect to db
-    conn = sqlite3.connection(database)
+    conn = sqlite3.connect(database)
     cur = conn.cursor()
        
     # get existing records
@@ -991,7 +991,7 @@ def add_workflow_inputs_to_db(database, fpr, table = 'Workflow_Inputs'):
     libraries = extract_workflow_info(fpr)
         
     # connect to db
-    conn = sqlite3.connection(database)
+    conn = sqlite3.connect(database)
     cur = conn.cursor()
        
     # get existing records
