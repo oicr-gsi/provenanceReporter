@@ -1037,7 +1037,7 @@ def add_workflow_inputs_to_db(database, fpr, table = 'Workflow_Inputs'):
 if __name__ == '__main__':
 
     # create top-level parser
-    parser = argparse.ArgumentParser(prog = 'ProvReporterDb.py', description='Script to add data from FPR, Nabu and Pinery to Provenance Reporter Db')
+    parser = argparse.ArgumentParser(prog = 'provReporterDb.py', description='Script to add data from FPR, Nabu and Pinery to Provenance Reporter Db')
     parser.add_argument('-f', '--fpr', dest='fpr', default = '/.mounts/labs/seqprodbio/private/backups/seqware_files_report_latest.tsv.gz', help='Path to the File Provenance Report. Default is /.mounts/labs/seqprodbio/private/backups/seqware_files_report_latest.tsv.gz')
     parser.add_argument('-n', '--nabu', dest='nabu', default='http://gsi-dcc.oicr.on.ca:3000', help='URL of the Nabu API. Default is http://gsi-dcc.oicr.on.ca:3000')
     parser.add_argument('-sp', '--sample_provenance', dest='sample_provenance', default = 'http://pinery.gsi.oicr.on.ca/provenance/v9/sample-provenance', help = 'URL of the Sample Provenance in Pinery. Default is http://pinery.gsi.oicr.on.ca/provenance/v9/sample-provenance')
