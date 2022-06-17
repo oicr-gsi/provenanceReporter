@@ -280,7 +280,7 @@ def add_file_info_to_qc(qc_info, file_info):
                 qc_info[project][file] = {'qc': {'skip': '', 'user': '', 'date': '',
                                           'status': '', 'ref': '', 'fresh': ''},
                                           'fid': '', 'filepath': file}
-            for i in ['md5sum', 'wfrunid', 'wfv', 'wf', 'library_type']:
+            for i in file_info[project][file]:
                 qc_info[project][file][i] = file_info[project][file][i]
             
 
