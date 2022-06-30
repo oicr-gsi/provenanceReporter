@@ -38,7 +38,7 @@ def extract_project_info(project_provenance = 'http://pinery.gsi.oicr.on.ca/samp
         for i in L:
             name = i['name']
             assert name not in D
-            D[name] = {'name': name}
+            D[name] = {'project_id': name}
             for j in ['pipeline', 'description', 'active', 'contact_name', 'contact_email']:
                 if j in i:
                     D[name][j] = i[j] 
@@ -116,6 +116,9 @@ def extract_qc_status_from_nabu(project, database, file_table = 'Files', nabu_ap
     cur = conn.cursor()
     cur.execute('SELECT {0}.file_swid FROM {0} WHERE {0}.project_id = \"{1}\"'.format(file_table, project))
     records = cur.fetchall()
+    
+    print('extract_qc_status', records[0])
+    
     conn.close()
     
     for project in D:
@@ -514,7 +517,7 @@ def define_column_types():
                     'Parents': ['INTEGER', 'INTEGER', 'VARCHAR(128)'],
                     'Children': ['INTEGER', 'INTEGER', 'VARCHAR(128)'],
                     'Projects': ['VARCHAR(128) PRIMARY KEY NOT NULL UNIQUE', 'VARCHAR(128)',
-                                 'TEXT', 'VARCHAR(128)', 'VARCHAR(256)', 'VARCHAR(256)'],
+                                  'TEXT', 'VARCHAR(128)', 'VARCHAR(256)', 'VARCHAR(256)'],
                     'Files': ['INTEGER PRIMARY KEY NOT NULL UNIQUE', 'VARCHAR(128)',
                               'VARCHAR(256)', 'VARCHAR(128)', 'VARCHAR(128)',
                               'INTEGER', 'TEXT', 'VARCHAR(128)', 'TEXT'],
@@ -551,38 +554,42 @@ def create_table(database, table):
     # define table format including constraints    
     table_format = ', '.join(list(map(lambda x: ' '.join(x), list(zip(column_names, column_types)))))
 
+
     if table  in ['Workflows', 'Parents', 'Children', 'Files', 'FilesQC', 'Libraries', 'Workflow_Inputs']:
-        constraints = '''CONSTRAINT FOREIGN KEY (project_id)
-           REFERENCES Projects (project_id)
-           ON DELETE CASCADE ON UPDATE CASCADE'''
+        constraints = '''FOREIGN KEY (project_id)
+            REFERENCES Projects (project_id)
+            ON DELETE CASCADE ON UPDATE CASCADE'''
         table_format = table_format + ', ' + constraints 
+    
     if table in ['Parents', 'Children']:
-       constraints = '''CONSTRAINT FOREIGN KEY (parents_id)
+        constraints = '''FOREIGN KEY (parents_id)
           REFERENCES Workflows (wfrun_id)
-          ON DELETE CASCADE ON UPDATE CASCADE
-          CONSTRAINT FOREIGN KEY (children_id)
-             REFERENCES Workflows (wfrun_id)
-             ON DELETE CASCADE ON UPDATE CASCADE''' 
-       table_format = table_format + ', ' + constraints
+          ON DELETE CASCADE ON UPDATE CASCADE,
+          FOREIGN KEY (children_id)
+              REFERENCES Workflows (wfrun_id)
+              ON DELETE CASCADE ON UPDATE CASCADE''' 
+        table_format = table_format + ', ' + constraints
+    
     if table == 'Parents':
         table_format = table_format + ', PRIMARY KEY (children_id, parents_id)'
+    
     if table == 'Children':
         table_format = table_format + ', PRIMARY KEY (parents_id, children_id)'
     
     if table == 'Files':
-        constraints = '''CONSTRAINT FOREIGN KEY (wfrun_id)
-           REFERENCES Workflows (wfrun_id)
-           ON DELETE CASCADE ON UPDATE CASCADE
-           CONSTRAINT PRIMARY KEY (file_swid)
-              REFERENCES FilesQC (file_swid)
-              ON DELETE CASCADE ON UPDATE CASCADE'''
+        constraints = '''FOREIGN KEY (wfrun_id)
+            REFERENCES Workflows (wfrun_id)
+            ON DELETE CASCADE ON UPDATE CASCADE,
+            FOREIGN KEY (file_swid)
+               REFERENCES FilesQC (file_swid)
+               ON DELETE CASCADE ON UPDATE CASCADE'''
         table_format = table_format + ', ' + constraints
     
     if table == 'Workflow_Inputs':
-        constraints = '''CONSTRAINT FOREIGN KEY (wfrun_id)
-           REFERENCES Workflows (wfrun_id)
-           ON DELETE CASCADE ON UPDATE CASCADE
-           CONSTRAINT PRIMARY KEY (library)
+        constraints = '''FOREIGN KEY (wfrun_id)
+            REFERENCES Workflows (wfrun_id)
+            ON DELETE CASCADE ON UPDATE CASCADE,
+            FOREIGN KEY (library)
               REFERENCES Libraries (library)
               ON DELETE CASCADE ON UPDATE CASCADE'''
         table_format = table_format + ', ' + constraints
@@ -593,9 +600,11 @@ def create_table(database, table):
     #cur.execute('DROP TABLE IF EXISTS {0};'.format(table))
     #conn.commit()
     # create table
-    cur.execute('CREATE TABLE {0} ({1})'.format(table, table_format))
+    cmd = 'CREATE TABLE {0} ({1})'.format(table, table_format)
+    cur.execute(cmd)
     conn.commit()
     conn.close()
+
 
 
 def initiate_db(database):
@@ -612,8 +621,9 @@ def initiate_db(database):
     # check if table exists
     conn = sqlite3.connect(database)
     cur = conn.cursor()
-    cur.execute('SHOW TABLES')
-    tables = [i[0] for i in cur]
+    cur.execute("SELECT name FROM sqlite_master WHERE type='table';")
+    tables = cur.fetchall()
+    tables = [i[0] for i in tables]    
     conn.close()
     for i in ['Projects', 'Workflows', 'Parents', 'Children', 'Files', 'FilesQC', 'Libraries', 'Workflow_Inputs']:
         if i not in tables:
@@ -641,22 +651,25 @@ def add_project_info_to_db(database, table = 'Projects', project_provenance = 'h
     projects = extract_project_info(project_provenance)
     
     # get existing records
-    cur.execute('SELECT {0}.project FROM {0}'.format(table))
+    cur.execute('SELECT {0}.project_id FROM {0}'.format(table))
     records = cur.fetchall()
+    records = [i[0] for i in records]
 
     # get column names
     column_names = define_column_names()[table]
 
     # add or update data
     for project in projects:
+        # order values according to column names
+        vals = [projects[project][i] for i in column_names]
         if project in records:
             # update project info
             for i in projects[project]:
-                cur.execute('UPDATE {0} SET {0}.{1} = \"{2}\" WHERE {0}.project=\"{3}\"'.format(table, i, projects[project][i], project))  
+                cur.execute('UPDATE {0} SET {1} = \"{2}\" WHERE project_id=\"{3}\"'.format(table, i, projects[project][i], project))  
                 conn.commit()
         else:
             # insert project info
-            cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(projects[project])))
+            cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(vals)))
             conn.commit()
     # remove any projects in database not anymore defined in pinery    
     for project in records:
@@ -688,6 +701,10 @@ def add_workflows(workflows, database, table = 'Workflows'):
     #get existing records
     cur.execute('SELECT {0}.wfrun_id, {0}.project_id FROM {0}'.format(table))
     records = cur.fetchall()
+    
+    print('add_workflows', table, records[0])
+    
+    
     # get column names
     column_names = define_column_names()[table]
     for project in workflows:
@@ -784,6 +801,10 @@ def add_workflow_relationships(D, database, table):
     elif table == 'Children':
         cur.execute('SELECT {0}.parents_id, {0}.children_id, {0}.project_id FROM {0}'.format(table))
     records = cur.fetchall()
+    
+    print('add_workflow_rels', table, records[0])
+    
+    
     # get column names
     column_names = define_column_names()[table]
     for project in D:
@@ -881,6 +902,9 @@ def add_file_info_to_db(database, table, fpr, file_table = 'Files', project_prov
     cur.execute('SELECT {0}.file_swid FROM {0}'.format(table))
     records = cur.fetchall()
 
+    print('add_file_info', table, records[0])
+
+
     # get column names
     column_names = define_column_names()[table]
 
@@ -936,6 +960,8 @@ def add_library_info_to_db(database, table = 'Libraries', sample_provenance='htt
     # get existing records
     cur.execute('SELECT {0}.library FROM {0}'.format(table))
     records = cur.fetchall()
+
+    print('add_library_info', table, records[0])
 
     # get column names
     column_names = define_column_names()[table]
@@ -998,6 +1024,9 @@ def add_workflow_inputs_to_db(database, fpr, table = 'Workflow_Inputs'):
     cur.execute('SELECT {0}.library, {0}.run, {0}.lane FROM {0}'.format(table))
     records = cur.fetchall()
 
+    print('add_wkf_input', table, records[0])
+
+
     # get column names
     column_names = define_column_names()[table]
 
@@ -1051,8 +1080,8 @@ if __name__ == '__main__':
     initiate_db(args.database)
     # add or update information in tables
     add_project_info_to_db(args.database, 'Projects', args.project_provenance)
-    add_workflows_info_to_db(args.fpr, args.database, 'Workflows', 'Parents', 'Children')
-    add_file_info_to_db(args.database, 'FilesQC', args.fpr, 'Files', args.project_provenance, args.nabu)
-    add_file_info_to_db(args.database, 'Files', args.fpr, 'Files', args.project_provenance, args.nabu)
-    add_library_info_to_db(args.database, 'Libraries', args.sample_provenance)
-    add_workflow_inputs_to_db(args.database, args.fpr, 'Workflow_Inputs')
+    # add_workflows_info_to_db(args.fpr, args.database, 'Workflows', 'Parents', 'Children')
+    # add_file_info_to_db(args.database, 'FilesQC', args.fpr, 'Files', args.project_provenance, args.nabu)
+    # add_file_info_to_db(args.database, 'Files', args.fpr, 'Files', args.project_provenance, args.nabu)
+    # add_library_info_to_db(args.database, 'Libraries', args.sample_provenance)
+    # add_workflow_inputs_to_db(args.database, args.fpr, 'Workflow_Inputs')
