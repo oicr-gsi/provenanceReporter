@@ -12,6 +12,7 @@ import requests
 import gzip
 import os
 import argparse
+import time
 
 
 def extract_project_info(project_provenance = 'http://pinery.gsi.oicr.on.ca/sample/projects'):
@@ -266,8 +267,14 @@ def get_workflow_relationships(fpr):
     F, P, W = {}, {}, {}
 
 
+    start = time.time()
+    
+
     # open fpr
     infile = open_fpr(fpr)
+    # skip header
+    infile.readline()
+    
     
     for line in infile:
         line = line.rstrip()
@@ -316,6 +323,12 @@ def get_workflow_relationships(fpr):
                 F[project][file_swid] = workflow_run
     
     infile.close()
+    
+    
+    end = time.time()
+    print('parsing workflow relationships', end - start)
+
+    
     return W, P, F        
 
 
@@ -1080,7 +1093,7 @@ if __name__ == '__main__':
     initiate_db(args.database)
     # add or update information in tables
     add_project_info_to_db(args.database, 'Projects', args.project_provenance)
-    # add_workflows_info_to_db(args.fpr, args.database, 'Workflows', 'Parents', 'Children')
+    add_workflows_info_to_db(args.fpr, args.database, 'Workflows', 'Parents', 'Children')
     # add_file_info_to_db(args.database, 'FilesQC', args.fpr, 'Files', args.project_provenance, args.nabu)
     # add_file_info_to_db(args.database, 'Files', args.fpr, 'Files', args.project_provenance, args.nabu)
     # add_library_info_to_db(args.database, 'Libraries', args.sample_provenance)
