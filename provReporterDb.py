@@ -311,9 +311,9 @@ def get_workflow_relationships(fpr):
             if project not in W:
                 W[project] = {}
             if workflow_run in W[project]:
-                assert W[project][workflow_run] == {'wfrun_id': 'wf.' + workflow_run, 'wfv': workflow_version, 'wf': workflow, 'attributes': attributes}
+                assert W[project][workflow_run] == {'wfrun_id': workflow_run, 'wfv': workflow_version, 'wf': workflow, 'attributes': attributes}
             else:
-                W[project][workflow_run] = {'wfrun_id': 'wf.' + workflow_run, 'wfv': workflow_version, 'wf': workflow, 'attributes': attributes}
+                W[project][workflow_run] = {'wfrun_id': workflow_run, 'wfv': workflow_version, 'wf': workflow, 'attributes': attributes}
         
             if project not in F:
                 F[project] = {}
@@ -346,6 +346,9 @@ def identify_parent_children_workflows(P, F):
     - F (dict): Map of file id and workflow id
     '''
     
+    start = time.time()
+    
+    
     # parents record parent-child workflow relationships
     # children record child-parent workflow relationships
     parents, children = {}, {}
@@ -370,6 +373,10 @@ def identify_parent_children_workflows(P, F):
     for project in parents:
         for workflow in parents[project]:
             parents[project][workflow] = sorted(list(set(parents[project][workflow])))
+    
+    end = time.time()
+    
+    print('identify parent_children', end - start)
     
     return parents, children
 
@@ -525,8 +532,7 @@ def define_column_types():
     '''
 
     # create dict to store column names for each table {table: [column names]}
-    column_types = {'Workflows': ['INTEGER PRIMARY KEY NOT NULL UNIQUE', 'VARCHAR(128)',
-                                  'VARCHAR(128)', 'VARCHAR(128)', 'TEXT'],
+    column_types = {'Workflows': ['INTEGER', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'TEXT'],
                     'Parents': ['INTEGER', 'INTEGER', 'VARCHAR(128)'],
                     'Children': ['INTEGER', 'INTEGER', 'VARCHAR(128)'],
                     'Projects': ['VARCHAR(128) PRIMARY KEY NOT NULL UNIQUE', 'VARCHAR(128)',
@@ -589,6 +595,9 @@ def create_table(database, table):
     if table == 'Children':
         table_format = table_format + ', PRIMARY KEY (parents_id, children_id)'
     
+    if table == 'Worklows':
+        table_format = table_format + ', PRIMARY KEY (wfrun_id, project_id)'
+        
     if table == 'Files':
         constraints = '''FOREIGN KEY (wfrun_id)
             REFERENCES Workflows (wfrun_id)
@@ -715,8 +724,10 @@ def add_workflows(workflows, database, table = 'Workflows'):
     cur.execute('SELECT {0}.wfrun_id, {0}.project_id FROM {0}'.format(table))
     records = cur.fetchall()
     
-    print('add_workflows', table, records[0])
-    
+    if records:
+        print('add_workflows', table, records[0])
+    else:
+        print('add_workflows', table, records)
     
     # get column names
     column_names = define_column_names()[table]
@@ -867,6 +878,7 @@ def add_workflows_info_to_db(fpr, database, workflow_table = 'Workflows', parent
 
     # get the workflow inputs and workflow info
     workflows, parents, files = get_workflow_relationships(fpr)
+    
     # identify parent-children workflow relationships
     parent_workflows, children_workflows = identify_parent_children_workflows(parents, files)
 
@@ -1093,7 +1105,11 @@ if __name__ == '__main__':
     initiate_db(args.database)
     # add or update information in tables
     add_project_info_to_db(args.database, 'Projects', args.project_provenance)
+    print('added data into Projects')
+    start = time.time()
     add_workflows_info_to_db(args.fpr, args.database, 'Workflows', 'Parents', 'Children')
+    end = time.time()
+    print('added data into Workflows', end - start)
     # add_file_info_to_db(args.database, 'FilesQC', args.fpr, 'Files', args.project_provenance, args.nabu)
     # add_file_info_to_db(args.database, 'Files', args.fpr, 'Files', args.project_provenance, args.nabu)
     # add_library_info_to_db(args.database, 'Libraries', args.sample_provenance)
