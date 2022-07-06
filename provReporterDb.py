@@ -696,7 +696,7 @@ def add_project_info_to_db(database, table = 'Projects', project_provenance = 'h
     # remove any projects in database not anymore defined in pinery    
     for project in records:
         if project not in projects:
-            cur.execute('DELETE FROM {0} WHERE {0}.project_id=\"{1}\"'.format(table, projects))
+            cur.execute('DELETE FROM {0} WHERE project_id=\"{1}\"'.format(table, projects))
             conn.commit()
     conn.close()
 
@@ -732,7 +732,7 @@ def add_workflows(workflows, database, table = 'Workflows'):
             if (workflow_run, project) in records:
                 # update workflows info
                 for i in column_names:
-                    cur.execute('UPDATE {0} SET {0}.{1} = \"{2}\" WHERE {0}.wfrun_id = \"{3}\" AND {0}.project_id = "\{4}\"'.format(table, i, workflows[project][i], workflow_run, project))
+                    cur.execute('UPDATE {0} SET {1} = \"{2}\" WHERE wfrun_id = \"{3}\" AND project_id = "\{4}\"'.format(table, i, workflows[project][i], workflow_run, project))
                     conn.commit()
             else:
                 # insert data into table
@@ -747,7 +747,7 @@ def add_workflows(workflows, database, table = 'Workflows'):
             cur.execute('DELETE FROM {0} WHERE {0}.project_id=\"{1}\"'.format(table, project))
             conn.commit()
         elif workflow_run not in workflows[project]:
-            cur.execute('DELETE FROM {0} WHERE {0}.wfrun_id = \"{1}\" AND {0}.project_id=\"{2}\"'.format(table, workflow_run, project))
+            cur.execute('DELETE FROM {0} WHERE wfrun_id = \"{1}\" AND project_id=\"{2}\"'.format(table, workflow_run, project))
             conn.commit()
     conn.close()
 
