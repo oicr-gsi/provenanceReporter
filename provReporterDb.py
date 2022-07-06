@@ -724,13 +724,9 @@ def add_workflows(workflows, database, table = 'Workflows'):
     cur.execute('SELECT {0}.wfrun_id, {0}.project_id FROM {0}'.format(table))
     records = cur.fetchall()
     
-    if records:
-        print('add_workflows', table, records[0])
-    else:
-        print('add_workflows', table, records)
-    
     # get column names
     column_names = define_column_names()[table]
+    
     for project in workflows:
         for workflow_run in workflows[project]:
             if (workflow_run, project) in records:
@@ -741,7 +737,7 @@ def add_workflows(workflows, database, table = 'Workflows'):
             else:
                 # insert data into table
                 values = [workflows[project][workflow_run][i] for i in column_names if i in workflows[project][workflow_run]]
-                values.append(project)
+                values.insert(-1, project)
                 cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(values)))
                 conn.commit()
         
@@ -884,11 +880,16 @@ def add_workflows_info_to_db(fpr, database, workflow_table = 'Workflows', parent
 
     # add workflow info
     add_workflows(workflows, database, workflow_table)
+    print('added workflows')
+    
+    
     # add parents-children workflow relationships
     add_workflow_relationships(parent_workflows, database, parent_table)    
+    print('added parents')
+    
     # add children-parents workflow relationships    
     add_workflow_relationships(children_workflows, database, children_table)    
-    
+    print('added children')
    
     
     
