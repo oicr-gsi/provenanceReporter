@@ -590,10 +590,10 @@ def create_table(database, table):
         table_format = table_format + ', ' + constraints
     
     if table == 'Parents':
-        table_format = table_format + ', PRIMARY KEY (children_id, parents_id)'
+        table_format = table_format + ', PRIMARY KEY (children_id, parents_id, project_id)'
     
     if table == 'Children':
-        table_format = table_format + ', PRIMARY KEY (parents_id, children_id)'
+        table_format = table_format + ', PRIMARY KEY (parents_id, children_id, project_id)'
     
     if table == 'Worklows':
         table_format = table_format + ', PRIMARY KEY (wfrun_id, project_id)'
@@ -671,6 +671,18 @@ def add_project_info_to_db(database, table = 'Projects', project_provenance = 'h
             
     # get project info
     projects = extract_project_info(project_provenance)
+    
+    to_remove = []
+    for i in projects:
+        if i not in ['HCCCFD', 'TGL01MOH', 'KLCS', 'BARON', 'SIMONE', 'HLCS', 'ARCH1']:
+            to_remove.append(i)
+    for i in to_remove:
+        del projects[i]
+    
+    
+    
+    
+    
     
     # get existing records
     cur.execute('SELECT {0}.project_id FROM {0}'.format(table))
@@ -822,11 +834,9 @@ def add_workflow_relationships(D, database, table):
         cur.execute('SELECT {0}.parents_id, {0}.children_id, {0}.project_id FROM {0}'.format(table))
     records = cur.fetchall()
     
-    print('add_workflow_rels', table, records[0])
-    
-    
     # get column names
     column_names = define_column_names()[table]
+    
     for project in D:
         for i in D[project]:
             for j in D[project][i]:
@@ -874,6 +884,16 @@ def add_workflows_info_to_db(fpr, database, workflow_table = 'Workflows', parent
 
     # get the workflow inputs and workflow info
     workflows, parents, files = get_workflow_relationships(fpr)
+    
+    to_remove = []
+    for i in workflows:
+        if i not in ['HCCCFD', 'TGL01MOH', 'KLCS', 'BARON', 'SIMONE', 'HLCS', 'ARCH1']:
+            to_remove.append(i)
+    for i in to_remove:
+        del workflows[i]
+        del parents[i]
+        del files[i]
+    
     
     # identify parent-children workflow relationships
     parent_workflows, children_workflows = identify_parent_children_workflows(parents, files)
