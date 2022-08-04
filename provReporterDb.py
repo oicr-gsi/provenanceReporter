@@ -107,7 +107,7 @@ def extract_qc_status_from_nabu(project, database, file_table = 'Files', nabu_ap
     if L:
         for i in L:
             qc = collect_info(i, ['skip', 'user', 'date', 'qcstatus', 'ref', 'stalestatus'], ['skip', 'user', 'date', 'status', 'reference', 'fresh']) 
-            file_swid = i['fileswid']
+            file_swid = int(i['fileswid'])
             D[project][file_swid] = qc 
     
     # QC may not be available for all files
@@ -149,7 +149,6 @@ def collect_qc_info(database, file_table = 'Files', project_provenance = 'http:/
     # collect QC information for all files in each project
     D = {}
     for project in projects:
-        qc = extract_qc_status_from_nabu(project, nabu_api)
         qc = extract_qc_status_from_nabu(project, database, file_table, nabu_api)
         assert project not in D
         D[project] = qc[project]
@@ -185,7 +184,7 @@ def collect_file_info_from_fpr(fpr):
             # get md5sums
             md5sum = line[47]
             # get file_swid
-            file_swid = line[44]
+            file_swid = int(line[44])
             # get the library type
             d = collect_info({k.split('=')[0]:k.split('=')[1] for k in line[17].split(';')},
                          ['geo_library_source_template_type'], ['library_type'])
@@ -203,7 +202,7 @@ def collect_file_info_from_fpr(fpr):
             # get workflow version
             version = line[31]        
             # get workflow run accession
-            workflow_run = line[36]
+            workflow_run = int(line[36])
             # collect file info
             D[project][file_swid] = {'md5sum': md5sum, 'workflow': workflow, 'version': version,
                    'wfrun_id': workflow_run, 'file': file, 'library_type': d['library_type'], 'attributes': attributes}
@@ -283,9 +282,9 @@ def get_workflow_relationships(fpr):
             # get project name
             project = line[1]
             # get workflow, workflow version and workflow run accession
-            workflow, workflow_version, workflow_run = line[30], line[31], line[36]
+            workflow, workflow_version, workflow_run = line[30], line[31], int(line[36])
             # get file swid
-            file_swid = line[44]
+            file_swid = int(line[44])
             input_files = line[38]
             if input_files:
                 input_files = sorted(input_files.split(';'))
@@ -478,7 +477,7 @@ def extract_workflow_info(fpr):
             # get sample name
             sample = line[7]
             # get workflow name and workflow run accession
-            workflow, workflow_run = line[30], line[36]
+            workflow, workflow_run = line[30], int(line[36])
                                   
             # get lane and run
             run, lane = line[18], line[24]            
@@ -844,7 +843,7 @@ def add_workflow_relationships(D, database, table):
                     # insert data into table
                     cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), (i, j, project)))
                     conn.commit()
-        
+                            
     # remove any workflow relationships not defined anymore in FPR    
     for (i, j, project) in records:
         if project not in D:
@@ -947,9 +946,12 @@ def add_file_info_to_db(database, table, fpr, file_table = 'Files', project_prov
     # get existing records
     cur.execute('SELECT {0}.file_swid FROM {0}'.format(table))
     records = cur.fetchall()
-
-    print('add_file_info', table, records[0])
-
+    records = [i[0] for i in records]
+    
+    if records:
+        print('add_file_info', table, records[0])
+    else:
+        print('add_file_info', table, records)
 
     # get column names
     column_names = define_column_names()[table]
@@ -967,7 +969,7 @@ def add_file_info_to_db(database, table, fpr, file_table = 'Files', project_prov
             if file_swid in records:
                 # update QC info
                 for i in range(1, len(column_names)):
-                    cur.execute('UPDATE {0} SET {0}.{1} = \"{2}\" WHERE {0}.file_swid=\"{3}\"'.format(table, column_names[i], L[i], file_swid))  
+                    cur.execute('UPDATE {0} SET {1} = \"{2}\" WHERE file_swid=\"{3}\"'.format(table, column_names[i], L[i], file_swid))  
                     conn.commit()
             else:
                 # insert project info
@@ -1131,7 +1133,10 @@ if __name__ == '__main__':
     add_workflows_info_to_db(args.fpr, args.database, 'Workflows', 'Parents', 'Children')
     end = time.time()
     print('added data into Workflows', end - start)
-    # add_file_info_to_db(args.database, 'FilesQC', args.fpr, 'Files', args.project_provenance, args.nabu)
+    start = time.time()
+    add_file_info_to_db(args.database, 'FilesQC', args.fpr, 'Files', args.project_provenance, args.nabu)
+    end = time.time()
+    print('added file info into FilesQC', end - start)
     # add_file_info_to_db(args.database, 'Files', args.fpr, 'Files', args.project_provenance, args.nabu)
     # add_library_info_to_db(args.database, 'Libraries', args.sample_provenance)
     # add_workflow_inputs_to_db(args.database, args.fpr, 'Workflow_Inputs')
