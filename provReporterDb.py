@@ -118,7 +118,8 @@ def extract_qc_status_from_nabu(project, database, file_table = 'Files', nabu_ap
     cur.execute('SELECT {0}.file_swid FROM {0} WHERE {0}.project_id = \"{1}\"'.format(file_table, project))
     records = cur.fetchall()
     
-    print('extract_qc_status', records[0])
+    if records:
+        print('extract_qc_status', records[0])
     
     conn.close()
     
@@ -738,6 +739,9 @@ def add_workflows(workflows, database, table = 'Workflows'):
     # get column names
     column_names = define_column_names()[table]
     
+    print(table)
+    print(column_names)
+    
     for project in workflows:
         for workflow_run in workflows[project]:
             if (workflow_run, project) in records:
@@ -763,51 +767,6 @@ def add_workflows(workflows, database, table = 'Workflows'):
     conn.close()
 
 
-# def add_parent_workflows(parents, database, table = 'Parents'):    
-#     '''
-#     (dict, str, str) -> None
-    
-#     Inserts or updates children-parents workflow relatiionships to table Parents in database
-        
-#     Parameters
-#     ---------- 
-#     - parents (dict): Dictionary with parent-children workflow relationships
-#     - database (str): Path to the database file
-#     - table (str): Name of the table storing parents-children workflow relationships. Default is Parents
-#     '''
-    
-#     # connect to db
-#     conn = sqlite3.connect(database)
-#     cur = conn.cursor()
-    
-#     #get existing records
-#     cur.execute('SELECT {0}.children_id, {0}.parents_id, {0}.project_id FROM {0}'.format(table))
-#     records = cur.fetchall()
-#     # get column names
-#     column_names = define_column_names()[table]
-#     for project in parents:
-#         for children_workflow in parents[project]:
-#             for parent_workflow in parents[project][parent_workflow]:
-#                 if (children_workflow, parent_workflow, project) not in records:
-#                     # insert data into table
-#                     cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), (children_workflow, parent_workflow, project)))
-#                     conn.commit()
-        
-#     # remove any workflow relationships not defined anymore in FPR    
-#     for (children_workflow, parent_workflow, project) in records:
-#         if project not in parents:
-#             cur.execute('DELETE FROM {0} WHERE {0}.project_id=\"{1}\"'.format(table, project))
-#             conn.commit()
-#         elif children_workflow not in parents[project]:
-#             cur.execute('DELETE FROM {0} WHERE {0}.children_id = \"{1}\" AND {0}.project_id=\"{2}\"'.format(table, children_workflow, project))
-#             conn.commit()
-#         elif parent_workflow not in parents[project][children_workflow]:
-#             cur.execute('DELETE FROM {0} WHERE {0}.children_id = \"{1}\" AND {0}.parents_id = \"{2}\" AND {0}.project_id=\"{3}\"'.format(table, children_workflow, parent_worklow, project))
-#             conn.commit()
-#     conn.close()
-
-    
-    
     
 def add_workflow_relationships(D, database, table):    
     '''
