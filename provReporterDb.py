@@ -739,15 +739,17 @@ def add_workflows(workflows, database, table = 'Workflows'):
     # get column names
     column_names = define_column_names()[table]
     
-    print(table)
-    print(column_names)
+    # make a list of fields to update
+    to_update = [i for i in column_names]
+    to_update.remove('project_id')
+    to_update.remove('wfrun_id')
     
     for project in workflows:
         for workflow_run in workflows[project]:
             if (workflow_run, project) in records:
                 # update workflows info
-                for i in column_names:
-                    cur.execute('UPDATE {0} SET {1} = \"{2}\" WHERE wfrun_id = \"{3}\" AND project_id = "\{4}\"'.format(table, i, workflows[project][i], workflow_run, project))
+                for i in to_update:
+                    cur.execute("UPDATE {0} SET {1} = '{2}' WHERE wfrun_id='{3}' AND project_id ='{4}'".format(table, i, workflows[project][workflow_run][i], workflow_run, project))
                     conn.commit()
             else:
                 # insert data into table
