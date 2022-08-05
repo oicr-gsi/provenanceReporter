@@ -178,7 +178,9 @@ def collect_file_info_from_fpr(fpr):
     '''
 
     infile = open_fpr(fpr)
-    
+    # skip header
+    infile.readline()
+        
     D = {}
     
     for line in infile:
@@ -196,9 +198,14 @@ def collect_file_info_from_fpr(fpr):
             # get file_swid
             file_swid = int(line[44])
             # get the library type
-            d = collect_info({k.split('=')[0]:k.split('=')[1] for k in line[17].split(';')},
+            library_type = line[17]
+            if library_type:
+                d = collect_info({k.split('=')[0]:k.split('=')[1] for k in line[17].split(';')},
                          ['geo_library_source_template_type'], ['library_type'])
-            
+                library_type = d['library_type']
+            else:
+                library_type = ''
+                        
             # get file attributes
             attributes = line[45]
             if attributes:
@@ -215,7 +222,7 @@ def collect_file_info_from_fpr(fpr):
             workflow_run = int(line[36])
             # collect file info
             D[project][file_swid] = {'md5sum': md5sum, 'workflow': workflow, 'version': version,
-                   'wfrun_id': workflow_run, 'file': file, 'library_type': d['library_type'], 'attributes': attributes}
+                   'wfrun_id': workflow_run, 'file': file, 'library_type': library_type, 'attributes': attributes}
     infile.close()
     return D
 
@@ -475,6 +482,9 @@ def extract_workflow_info(fpr):
     D = {}
 
     infile = open_fpr(fpr)
+    # skip header
+    infile.readline()
+    
     for line in infile:
         line = line.rstrip()
         if line:
@@ -908,7 +918,17 @@ def add_file_info_to_db(database, table, fpr, file_table = 'Files', project_prov
     elif table == 'Files':
         # collect file info from FPR
         D = collect_file_info_from_fpr(fpr)
-       
+    
+        
+    to_remove = []
+    for i in D:
+        if i not in ['HCCCFD', 'TGL01MOH', 'KLCS', 'BARON', 'SIMONE', 'HLCS', 'ARCH1']:
+            to_remove.append(i)
+    for i in to_remove:
+        del D[i]
+    
+    
+    
     # connect to db
     conn = sqlite3.connect(database)
     cur = conn.cursor()
@@ -972,6 +992,15 @@ def add_library_info_to_db(database, table = 'Libraries', sample_provenance='htt
     # collect lims information
     lims = collect_lims_info(sample_provenance)
     
+    
+    to_remove = []
+    for i in lims:
+        if i not in ['HCCCFD', 'TGL01MOH', 'KLCS', 'BARON', 'SIMONE', 'HLCS', 'ARCH1']:
+            to_remove.append(i)
+    for i in to_remove:
+        del lims[i]
+        
+    
     # connect to db
     conn = sqlite3.connect(database)
     cur = conn.cursor()
@@ -979,8 +1008,7 @@ def add_library_info_to_db(database, table = 'Libraries', sample_provenance='htt
     # get existing records
     cur.execute('SELECT {0}.library FROM {0}'.format(table))
     records = cur.fetchall()
-
-    print('add_library_info', table, records[0])
+    records = [i[0] for i in records]
 
     # get column names
     column_names = define_column_names()[table]
@@ -993,14 +1021,14 @@ def add_library_info_to_db(database, table = 'Libraries', sample_provenance='htt
         for sample in lims[project]:
             for library in lims[project][sample]:
                 libraries.append(library)
-                L = [lims[project][library][i] for i in column_names if i in lims[project][library]]
+                L = [lims[project][sample][library][i] for i in column_names if i in lims[project][sample][library]]
                 L.insert(0, sample)
                 L.insert(0, library)
                 L.append(project)
                 if library in records:
                     # update QC info
                     for i in range(1, len(column_names)):
-                        cur.execute('UPDATE {0} SET {0}.{1} = \"{2}\" WHERE {0}.library=\"{3}\"'.format(table, column_names[i], L[i], library))  
+                        cur.execute("UPDATE {0} SET {1} = '{2}' WHERE library='{3}'".format(table, column_names[i], L[i], library))  
                         conn.commit()
                 else:
                     # insert project info
@@ -1013,9 +1041,6 @@ def add_library_info_to_db(database, table = 'Libraries', sample_provenance='htt
            cur.execute('DELETE FROM {0} WHERE {0}.library=\"{1}\"'.format(table, library))
            conn.commit()
     conn.close()
-
-
-
 
 
 
@@ -1098,19 +1123,26 @@ if __name__ == '__main__':
     # initiate database
     initiate_db(args.database)
     # add or update information in tables
-    add_project_info_to_db(args.database, 'Projects', args.project_provenance)
+    #add_project_info_to_db(args.database, 'Projects', args.project_provenance)
     print('added data into Projects')
     start = time.time()
-    add_workflows_info_to_db(args.fpr, args.database, 'Workflows', 'Parents', 'Children')
+    #add_workflows_info_to_db(args.fpr, args.database, 'Workflows', 'Parents', 'Children')
     end = time.time()
     print('added data into Workflows', end - start)
     start = time.time()
-    add_file_info_to_db(args.database, 'FilesQC', args.fpr, 'Files', args.project_provenance, args.nabu)
+    #add_file_info_to_db(args.database, 'FilesQC', args.fpr, 'Files', args.project_provenance, args.nabu)
     end = time.time()
     print('added file info into FilesQC', end - start)
     start = time.time()
-    add_file_info_to_db(args.database, 'Files', args.fpr, 'Files', args.project_provenance, args.nabu)
+    #add_file_info_to_db(args.database, 'Files', args.fpr, 'Files', args.project_provenance, args.nabu)
     end = time.time()
     print('added file info into Files', end - start)
-    # add_library_info_to_db(args.database, 'Libraries', args.sample_provenance)
-    # add_workflow_inputs_to_db(args.database, args.fpr, 'Workflow_Inputs')
+    start = time.time()
+    #add_library_info_to_db(args.database, 'Libraries', args.sample_provenance)
+    end = time.time()
+    print('added library info into Libraries', end - start)
+    start = time.time()
+    add_workflow_inputs_to_db(args.database, args.fpr, 'Workflow_Inputs')
+    end = time.time()
+    print('added workflow inputs to Workflow_Inputs', end - start)
+    
