@@ -111,22 +111,18 @@ def extract_qc_status_from_nabu(project, database, file_table = 'Files', nabu_ap
             D[project][file_swid] = qc 
     
     # QC may not be available for all files
-    # retrieve file swids from database instead of prasing again fpr
+    # retrieve file swids from database instead of parsing again fpr
     # add empty values to qc fields if qc not available
     conn = sqlite3.connect(database)
     cur = conn.cursor()
     cur.execute('SELECT {0}.file_swid FROM {0} WHERE {0}.project_id = \"{1}\"'.format(file_table, project))
     records = cur.fetchall()
-    
-    if records:
-        print('extract_qc_status', records[0])
-    
     conn.close()
     
     for project in D:
         for file_swid in records:
             if file_swid not in D[project]:
-                D[project][file_swid] = {'skip': '', 'user': '', 'date': '', 'status': '', 'ref': '', 'fresh': ''}
+                D[project][file_swid] = {'skip': '', 'user': '', 'date': '', 'status': '', 'reference': '', 'fresh': ''}
     return D
 
 
@@ -147,6 +143,19 @@ def collect_qc_info(database, file_table = 'Files', project_provenance = 'http:/
     # make a list of projects defined in Pinery
     projects = list(extract_project_info(project_provenance).keys())
         
+    
+    to_remove = []
+    for i in projects:
+        if i not in ['HCCCFD', 'TGL01MOH', 'KLCS', 'BARON', 'SIMONE', 'HLCS', 'ARCH1']:
+            to_remove.append(i)
+    for i in to_remove:
+        projects.remove(i)
+    
+    
+    
+    
+    
+    
     # collect QC information for all files in each project
     D = {}
     for project in projects:
@@ -516,7 +525,7 @@ def define_column_names():
                     'Children': ['parents_id', 'children_id', 'project_id'],
                     'Projects': ['project_id', 'pipeline', 'description', 'active', 'contact_name', 'contact_email'],
                     'Files': ['file_swid', 'project_id', 'md5sum', 'workflow', 'version', 'wfrun_id', 'file', 'library_type', 'attributes'],
-                    'FilesQC': ['file_swid', 'project_id', 'skip', 'user', 'date', 'status', 'ref', 'fresh'],
+                    'FilesQC': ['file_swid', 'project_id', 'skip', 'user', 'date', 'status', 'reference', 'fresh'],
                     'Libraries': ['library', 'sample', 'tissue_type', 'ext_id', 'tissue_origin',
                                   'library_type', 'prep', 'tissue_prep', 'sample_received_date', 'group_id', 'group_id_description', 'project_id'],
                     'Workflow_Inputs': ['library', 'run', 'lane', 'wfrun_id', 'limskey', 'barcode', 'platform', 'project_id']}
@@ -927,6 +936,7 @@ def add_file_info_to_db(database, table, fpr, file_table = 'Files', project_prov
             L = [D[project][file_swid][i] for i in column_names if i in D[project][file_swid]]
             L.insert(0, project)
             L.insert(0, file_swid)
+            
             if file_swid in records:
                 # update QC info
                 for i in range(1, len(column_names)):
@@ -1098,6 +1108,9 @@ if __name__ == '__main__':
     add_file_info_to_db(args.database, 'FilesQC', args.fpr, 'Files', args.project_provenance, args.nabu)
     end = time.time()
     print('added file info into FilesQC', end - start)
-    # add_file_info_to_db(args.database, 'Files', args.fpr, 'Files', args.project_provenance, args.nabu)
+    start = time.time()
+    add_file_info_to_db(args.database, 'Files', args.fpr, 'Files', args.project_provenance, args.nabu)
+    end = time.time()
+    print('added file info into Files', end - start)
     # add_library_info_to_db(args.database, 'Libraries', args.sample_provenance)
     # add_workflow_inputs_to_db(args.database, args.fpr, 'Workflow_Inputs')
