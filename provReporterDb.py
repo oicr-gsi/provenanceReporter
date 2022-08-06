@@ -15,7 +15,7 @@ import argparse
 import time
 
 
-def extract_project_info(project_provenance = 'http://pinery.gsi.oicr.on.ca/sample/projects'):
+def extract_project_info(project_provenance):
     '''
     (str) -> dict
     
@@ -81,7 +81,7 @@ def collect_info(data, names, keys):
 
 
 
-def extract_qc_status_from_nabu(project, database, file_table = 'Files', nabu_api = 'http://gsi-dcc.oicr.on.ca:3000'):
+def extract_qc_status_from_nabu(project, database, nabu_api, file_table = 'Files'):
     '''
     (str, str, str, str) -> dict
 
@@ -92,7 +92,7 @@ def extract_qc_status_from_nabu(project, database, file_table = 'Files', nabu_ap
     - project (str): Name of project of interest
     - database (str): Path to the database file
     - file_table (str): Table in database storing file information. Default is Files
-    - nabu_api (str): URL of the nabu API
+    - nabu_api (str): URL of the nabu API: 'http://gsi-dcc.oicr.on.ca:3000'
     '''
         
     response = requests.get(nabu_api + '/fileqcs?project={0}'.format(project))
@@ -126,7 +126,7 @@ def extract_qc_status_from_nabu(project, database, file_table = 'Files', nabu_ap
     return D
 
 
-def collect_qc_info(database, file_table = 'Files', project_provenance = 'http://pinery.gsi.oicr.on.ca/sample/projects', nabu_api = 'http://gsi-dcc.oicr.on.ca:3000'):
+def collect_qc_info(database, project_provenance, nabu_api, file_table = 'Files'):
     '''
     (str, str, str, str) -> dict
     
@@ -136,8 +136,8 @@ def collect_qc_info(database, file_table = 'Files', project_provenance = 'http:/
     ----------
     - database (str): Path to the database file
     - file_table (str): Table in database storing file information. Default is Files 
-    - project_provenance (str): Pinery API
-    - nabu_api (str): URL of the nabu API
+    - project_provenance (str): Pinery API: 'http://pinery.gsi.oicr.on.ca/sample/projects'
+    - nabu_api (str): URL of the nabu API: 'http://gsi-dcc.oicr.on.ca:3000'
     '''
         
     # make a list of projects defined in Pinery
@@ -159,7 +159,7 @@ def collect_qc_info(database, file_table = 'Files', project_provenance = 'http:/
     # collect QC information for all files in each project
     D = {}
     for project in projects:
-        qc = extract_qc_status_from_nabu(project, database, file_table, nabu_api)
+        qc = extract_qc_status_from_nabu(project, database, nabu_api, file_table)
         assert project not in D
         D[project] = qc[project]
     
@@ -420,7 +420,7 @@ def get_provenance_data(provenance):
 
 
 
-def collect_lims_info(sample_provenance='http://pinery.gsi.oicr.on.ca/provenance/v9/sample-provenance'):
+def collect_lims_info(sample_provenance):
     '''
     (str) -> dict
     
@@ -429,6 +429,7 @@ def collect_lims_info(sample_provenance='http://pinery.gsi.oicr.on.ca/provenance
     Parameters
     ----------
     - sample_provenance (str): URL of the pinery sample_provenance API
+    'http://pinery.gsi.oicr.on.ca/provenance/v9/sample-provenance'
     ''' 
 
     # get sample info from pinery
@@ -463,8 +464,6 @@ def collect_lims_info(sample_provenance='http://pinery.gsi.oicr.on.ca/provenance
             if D[project][sample][library][k] == '':
                 D[project][sample][library][k] = d[k]    
     return D    
-
-
 
 
 def extract_workflow_info(fpr):
@@ -514,6 +513,11 @@ def extract_workflow_info(fpr):
             if workflow_run not in D[project]:
                 D[project][workflow_run] = {'sample': sample, 'workflow': workflow, 'libraries': [d]}
             else:
+                if sample != D[project][workflow_run]['sample']:
+                    print(sample)
+                    print(D[project][workflow_run]['sample'])
+                    print(project)
+                    print(workflow_run)
                 assert sample == D[project][workflow_run]['sample']
                 assert workflow == D[project][workflow_run]['workflow']
                 if d not in D[project][workflow_run]['libraries']:
@@ -672,9 +676,9 @@ def initiate_db(database):
 
 
 
-def add_project_info_to_db(database, table = 'Projects', project_provenance = 'http://pinery.gsi.oicr.on.ca/sample/projects'):
+def add_project_info_to_db(database, project_provenance, table = 'Projects'):
     '''
-    (str, str) -> None
+    (str, str, str) -> None
     
     Add project information into Projects table of database
        
@@ -682,6 +686,7 @@ def add_project_info_to_db(database, table = 'Projects', project_provenance = 'h
     ----------
     - database (str): Path to the database file
     - project_provenance (str): Pinery API, http://pinery.gsi.oicr.on.ca/sample/projects
+    - table (str): Name of Table in database. Default is Projects
     '''
 
     # connect to db
@@ -892,7 +897,7 @@ def add_workflows_info_to_db(fpr, database, workflow_table = 'Workflows', parent
    
     
     
-def add_file_info_to_db(database, table, fpr, file_table = 'Files', project_provenance = 'http://pinery.gsi.oicr.on.ca/sample/projects', nabu_api = 'http://gsi-dcc.oicr.on.ca:3000'):
+def add_file_info_to_db(database, table, fpr, project_provenance, nabu_api, file_table = 'Files'):
     '''
     (str, str, str, str, str, str) -> None
     
@@ -905,8 +910,8 @@ def add_file_info_to_db(database, table, fpr, file_table = 'Files', project_prov
                    Accepted values are FilesQC or Files
     - fpr (str): Path to the File Provenance Report
     - file_table (str): Table in database storing file information. Default is Files 
-    - project_provenance (str): Pinery API
-    - nabu_api (str): URL of the nabu API
+    - project_provenance (str): Pinery API: 'http://pinery.gsi.oicr.on.ca/sample/projects'
+    - nabu_api (str): URL of the nabu API: 'http://gsi-dcc.oicr.on.ca:3000'
     '''
 
     assert table in ['Files', 'FilesQC']        
@@ -914,7 +919,7 @@ def add_file_info_to_db(database, table, fpr, file_table = 'Files', project_prov
     # check if adding QC info or file info
     if table == 'FilesQC':
         # adding file QC information
-        D = collect_qc_info(database, file_table, project_provenance, nabu_api)
+        D = collect_qc_info(database, project_provenance, nabu_api, file_table)
     elif table == 'Files':
         # collect file info from FPR
         D = collect_file_info_from_fpr(fpr)
@@ -976,7 +981,7 @@ def add_file_info_to_db(database, table, fpr, file_table = 'Files', project_prov
 
 
 
-def add_library_info_to_db(database, table = 'Libraries', sample_provenance='http://pinery.gsi.oicr.on.ca/provenance/v9/sample-provenance'):
+def add_library_info_to_db(database, sample_provenance, table = 'Libraries'):
     '''
     (str, str, str) -> None
     
@@ -986,12 +991,11 @@ def add_library_info_to_db(database, table = 'Libraries', sample_provenance='htt
     ----------
     - database (str): Path to the databae file
     - table (str): Table storing library in database. Default is Libraries
-    - sample_provenance (str): URL of the sample provenance API
+    - sample_provenance (str): URL of the sample provenance API: 'http://pinery.gsi.oicr.on.ca/provenance/v9/sample-provenance'
     '''
     
     # collect lims information
     lims = collect_lims_info(sample_provenance)
-    
     
     to_remove = []
     for i in lims:
@@ -1123,22 +1127,22 @@ if __name__ == '__main__':
     # initiate database
     initiate_db(args.database)
     # add or update information in tables
-    #add_project_info_to_db(args.database, 'Projects', args.project_provenance)
+    #add_project_info_to_db(args.database, args.project_provenance, 'Projects')
     print('added data into Projects')
     start = time.time()
     #add_workflows_info_to_db(args.fpr, args.database, 'Workflows', 'Parents', 'Children')
     end = time.time()
     print('added data into Workflows', end - start)
     start = time.time()
-    #add_file_info_to_db(args.database, 'FilesQC', args.fpr, 'Files', args.project_provenance, args.nabu)
+    #add_file_info_to_db(args.database, 'FilesQC', args.fpr, args.project_provenance, args.nabu, 'Files')
     end = time.time()
     print('added file info into FilesQC', end - start)
     start = time.time()
-    #add_file_info_to_db(args.database, 'Files', args.fpr, 'Files', args.project_provenance, args.nabu)
+    #add_file_info_to_db(args.database, 'Files', args.fpr, args.project_provenance, args.nabu, 'Files')
     end = time.time()
     print('added file info into Files', end - start)
     start = time.time()
-    #add_library_info_to_db(args.database, 'Libraries', args.sample_provenance)
+    #add_library_info_to_db(args.database, args.sample_provenance, 'Libraries')
     end = time.time()
     print('added library info into Libraries', end - start)
     start = time.time()
