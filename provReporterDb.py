@@ -519,67 +519,6 @@ def extract_workflow_info(fpr):
                     D[project][workflow_run][sample]['libraries'].append(d)
     return D            
 
-# def extract_workflow_info(fpr):
-#     '''
-#     (str) -> dict
-    
-#     Returns a dictionary with library input information for all workflows for each project
-    
-#     Parameters
-#     ----------
-#     - fpr (str): Path to the File Provenance Report
-#     '''
-
-#     # create a dict to store workflow input libraries
-#     D = {}
-
-#     infile = open_fpr(fpr)
-#     # skip header
-#     infile.readline()
-    
-#     for line in infile:
-#         line = line.rstrip()
-#         if line:
-#             line = line.split('\t')
-#             # get project name
-#             project = line[1]
-                        
-#             # get sample name
-#             sample = line[7]
-#             # get workflow name and workflow run accession
-#             workflow, workflow_run = line[30], int(line[36])
-                                  
-#             # get lane and run
-#             run, lane = line[18], line[24]            
-#             # get library and limskey
-#             library, limskey  = line[13], line[56]
-            
-#             # get barcode and platform
-#             barcode, platform = line[27], line[22]
-            
-#             d = {'run': run, 'lane': lane, 'library': library, 'limskey': limskey, 'barcode': barcode, 'platform': platform}
-            
-#             if project not in D:
-#                 D[project] = {}
-#             if workflow_run not in D[project]:
-#                 D[project][workflow_run] = {}
-#             key = ';'.join([library, run, lane])
-#             if key not in D[project][workflow_run]:
-#                 D[project][workflow_run][key] = {'sample': sample, 'workflow': workflow, 'libraries': [d]}
-#             else:
-#                 # if sample != D[project][workflow_run]['sample']:
-#                 #     print(sample)
-#                 #     print(D[project][workflow_run]['sample'])
-#                 #     print(project)
-#                 #     print(workflow_run)
-#                 #     print(workflow)
-#                 #     print(D[project][workflow_run]['workflow'])
-#                 assert sample == D[project][workflow_run][key]['sample']
-#                 assert workflow == D[project][workflow_run][key]['workflow']
-#                 if d not in D[project][workflow_run][key]['libraries']:
-#                     D[project][workflow_run][key]['libraries'].append(d)
-#     return D            
-
 
 def define_column_names():
     '''
@@ -693,12 +632,10 @@ def create_table(database, table):
               REFERENCES Libraries (library)
               ON DELETE CASCADE ON UPDATE CASCADE'''
         table_format = table_format + ', ' + constraints
-    
+            
     # connect to database
     conn = sqlite3.connect(database)
     cur = conn.cursor()
-    #cur.execute('DROP TABLE IF EXISTS {0};'.format(table))
-    #conn.commit()
     # create table
     cmd = 'CREATE TABLE {0} ({1})'.format(table, table_format)
     cur.execute(cmd)
@@ -1118,7 +1055,7 @@ def add_workflow_inputs_to_db(database, fpr, table = 'Workflow_Inputs'):
 
     # collect information about library inputs
     libraries = extract_workflow_info(fpr)
-        
+    
     to_remove = []
     for i in libraries:
         if i not in ['HCCCFD', 'TGL01MOH', 'KLCS', 'BARON', 'SIMONE', 'HLCS', 'ARCH1']:
@@ -1133,19 +1070,17 @@ def add_workflow_inputs_to_db(database, fpr, table = 'Workflow_Inputs'):
     cur = conn.cursor()
        
     # get existing records
-    cur.execute('SELECT {0}.library, {0}.run, {0}.lane FROM {0}'.format(table))
+    #cur.execute('SELECT {0}.library, {0}.run, {0}.lane, {0}.wfrun_id FROM {0}'.format(table))
+    cur.execute('SELECT * FROM {0}'.format(table))
     records = cur.fetchall()
 
+    data = cur.execute('SELECT * FROM {0}'.format(table))
+    column_names = [column[0] for column in data.description]
+        
     if records:
         print('add_wkf_input', table, records[0])
     else:
         print('add_wkf_input', table, records)
-
-    # get column names
-    column_names = define_column_names()[table]
-
-    print(column_names)
-
 
     # make a list of (library, run, lane)
     # library, run and lane defines an input to workflow
@@ -1157,26 +1092,24 @@ def add_workflow_inputs_to_db(database, fpr, table = 'Workflow_Inputs'):
             for sample in libraries[project][workflow_run]:
                 for i in libraries[project][workflow_run][sample]['libraries']:
                     library, run, lane = i['library'], i['run'], i['lane']
-                    key = tuple([library, run, lane])
-                    inputs.append(key)
+                    #key = tuple([library, run, lane, workflow_run])
                     L = [i[j] for j in column_names if j in i]
                     L.append(project)
                     L.insert(3, workflow_run)
-                                      
-                    if key in records:
-                        # update inputs info
-                        for i in range(3, len(column_names)):
-                            cur.execute("UPDATE {0} SET {1} = '{2}' WHERE library='{3}' AND run = '{4}' AND lane = '{5}'".format(table, column_names[i], L[i], library, run, lane))  
-                            conn.commit()
-                    else:
+                    
+                    assert tuple(L) not in inputs
+                    inputs.append(tuple(L))                    
+                       
+                    if tuple(L) not in records:
                         # insert project info
                         cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
                         conn.commit()
-   
+     
     # remove any inputs in database not anymore defined in FPR    
     for k in records:
-       if library not in inputs:
-           cur.execute('DELETE FROM {0} WHERE {0}.library=\"{1}\" AND {0}.run=\"{2}\" AND {0}.lane=\"{3}\"'.format(table, library, run, lane))
+       if k not in inputs:
+           library, run, lane, workflow_run, limskey, barcode, platform, project_id = k    
+           cur.execute('DELETE FROM {0} WHERE {0}.library=\"{1}\" AND {0}.run=\"{2}\" AND {0}.lane=\"{3}\" and {0}.wfrun_id=\{4}\"  AND {0}.limskey=\"{5}\" AND {0}.barcode=\"{6}\" AND {0}.platform=\"{7}\" AND {0}.project_id=\"{8}\"'.format(table, library, run, lane, workflow_run, limskey, barcode, platform, project_id))
            conn.commit()
     conn.close()
 
