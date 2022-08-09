@@ -490,9 +490,7 @@ def extract_workflow_info(fpr):
             line = line.split('\t')
             # get project name
             project = line[1]
-            if project not in D:
-                D[project] = {}
-            
+                        
             # get sample name
             sample = line[7]
             # get workflow name and workflow run accession
@@ -511,19 +509,76 @@ def extract_workflow_info(fpr):
             if project not in D:
                 D[project] = {}
             if workflow_run not in D[project]:
-                D[project][workflow_run] = {'sample': sample, 'workflow': workflow, 'libraries': [d]}
+                D[project][workflow_run] = {}
+            if sample not in D[project][workflow_run]:
+                D[project][workflow_run][sample] = {'sample': sample, 'workflow': workflow, 'libraries': [d]}
             else:
-                if sample != D[project][workflow_run]['sample']:
-                    print(sample)
-                    print(D[project][workflow_run]['sample'])
-                    print(project)
-                    print(workflow_run)
-                assert sample == D[project][workflow_run]['sample']
-                assert workflow == D[project][workflow_run]['workflow']
-                if d not in D[project][workflow_run]['libraries']:
-                    D[project][workflow_run]['libraries'].append(d)
+                assert sample == D[project][workflow_run][sample]['sample']
+                assert workflow == D[project][workflow_run][sample]['workflow']
+                if d not in D[project][workflow_run][sample]['libraries']:
+                    D[project][workflow_run][sample]['libraries'].append(d)
     return D            
 
+# def extract_workflow_info(fpr):
+#     '''
+#     (str) -> dict
+    
+#     Returns a dictionary with library input information for all workflows for each project
+    
+#     Parameters
+#     ----------
+#     - fpr (str): Path to the File Provenance Report
+#     '''
+
+#     # create a dict to store workflow input libraries
+#     D = {}
+
+#     infile = open_fpr(fpr)
+#     # skip header
+#     infile.readline()
+    
+#     for line in infile:
+#         line = line.rstrip()
+#         if line:
+#             line = line.split('\t')
+#             # get project name
+#             project = line[1]
+                        
+#             # get sample name
+#             sample = line[7]
+#             # get workflow name and workflow run accession
+#             workflow, workflow_run = line[30], int(line[36])
+                                  
+#             # get lane and run
+#             run, lane = line[18], line[24]            
+#             # get library and limskey
+#             library, limskey  = line[13], line[56]
+            
+#             # get barcode and platform
+#             barcode, platform = line[27], line[22]
+            
+#             d = {'run': run, 'lane': lane, 'library': library, 'limskey': limskey, 'barcode': barcode, 'platform': platform}
+            
+#             if project not in D:
+#                 D[project] = {}
+#             if workflow_run not in D[project]:
+#                 D[project][workflow_run] = {}
+#             key = ';'.join([library, run, lane])
+#             if key not in D[project][workflow_run]:
+#                 D[project][workflow_run][key] = {'sample': sample, 'workflow': workflow, 'libraries': [d]}
+#             else:
+#                 # if sample != D[project][workflow_run]['sample']:
+#                 #     print(sample)
+#                 #     print(D[project][workflow_run]['sample'])
+#                 #     print(project)
+#                 #     print(workflow_run)
+#                 #     print(workflow)
+#                 #     print(D[project][workflow_run]['workflow'])
+#                 assert sample == D[project][workflow_run][key]['sample']
+#                 assert workflow == D[project][workflow_run][key]['workflow']
+#                 if d not in D[project][workflow_run][key]['libraries']:
+#                     D[project][workflow_run][key]['libraries'].append(d)
+#     return D            
 
 
 def define_column_names():
@@ -1064,6 +1119,15 @@ def add_workflow_inputs_to_db(database, fpr, table = 'Workflow_Inputs'):
     # collect information about library inputs
     libraries = extract_workflow_info(fpr)
         
+    to_remove = []
+    for i in libraries:
+        if i not in ['HCCCFD', 'TGL01MOH', 'KLCS', 'BARON', 'SIMONE', 'HLCS', 'ARCH1']:
+            to_remove.append(i)
+    for i in to_remove:
+        del libraries[i] 
+        
+    print('extracted workflow info')
+    
     # connect to db
     conn = sqlite3.connect(database)
     cur = conn.cursor()
@@ -1072,11 +1136,16 @@ def add_workflow_inputs_to_db(database, fpr, table = 'Workflow_Inputs'):
     cur.execute('SELECT {0}.library, {0}.run, {0}.lane FROM {0}'.format(table))
     records = cur.fetchall()
 
-    print('add_wkf_input', table, records[0])
-
+    if records:
+        print('add_wkf_input', table, records[0])
+    else:
+        print('add_wkf_input', table, records)
 
     # get column names
     column_names = define_column_names()[table]
+
+    print(column_names)
+
 
     # make a list of (library, run, lane)
     # library, run and lane defines an input to workflow
@@ -1085,22 +1154,24 @@ def add_workflow_inputs_to_db(database, fpr, table = 'Workflow_Inputs'):
     # add or update data
     for project in libraries:
         for workflow_run in libraries[project]:
-            for i in libraries[project][workflow_run]['libraries']:
-                library, run, lane = i['library'], i['run'], i['lane']
-                key = tuple(library, run, lane)
-                inputs.append(key)
-                L = [i[j] for j in column_names if j in i]
-                L.append(project)
-                L.insert(2, workflow_run)
-                if key in records:
-                    # update inputs info
-                    for i in range(3, len(column_names)):
-                        cur.execute('UPDATE {0} SET {0}.{1} = \"{2}\" WHERE {0}.library=\"{3}\" AND {0}.run=\"{4}\" AND {0}.lane=\"{5}\"'.format(table, column_names[i], L[i], library, run, lane))  
+            for sample in libraries[project][workflow_run]:
+                for i in libraries[project][workflow_run][sample]['libraries']:
+                    library, run, lane = i['library'], i['run'], i['lane']
+                    key = tuple([library, run, lane])
+                    inputs.append(key)
+                    L = [i[j] for j in column_names if j in i]
+                    L.append(project)
+                    L.insert(3, workflow_run)
+                                      
+                    if key in records:
+                        # update inputs info
+                        for i in range(3, len(column_names)):
+                            cur.execute("UPDATE {0} SET {1} = '{2}' WHERE library='{3}' AND run = '{4}' AND lane = '{5}'".format(table, column_names[i], L[i], library, run, lane))  
+                            conn.commit()
+                    else:
+                        # insert project info
+                        cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
                         conn.commit()
-                else:
-                    # insert project info
-                    cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
-                    conn.commit()
    
     # remove any inputs in database not anymore defined in FPR    
     for k in records:
