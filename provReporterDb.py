@@ -1091,16 +1091,23 @@ def add_workflow_inputs_to_db(database, fpr, table = 'Workflow_Inputs'):
         for workflow_run in libraries[project]:
             for sample in libraries[project][workflow_run]:
                 for i in libraries[project][workflow_run][sample]['libraries']:
-                    library, run, lane = i['library'], i['run'], i['lane']
+                    library, run, lane = i['library'], i['run'], int(i['lane'])
                     #key = tuple([library, run, lane, workflow_run])
-                    L = [i[j] for j in column_names if j in i]
+                    L = []
+                    for j in column_names:
+                        if j in i:
+                            if j != 'lane':
+                                L.append(i[j])
+                            else:
+                                L.append(int(i[j]))
                     L.append(project)
                     L.insert(3, workflow_run)
-                    
                     assert tuple(L) not in inputs
                     inputs.append(tuple(L))                    
-                       
+                                       
                     if tuple(L) not in records:
+                        print('inserting into Workflow inputs')
+                        
                         # insert project info
                         cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
                         conn.commit()
@@ -1109,6 +1116,7 @@ def add_workflow_inputs_to_db(database, fpr, table = 'Workflow_Inputs'):
     for k in records:
        if k not in inputs:
            library, run, lane, workflow_run, limskey, barcode, platform, project_id = k    
+           print('deleting from Workflow inputs')
            cur.execute('DELETE FROM {0} WHERE {0}.library=\"{1}\" AND {0}.run=\"{2}\" AND {0}.lane=\"{3}\" and {0}.wfrun_id=\{4}\"  AND {0}.limskey=\"{5}\" AND {0}.barcode=\"{6}\" AND {0}.platform=\"{7}\" AND {0}.project_id=\"{8}\"'.format(table, library, run, lane, workflow_run, limskey, barcode, platform, project_id))
            conn.commit()
     conn.close()
