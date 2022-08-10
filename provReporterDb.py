@@ -715,7 +715,7 @@ def add_project_info_to_db(database, project_provenance, table = 'Projects'):
         if project in records:
             # update project info
             for i in projects[project]:
-                cur.execute('UPDATE {0} SET {1} = \"{2}\" WHERE project_id=\"{3}\"'.format(table, i, projects[project][i], project))  
+                cur.execute("UPDATE {0} SET {1} = '{2}' WHERE project_id='{3}'".format(table, i, projects[project][i], project))  
                 conn.commit()
         else:
             # insert project info
@@ -777,7 +777,7 @@ def add_workflows(workflows, database, table = 'Workflows'):
     # remove any workflows not defined anymore in FPR    
     for (workflow_run, project) in records:
         if project not in workflows:
-            cur.execute('DELETE FROM {0} WHERE {0}.project_id=\"{1}\"'.format(table, project))
+            cur.execute('DELETE FROM {0} WHERE project_id=\"{1}\"'.format(table, project))
             conn.commit()
         elif workflow_run not in workflows[project]:
             cur.execute('DELETE FROM {0} WHERE wfrun_id = \"{1}\" AND project_id=\"{2}\"'.format(table, workflow_run, project))
@@ -824,20 +824,20 @@ def add_workflow_relationships(D, database, table):
     # remove any workflow relationships not defined anymore in FPR    
     for (i, j, project) in records:
         if project not in D:
-            cur.execute('DELETE FROM {0} WHERE {0}.project_id=\"{1}\"'.format(table, project))
+            cur.execute('DELETE FROM {0} WHERE project_id=\"{1}\"'.format(table, project))
             conn.commit()
         elif i not in D[project]:
             if table == 'Parents':
-                cmd1 = 'DELETE FROM {0} WHERE {0}.children_id = \"{1}\" AND {0}.project_id=\"{2}\"'.format(table, i, project)
+                cmd1 = 'DELETE FROM {0} WHERE children_id = \"{1}\" AND project_id=\"{2}\"'.format(table, i, project)
             elif table == 'Children':
-                cmd1 = 'DELETE FROM {0} WHERE {0}.parents_id = \"{1}\" AND {0}.project_id=\"{2}\"'.format(table, i, project)
+                cmd1 = 'DELETE FROM {0} WHERE parents_id = \"{1}\" AND project_id=\"{2}\"'.format(table, i, project)
             cur.execute(cmd1)
             conn.commit()
         elif j not in D[project][i]:
             if table == 'Parents':
-                cmd2 = 'DELETE FROM {0} WHERE {0}.children_id = \"{1}\" AND {0}.parents_id = \"{2}\" AND {0}.project_id=\"{3}\"'.format(table, i, j, project)
+                cmd2 = 'DELETE FROM {0} WHERE children_id = \"{1}\" AND parents_id = \"{2}\" AND project_id=\"{3}\"'.format(table, i, j, project)
             elif table == 'Children':
-                cmd2 = 'DELETE FROM {0} WHERE {0}.parents_id = \"{1}\" AND {0}.children_id = \"{2}\" AND {0}.project_id=\"{3}\"'.format(table, i, j, project)
+                cmd2 = 'DELETE FROM {0} WHERE parents_id = \"{1}\" AND children_id = \"{2}\" AND project_id=\"{3}\"'.format(table, i, j, project)
             cur.execute(cmd2)            
             conn.commit()
     conn.close()
@@ -957,7 +957,7 @@ def add_file_info_to_db(database, table, fpr, project_provenance, nabu_api, file
             if file_swid in records:
                 # update QC info
                 for i in range(1, len(column_names)):
-                    cur.execute('UPDATE {0} SET {1} = \"{2}\" WHERE file_swid=\"{3}\"'.format(table, column_names[i], L[i], file_swid))  
+                    cur.execute("UPDATE {0} SET {1} = '{2}' WHERE file_swid='{3}'".format(table, column_names[i], L[i], file_swid))  
                     conn.commit()
             else:
                 # insert project info
@@ -967,7 +967,7 @@ def add_file_info_to_db(database, table, fpr, project_provenance, nabu_api, file
     # remove any file in database not anymore defined in Nabu    
     for file_swid in records:
         if file_swid not in file_swids:
-            cur.execute('DELETE FROM {0} WHERE {0}.file_swid=\"{1}\"'.format(table, file_swid))
+            cur.execute('DELETE FROM {0} WHERE file_swid=\"{1}\"'.format(table, file_swid))
             conn.commit()
     conn.close()
 
@@ -1034,7 +1034,7 @@ def add_library_info_to_db(database, sample_provenance, table = 'Libraries'):
     # remove any library in database not anymore defined in Pinery    
     for library in records:
        if library not in libraries:
-           cur.execute('DELETE FROM {0} WHERE {0}.library=\"{1}\"'.format(table, library))
+           cur.execute('DELETE FROM {0} WHERE library=\"{1}\"'.format(table, library))
            conn.commit()
     conn.close()
 
@@ -1106,8 +1106,6 @@ def add_workflow_inputs_to_db(database, fpr, table = 'Workflow_Inputs'):
                     inputs.append(tuple(L))                    
                                        
                     if tuple(L) not in records:
-                        print('inserting into Workflow inputs')
-                        
                         # insert project info
                         cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
                         conn.commit()
@@ -1116,8 +1114,7 @@ def add_workflow_inputs_to_db(database, fpr, table = 'Workflow_Inputs'):
     for k in records:
        if k not in inputs:
            library, run, lane, workflow_run, limskey, barcode, platform, project_id = k    
-           print('deleting from Workflow inputs')
-           cur.execute('DELETE FROM {0} WHERE {0}.library=\"{1}\" AND {0}.run=\"{2}\" AND {0}.lane=\"{3}\" and {0}.wfrun_id=\{4}\"  AND {0}.limskey=\"{5}\" AND {0}.barcode=\"{6}\" AND {0}.platform=\"{7}\" AND {0}.project_id=\"{8}\"'.format(table, library, run, lane, workflow_run, limskey, barcode, platform, project_id))
+           cur.execute("DELETE FROM {0} WHERE library='{1}' AND run='{2}' AND lane='{3} AND wfrun_id='{4}' AND limskey='{5}' AND barcode='{6}' AND platform='{7}' AND project_id='{8}'".format(table, library, run, lane, workflow_run, limskey, barcode, platform, project_id))
            conn.commit()
     conn.close()
 
@@ -1136,29 +1133,35 @@ if __name__ == '__main__':
     # get arguments from the command line
     args = parser.parse_args()
     
+    start1 = time.time()
+    
+    
     # initiate database
     initiate_db(args.database)
     # add or update information in tables
-    #add_project_info_to_db(args.database, args.project_provenance, 'Projects')
+    add_project_info_to_db(args.database, args.project_provenance, 'Projects')
     print('added data into Projects')
     start = time.time()
-    #add_workflows_info_to_db(args.fpr, args.database, 'Workflows', 'Parents', 'Children')
+    add_workflows_info_to_db(args.fpr, args.database, 'Workflows', 'Parents', 'Children')
     end = time.time()
     print('added data into Workflows', end - start)
     start = time.time()
-    #add_file_info_to_db(args.database, 'FilesQC', args.fpr, args.project_provenance, args.nabu, 'Files')
+    add_file_info_to_db(args.database, 'FilesQC', args.fpr, args.project_provenance, args.nabu, 'Files')
     end = time.time()
     print('added file info into FilesQC', end - start)
     start = time.time()
-    #add_file_info_to_db(args.database, 'Files', args.fpr, args.project_provenance, args.nabu, 'Files')
+    add_file_info_to_db(args.database, 'Files', args.fpr, args.project_provenance, args.nabu, 'Files')
     end = time.time()
     print('added file info into Files', end - start)
     start = time.time()
-    #add_library_info_to_db(args.database, args.sample_provenance, 'Libraries')
+    add_library_info_to_db(args.database, args.sample_provenance, 'Libraries')
     end = time.time()
     print('added library info into Libraries', end - start)
     start = time.time()
     add_workflow_inputs_to_db(args.database, args.fpr, 'Workflow_Inputs')
     end = time.time()
     print('added workflow inputs to Workflow_Inputs', end - start)
+    
+    end1 = time.time()
+    print('added info to db', end1 - start1)
     
