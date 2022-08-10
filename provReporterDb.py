@@ -281,10 +281,6 @@ def get_workflow_relationships(fpr):
 
     F, P, W = {}, {}, {}
 
-
-    start = time.time()
-    
-
     # open fpr
     infile = open_fpr(fpr)
     # skip header
@@ -339,11 +335,6 @@ def get_workflow_relationships(fpr):
     
     infile.close()
     
-    
-    end = time.time()
-    print('parsing workflow relationships', end - start)
-
-    
     return W, P, F        
 
 
@@ -360,9 +351,6 @@ def identify_parent_children_workflows(P, F):
     - P (dict): Input file ids for each workflow run id
     - F (dict): Map of file id and workflow id
     '''
-    
-    start = time.time()
-    
     
     # parents record parent-child workflow relationships
     # children record child-parent workflow relationships
@@ -389,13 +377,7 @@ def identify_parent_children_workflows(P, F):
         for workflow in parents[project]:
             parents[project][workflow] = sorted(list(set(parents[project][workflow])))
     
-    end = time.time()
-    
-    print('identify parent_children', end - start)
-    
     return parents, children
-
-
 
 
 def get_provenance_data(provenance):
@@ -875,17 +857,13 @@ def add_workflows_info_to_db(fpr, database, workflow_table = 'Workflows', parent
 
     # add workflow info
     add_workflows(workflows, database, workflow_table)
-    print('added workflows')
-    
-    
+        
     # add parents-children workflow relationships
     add_workflow_relationships(parent_workflows, database, parent_table)    
-    print('added parents')
-    
+       
     # add children-parents workflow relationships    
     add_workflow_relationships(children_workflows, database, children_table)    
-    print('added children')
-   
+       
     
     
 def add_file_info_to_db(database, table, fpr, project_provenance, nabu_api, file_table = 'Files'):
@@ -934,11 +912,6 @@ def add_file_info_to_db(database, table, fpr, project_provenance, nabu_api, file
     records = cur.fetchall()
     records = [i[0] for i in records]
     
-    if records:
-        print('add_file_info', table, records[0])
-    else:
-        print('add_file_info', table, records)
-
     # get column names
     column_names = define_column_names()[table]
 
@@ -1062,7 +1035,7 @@ def add_workflow_inputs_to_db(database, fpr, table = 'Workflow_Inputs'):
     for i in to_remove:
         del libraries[i] 
         
-    print('extracted workflow info')
+    
     
     # connect to db
     conn = sqlite3.connect(database)
@@ -1076,11 +1049,6 @@ def add_workflow_inputs_to_db(database, fpr, table = 'Workflow_Inputs'):
     data = cur.execute('SELECT * FROM {0}'.format(table))
     column_names = [column[0] for column in data.description]
         
-    if records:
-        print('add_wkf_input', table, records[0])
-    else:
-        print('add_wkf_input', table, records)
-
     # make a list of (library, run, lane)
     # library, run and lane defines an input to workflow
     inputs = []
