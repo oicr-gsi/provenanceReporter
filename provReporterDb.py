@@ -116,6 +116,7 @@ def extract_qc_status_from_nabu(project, database, nabu_api, file_table = 'Files
     cur = conn.cursor()
     cur.execute('SELECT {0}.file_swid FROM {0} WHERE {0}.project_id = \"{1}\"'.format(file_table, project))
     records = cur.fetchall()
+    records = [int(i[0]) for i in records]
     conn.close()
     
     for project in D:
@@ -925,14 +926,18 @@ def add_file_info_to_db(database, table, fpr, project_provenance, nabu_api, file
             L = [D[project][file_swid][i] for i in column_names if i in D[project][file_swid]]
             L.insert(0, project)
             L.insert(0, file_swid)
-            
+                       
             if file_swid in records:
                 # update QC info
                 for i in range(1, len(column_names)):
+                    print('updating {0} for {1} in {2}'.format(file_swid, project, table))
+                    
+                    
                     cur.execute("UPDATE {0} SET {1} = '{2}' WHERE file_swid='{3}'".format(table, column_names[i], L[i], file_swid))  
                     conn.commit()
             else:
                 # insert project info
+                print('inserting {0} for {1} in {2}'.format(file_swid, project, table))
                 cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
                 conn.commit()
     
@@ -1109,11 +1114,11 @@ if __name__ == '__main__':
     add_project_info_to_db(args.database, args.project_provenance, 'Projects')
     print('added data into Projects')
     start = time.time()
-    add_workflows_info_to_db(args.fpr, args.database, 'Workflows', 'Parents', 'Children')
+    #add_workflows_info_to_db(args.fpr, args.database, 'Workflows', 'Parents', 'Children')
     end = time.time()
     print('added data into Workflows', end - start)
     start = time.time()
-    add_file_info_to_db(args.database, 'FilesQC', args.fpr, args.project_provenance, args.nabu, 'Files')
+    #add_file_info_to_db(args.database, 'FilesQC', args.fpr, args.project_provenance, args.nabu, 'Files')
     end = time.time()
     print('added file info into FilesQC', end - start)
     start = time.time()
@@ -1121,11 +1126,11 @@ if __name__ == '__main__':
     end = time.time()
     print('added file info into Files', end - start)
     start = time.time()
-    add_library_info_to_db(args.database, args.sample_provenance, 'Libraries')
+    #add_library_info_to_db(args.database, args.sample_provenance, 'Libraries')
     end = time.time()
     print('added library info into Libraries', end - start)
     start = time.time()
-    add_workflow_inputs_to_db(args.database, args.fpr, 'Workflow_Inputs')
+    #add_workflow_inputs_to_db(args.database, args.fpr, 'Workflow_Inputs')
     end = time.time()
     print('added workflow inputs to Workflow_Inputs', end - start)
     
