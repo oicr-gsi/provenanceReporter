@@ -10,7 +10,6 @@ import sqlite3
 import json
 import requests
 import gzip
-import os
 import argparse
 import time
 
