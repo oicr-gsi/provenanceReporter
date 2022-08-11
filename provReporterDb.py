@@ -143,19 +143,6 @@ def collect_qc_info(database, project_provenance, nabu_api, file_table = 'Files'
     # make a list of projects defined in Pinery
     projects = list(extract_project_info(project_provenance).keys())
         
-    
-    to_remove = []
-    for i in projects:
-        if i not in ['HCCCFD', 'TGL01MOH', 'KLCS', 'BARON', 'SIMONE', 'HLCS', 'ARCH1']:
-            to_remove.append(i)
-    for i in to_remove:
-        projects.remove(i)
-    
-    
-    
-    
-    
-    
     # collect QC information for all files in each project
     D = {}
     for project in projects:
@@ -670,18 +657,6 @@ def add_project_info_to_db(database, project_provenance, table = 'Projects'):
     # get project info
     projects = extract_project_info(project_provenance)
     
-    to_remove = []
-    for i in projects:
-        if i not in ['HCCCFD', 'TGL01MOH', 'KLCS', 'BARON', 'SIMONE', 'HLCS', 'ARCH1']:
-            to_remove.append(i)
-    for i in to_remove:
-        del projects[i]
-    
-    
-    
-    
-    
-    
     # get existing records
     cur.execute('SELECT {0}.project_id FROM {0}'.format(table))
     records = cur.fetchall()
@@ -843,16 +818,6 @@ def add_workflows_info_to_db(fpr, database, workflow_table = 'Workflows', parent
     # get the workflow inputs and workflow info
     workflows, parents, files = get_workflow_relationships(fpr)
     
-    to_remove = []
-    for i in workflows:
-        if i not in ['HCCCFD', 'TGL01MOH', 'KLCS', 'BARON', 'SIMONE', 'HLCS', 'ARCH1']:
-            to_remove.append(i)
-    for i in to_remove:
-        del workflows[i]
-        del parents[i]
-        del files[i]
-    
-    
     # identify parent-children workflow relationships
     parent_workflows, children_workflows = identify_parent_children_workflows(parents, files)
 
@@ -893,16 +858,6 @@ def add_file_info_to_db(database, table, fpr, project_provenance, nabu_api, file
     elif table == 'Files':
         # collect file info from FPR
         D = collect_file_info_from_fpr(fpr)
-    
-        
-    to_remove = []
-    for i in D:
-        if i not in ['HCCCFD', 'TGL01MOH', 'KLCS', 'BARON', 'SIMONE', 'HLCS', 'ARCH1']:
-            to_remove.append(i)
-    for i in to_remove:
-        del D[i]
-    
-    
     
     # connect to db
     conn = sqlite3.connect(database)
@@ -966,14 +921,6 @@ def add_library_info_to_db(database, sample_provenance, table = 'Libraries'):
     # collect lims information
     lims = collect_lims_info(sample_provenance)
     
-    to_remove = []
-    for i in lims:
-        if i not in ['HCCCFD', 'TGL01MOH', 'KLCS', 'BARON', 'SIMONE', 'HLCS', 'ARCH1']:
-            to_remove.append(i)
-    for i in to_remove:
-        del lims[i]
-        
-    
     # connect to db
     conn = sqlite3.connect(database)
     cur = conn.cursor()
@@ -1033,15 +980,6 @@ def add_workflow_inputs_to_db(database, fpr, table = 'Workflow_Inputs'):
     # collect information about library inputs
     libraries = extract_workflow_info(fpr)
     
-    to_remove = []
-    for i in libraries:
-        if i not in ['HCCCFD', 'TGL01MOH', 'KLCS', 'BARON', 'SIMONE', 'HLCS', 'ARCH1']:
-            to_remove.append(i)
-    for i in to_remove:
-        del libraries[i] 
-        
-    
-    
     # connect to db
     conn = sqlite3.connect(database)
     cur = conn.cursor()
@@ -1078,6 +1016,8 @@ def add_workflow_inputs_to_db(database, fpr, table = 'Workflow_Inputs'):
                     inputs.append(tuple(L))                    
                                        
                     if tuple(L) not in records:
+                        print('inserting {0} {1} {2} in Worklow Inputs'.format(project, workflow_run, sample))
+                        
                         # insert project info
                         cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
                         conn.commit()
@@ -1105,35 +1045,34 @@ if __name__ == '__main__':
     # get arguments from the command line
     args = parser.parse_args()
     
-    start1 = time.time()
-    
-    
     # initiate database
+    start1 = time.time()
     initiate_db(args.database)
+    start = time.time()
     # add or update information in tables
     add_project_info_to_db(args.database, args.project_provenance, 'Projects')
-    print('added data into Projects')
-    start = time.time()
-    #add_workflows_info_to_db(args.fpr, args.database, 'Workflows', 'Parents', 'Children')
     end = time.time()
-    print('added data into Workflows', end - start)
+    print('added data to Projects', end - start)
     start = time.time()
-    #add_file_info_to_db(args.database, 'FilesQC', args.fpr, args.project_provenance, args.nabu, 'Files')
+    add_workflows_info_to_db(args.fpr, args.database, 'Workflows', 'Parents', 'Children')
     end = time.time()
-    print('added file info into FilesQC', end - start)
+    print('added data to Workflows', end - start)
+    start = time.time()
+    add_file_info_to_db(args.database, 'FilesQC', args.fpr, args.project_provenance, args.nabu, 'Files')
+    end = time.time()
+    print('added data to FilesQC', end - start)
     start = time.time()
     add_file_info_to_db(args.database, 'Files', args.fpr, args.project_provenance, args.nabu, 'Files')
     end = time.time()
-    print('added file info into Files', end - start)
+    print('added data to Files', end - start)
     start = time.time()
-    #add_library_info_to_db(args.database, args.sample_provenance, 'Libraries')
+    add_library_info_to_db(args.database, args.sample_provenance, 'Libraries')
     end = time.time()
-    print('added library info into Libraries', end - start)
+    print('added data to Libraries', end - start)
     start = time.time()
-    #add_workflow_inputs_to_db(args.database, args.fpr, 'Workflow_Inputs')
+    add_workflow_inputs_to_db(args.database, args.fpr, 'Workflow_Inputs')
     end = time.time()
-    print('added workflow inputs to Workflow_Inputs', end - start)
-    
+    print('added data to Workflow_Inputs', end - start)
     end1 = time.time()
     print('added info to db', end1 - start1)
     
