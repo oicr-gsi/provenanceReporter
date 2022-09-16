@@ -116,7 +116,7 @@ def extract_qc_status_from_nabu(project, database, nabu_api, file_table = 'Files
     cur = conn.cursor()
     cur.execute('SELECT {0}.file_swid FROM {0} WHERE {0}.project_id = \"{1}\"'.format(file_table, project))
     records = cur.fetchall()
-    records = [int(i[0]) for i in records]
+    records = [i[0] for i in records]
     conn.close()
     
     for project in D:
@@ -142,7 +142,11 @@ def collect_qc_info(database, project_provenance, nabu_api, file_table = 'Files'
         
     # make a list of projects defined in Pinery
     projects = list(extract_project_info(project_provenance).keys())
-        
+    
+    to_remove = [i for i in projects if i not in ['HCCCFD','KLCS', 'HLCS']]
+    for i in to_remove:
+        projects.remove(i)             
+    
     # collect QC information for all files in each project
     D = {}
     for project in projects:
@@ -176,6 +180,13 @@ def collect_file_info_from_fpr(fpr):
             line = line.split('\t')
             # get project and initiate dict
             project = line[1]
+            
+            if project not in ['HCCCFD','KLCS', 'HLCS']:
+                continue             
+    
+            
+            
+            
             if project not in D:
                 D[project] = {}
             # get file path
@@ -183,7 +194,7 @@ def collect_file_info_from_fpr(fpr):
             # get md5sums
             md5sum = line[47]
             # get file_swid
-            file_swid = int(line[44])
+            file_swid = line[44]
             # get the library type
             library_type = line[17]
             if library_type:
@@ -206,7 +217,7 @@ def collect_file_info_from_fpr(fpr):
             # get workflow version
             version = line[31]        
             # get workflow run accession
-            workflow_run = int(line[36])
+            workflow_run = line[36]
             # collect file info
             D[project][file_swid] = {'md5sum': md5sum, 'workflow': workflow, 'version': version,
                    'wfrun_id': workflow_run, 'file': file, 'library_type': library_type, 'attributes': attributes}
@@ -281,10 +292,19 @@ def get_workflow_relationships(fpr):
             line = line.split('\t')
             # get project name
             project = line[1]
+            
+            if project not in ['HCCCFD','KLCS', 'HLCS']:
+                continue
+                        
+    
+            
+            
+            
+            
             # get workflow, workflow version and workflow run accession
-            workflow, workflow_version, workflow_run = line[30], line[31], int(line[36])
+            workflow, workflow_version, workflow_run = line[30], line[31], line[36]
             # get file swid
-            file_swid = int(line[44])
+            file_swid = line[44]
             input_files = line[38]
             if input_files:
                 input_files = sorted(input_files.split(';'))
@@ -323,6 +343,11 @@ def get_workflow_relationships(fpr):
     
     infile.close()
     
+    print(len(W))
+    print(len(P))
+    print(len(F))
+    
+    
     return W, P, F        
 
 
@@ -343,7 +368,20 @@ def identify_parent_children_workflows(P, F):
     # parents record parent-child workflow relationships
     # children record child-parent workflow relationships
     parents, children = {}, {}
-       
+    
+    
+    to_remove = [i for i in P if i not in ['HCCCFD','KLCS', 'HLCS']]
+    for i in to_remove:
+        del P[i]             
+    
+    
+    
+    
+    
+    
+    
+    
+    
     for project in P:
         if project not in children:
             children[project] = {}
@@ -459,6 +497,12 @@ def extract_workflow_info(fpr):
             line = line.split('\t')
             # get project name
             project = line[1]
+            
+            if project in ['HCCCFD','KLCS', 'HLCS']:
+                continue             
+    
+            
+            
                         
             # get sample name
             sample = line[7]
@@ -518,22 +562,22 @@ def define_column_types():
     '''
 
     # create dict to store column names for each table {table: [column names]}
-    column_types = {'Workflows': ['INTEGER', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'TEXT'],
-                    'Parents': ['INTEGER', 'INTEGER', 'VARCHAR(128)'],
-                    'Children': ['INTEGER', 'INTEGER', 'VARCHAR(128)'],
+    column_types = {'Workflows': ['VARCHAR(572)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'TEXT'],
+                    'Parents': ['VARCHAR(572)', 'VARCHAR(572)', 'VARCHAR(128)'],
+                    'Children': ['VARCHAR(572)', 'VARCHAR(572)', 'VARCHAR(128)'],
                     'Projects': ['VARCHAR(128) PRIMARY KEY NOT NULL UNIQUE', 'VARCHAR(128)',
                                   'TEXT', 'VARCHAR(128)', 'VARCHAR(256)', 'VARCHAR(256)'],
-                    'Files': ['INTEGER PRIMARY KEY NOT NULL UNIQUE', 'VARCHAR(128)',
+                    'Files': ['VARCHAR(572) PRIMARY KEY NOT NULL UNIQUE', 'VARCHAR(128)',
                               'VARCHAR(256)', 'VARCHAR(128)', 'VARCHAR(128)',
-                              'INTEGER', 'TEXT', 'VARCHAR(128)', 'TEXT'],
-                    'FilesQC': ['INTEGER PRIMARY KEY NOT NULL UNIQUE', 'VARCHAR(128)',
+                              'VARCHAR(572)', 'TEXT', 'VARCHAR(128)', 'TEXT'],
+                    'FilesQC': ['VARCHAR(572) PRIMARY KEY NOT NULL UNIQUE', 'VARCHAR(128)',
                                 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)',
                                 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)'],
                     'Libraries': ['VARCHAR(256) PRIMARY KEY NOT NULL', 'VARCHAR(128)',
                                   'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)',
                                   'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 
                                   'VARCHAR(256)', 'VARCHAR(128)', 'VARCHAR(256)', 'VARCHAR(128)'],
-                    'Workflow_Inputs': ['VARCHAR(128)', 'VARCHAR(256)', 'INTEGER', 'INTEGER', 
+                    'Workflow_Inputs': ['VARCHAR(128)', 'VARCHAR(256)', 'INTEGER', 'VARCHAR(572)', 
                                         'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)']}
     
     return column_types
@@ -656,6 +700,13 @@ def add_project_info_to_db(database, project_provenance, table = 'Projects'):
             
     # get project info
     projects = extract_project_info(project_provenance)
+    
+    to_remove = [i for i in projects if i not in ['HCCCFD','KLCS', 'HLCS']]
+    for i in to_remove:
+        del projects[i]             
+    
+    
+    
     
     # get existing records
     cur.execute('SELECT {0}.project_id FROM {0}'.format(table))
@@ -885,14 +936,10 @@ def add_file_info_to_db(database, table, fpr, project_provenance, nabu_api, file
             if file_swid in records:
                 # update QC info
                 for i in range(1, len(column_names)):
-                    print('updating {0} for {1} in {2}'.format(file_swid, project, table))
-                    
-                    
                     cur.execute("UPDATE {0} SET {1} = '{2}' WHERE file_swid='{3}'".format(table, column_names[i], L[i], file_swid))  
                     conn.commit()
             else:
                 # insert project info
-                print('inserting {0} for {1} in {2}'.format(file_swid, project, table))
                 cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
                 conn.commit()
     
@@ -920,6 +967,16 @@ def add_library_info_to_db(database, sample_provenance, table = 'Libraries'):
     
     # collect lims information
     lims = collect_lims_info(sample_provenance)
+    
+    
+    to_remove = [i for i in lims if i not in ['HCCCFD','KLCS', 'HLCS']]
+    for i in to_remove:
+        lims.remove(i)             
+    
+    
+    
+    
+    
     
     # connect to db
     conn = sqlite3.connect(database)
@@ -1016,8 +1073,6 @@ def add_workflow_inputs_to_db(database, fpr, table = 'Workflow_Inputs'):
                     inputs.append(tuple(L))                    
                                        
                     if tuple(L) not in records:
-                        print('inserting {0} {1} {2} in Worklow Inputs'.format(project, workflow_run, sample))
-                        
                         # insert project info
                         cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
                         conn.commit()
@@ -1036,7 +1091,7 @@ if __name__ == '__main__':
 
     # create top-level parser
     parser = argparse.ArgumentParser(prog = 'provReporterDb.py', description='Script to add data from FPR, Nabu and Pinery to Provenance Reporter Db')
-    parser.add_argument('-f', '--fpr', dest='fpr', default = '/.mounts/labs/seqprodbio/private/backups/seqware_files_report_latest.tsv.gz', help='Path to the File Provenance Report. Default is /.mounts/labs/seqprodbio/private/backups/seqware_files_report_latest.tsv.gz')
+    parser.add_argument('-f', '--fpr', dest='fpr', default = '/scratch2/groups/gsi/production/vidarr/vidarr_files_report_latest.tsv.gz', help='Path to the File Provenance Report. Default is /scratch2/groups/gsi/production/vidarr/vidarr_files_report_latest.tsv.gz')
     parser.add_argument('-n', '--nabu', dest='nabu', default='http://gsi-dcc.oicr.on.ca:3000', help='URL of the Nabu API. Default is http://gsi-dcc.oicr.on.ca:3000')
     parser.add_argument('-sp', '--sample_provenance', dest='sample_provenance', default = 'http://pinery.gsi.oicr.on.ca/provenance/v9/sample-provenance', help = 'URL of the Sample Provenance in Pinery. Default is http://pinery.gsi.oicr.on.ca/provenance/v9/sample-provenance')
     parser.add_argument('-pp', '--project_provenance', dest = 'project_provenance', default = 'http://pinery.gsi.oicr.on.ca/sample/projects', help = 'URL of the Project Provenance in Pinery. Default is http://pinery.gsi.oicr.on.ca/sample/projects')
@@ -1050,11 +1105,11 @@ if __name__ == '__main__':
     initiate_db(args.database)
     start = time.time()
     # add or update information in tables
-    add_project_info_to_db(args.database, args.project_provenance, 'Projects')
+    #add_project_info_to_db(args.database, args.project_provenance, 'Projects')
     end = time.time()
     print('added data to Projects', end - start)
     start = time.time()
-    add_workflows_info_to_db(args.fpr, args.database, 'Workflows', 'Parents', 'Children')
+    #add_workflows_info_to_db(args.fpr, args.database, 'Workflows', 'Parents', 'Children')
     end = time.time()
     print('added data to Workflows', end - start)
     start = time.time()
