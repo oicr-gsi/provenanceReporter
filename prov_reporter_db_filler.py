@@ -507,7 +507,7 @@ def extract_workflow_info(fpr):
             # get sample name
             sample = line[7]
             # get workflow name and workflow run accession
-            workflow, workflow_run = line[30], int(line[36])
+            workflow, workflow_run = line[30], line[36]
                                   
             # get lane and run
             run, lane = line[18], line[24]            
@@ -971,7 +971,7 @@ def add_library_info_to_db(database, sample_provenance, table = 'Libraries'):
     
     to_remove = [i for i in lims if i not in ['HCCCFD','KLCS', 'HLCS']]
     for i in to_remove:
-        lims.remove(i)             
+        del lims[i]             
     
     
     
@@ -1113,15 +1113,15 @@ if __name__ == '__main__':
     end = time.time()
     print('added data to Workflows', end - start)
     start = time.time()
-    add_file_info_to_db(args.database, 'FilesQC', args.fpr, args.project_provenance, args.nabu, 'Files')
+    #add_file_info_to_db(args.database, 'FilesQC', args.fpr, args.project_provenance, args.nabu, 'Files')
     end = time.time()
     print('added data to FilesQC', end - start)
     start = time.time()
-    add_file_info_to_db(args.database, 'Files', args.fpr, args.project_provenance, args.nabu, 'Files')
+    #add_file_info_to_db(args.database, 'Files', args.fpr, args.project_provenance, args.nabu, 'Files')
     end = time.time()
     print('added data to Files', end - start)
     start = time.time()
-    add_library_info_to_db(args.database, args.sample_provenance, 'Libraries')
+    #add_library_info_to_db(args.database, args.sample_provenance, 'Libraries')
     end = time.time()
     print('added data to Libraries', end - start)
     start = time.time()
