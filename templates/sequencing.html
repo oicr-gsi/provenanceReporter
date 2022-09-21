@@ -1,15 +1,14 @@
 {% extends 'project_base.html' %}
 
 
-{% block link %} <a href="{{ url_for('project', project_name=project['name']) }}">{{ project['name'] }}</a> {% endblock %}
+{% block link %} <a href="{{ url_for('project', project_name=project['project_id']) }}">{{ project['project_id'] }}</a> {% endblock %}
 
 
 {% block content %}
    <div class="project_title">
-     <p>{% block title %}{{ project['name'] }} {% endblock %}</p>
+     <p>{% block title %}{{ project['project_id'] }} {% endblock %}</p>
    </div>    
 
-   
 <table id="project_table">
    <tr>
      <th>Cases</th>
@@ -21,36 +20,24 @@
      <th>Workflow</th> 
      <th>Release status</th>
    </tr>     
-   
 
-   {% for case in sequences %}
+   {% for i in sequences %}
      <tr>
-       {% for sample in sequences[case] %}
-         <tr>  
-           {% for library in sequences[case][sample] %}
-             <tr>          
-               {% for run in sequences[case][sample][library] %}
-                 <tr>
-                   <td> {{case}} </td>
-                   <td> {{sample}} </td>
-                   <td> {{library}} </td> 
-                   <td> {{run}} </td>
-                   <td> {% for item in sequences[case][sample][library][run]['files'] %}
-                          {{item}}
-                          <br>
-                        {% endfor %}                    
-                   </td>        
-                   <td> {{sequences[case][sample][library][run]['read_count']}} </td>
-                   <td> {{sequences[case][sample][library][run]['workflow']}} </td>
-                   <td> {{sequences[case][sample][library][run]['release']}} </td>
-               {% endfor %}               
-               </tr>               
-           {% endfor %}
-           </tr> 
-       {% endfor %}
-       </tr>       
-      </tr>
-      {% endfor %}
+       <td> {{i['case']}} </td>
+       <td> {{i['sample']}} </td>
+       <td> {{i['library']}} </td>
+       <td> {{i['run']}} </td>
+       <td>
+         {% for item in i['files'] %}
+           {{item}}
+           <br>
+         {% endfor %}                    
+       </td>        
+       <td> {{i['read_count']}} </td>
+       <td> {{i['workflow']}} </td>
+       <td> {{i['release_status']}} </td>
+     </tr>
+   {% endfor %}               
    </table>
 
 {% endblock %}

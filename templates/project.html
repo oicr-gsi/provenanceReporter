@@ -1,6 +1,6 @@
 {% extends 'project_base.html' %}
 
-{% block link %} <a href="{{ url_for('sequencing', project_name=project['name']) }}">Sequencing</a> {% endblock %}
+{% block link %} <a href="{{ url_for('sequencing', project_name=project['project_id']) }}">Sequencing</a> {% endblock %}
 
 
 {% block content %}
@@ -11,7 +11,7 @@
   <table class="project_info_table">
   <tr>
     <th>Project name:</th>
-    <td>{{ project['name'] }}</td>
+    <td>{{ project['project_id'] }}</td>
   </tr>
   <tr>
     <th>Project description:</th>
