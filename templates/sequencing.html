@@ -1,7 +1,12 @@
 {% extends 'project_base.html' %}
 
 
-{% block link %} <a href="{{ url_for('project', project_name=project['project_id']) }}">{{ project['project_id'] }}</a> {% endblock %}
+{% block link %}
+ <a href="{{ url_for('project', project_name=project['project_id']) }}">{{ project['project_id'] }}</a>
+ {% for i in pipelines %}
+   <a href="#{{i}}">{{i}}</a>
+ {% endfor %}   
+{% endblock %}
 
 
 {% block content %}

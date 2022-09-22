@@ -1463,69 +1463,6 @@ def connect_to_db():
     return conn
 
 
-# def group_sequences(L):
-#     '''
-#     (list) -> dict
-
-#     Returns a dictionary with sequence file information by grouping paired fastqs    
-#     Pre-condition: all fastqs are paired-fastqs
-    
-#     Parameters
-#     ----------
-#     - L (list): List of sqlite3.Row extracted from the database and containing sequence file information
-#     '''
-    
-#     D = {}
-    
-#     # find and group paired-fastqs
-#     for i in range(len(L) -1):
-#         for j in range(i+1, len(L)):
-#             case1, case2 = L[i]['sample'], L[j]['sample']
-#             sample1, sample2 = case1 + '_' + L[i]['ext_id'], case2 + '_' + L[j]['ext_id']
-#             library1, library2 = L[i]['library'] + '_' + L[i]['group_id'], L[j]['library'] + '_' + L[j]['group_id']
-#             workflow1, workflow2 = L[i]['workflow'] + '_' + L[i]['version'], L[j]['workflow'] + '_' + L[j]['version']
-#             wfrun1, wfrun2 = L[i]['wfrun_id'], L[j]['wfrun_id']      
-#             file1, file2 = L[i]['file'], L[j]['file']
-#             run1, run2 = L[i]['run'] + '_' + str(L[i]['lane']), L[j]['run'] + '_' + str(L[j]['lane'])
-#             platform1, platform2 = L[i]['platform'], L[j]['platform']
-#             read_count1 = json.loads(L[i]['attributes'])['read_count'] if 'read_count' in json.loads(L[i]['attributes']) else 'NA' 
-#             read_count2 = json.loads(L[j]['attributes'])['read_count'] if 'read_count' in json.loads(L[j]['attributes']) else 'NA' 
-            
-            
-#             # attributes1 = json.loads(L[i]['attributes'])
-#             # if 'read_count' not in attributes1:
-#             #     read_count1 = 'NA'
-#             # else:
-#             #     read_count1 = attributes1['read_count']
-            
-#             # attributes2 = json.loads(L[j]['attributes'])
-#             # if 'read_count' not in attributes2:
-#             #     read_count2 = 'NA'
-#             # else:
-#             #     read_count2 = attributes2['read_count']
-            
-#             if case1 == case2 and run1 == run2 and platform1 == platform2 \
-#                 and library1 == library2 and sample1 == sample2 and wfrun1 == wfrun2:
-#                     assert read_count1 == read_count2 
-#                     assert workflow1 == workflow2
-#                     if case1 not in D:
-#                         D[case1] = {}
-#                     if sample1 not in D[case1]:
-#                         D[case1][sample1] = {}
-#                     if library1 not in D[case1][sample1]:
-#                         D[case1][sample1][library1] = {}
-#                     if run1 not in D[case1][sample1][library1]:
-#                         D[case1][sample1][library1][run1] = {'files': [], 'read_count': read_count1, 'workflow': workflow1}
-                                      
-#                     D[case1][sample1][library1][run1]['files'].extend([file1, file2])
-#                     D[case1][sample1][library1][run1]['release_status'] = 'NA'
-                    
-#     return D
-
-
-
-
-
 
 def group_sequences(L):
     '''
@@ -1567,13 +1504,84 @@ def group_sequences(L):
                  'files': [file1, file2], 'read_count': read_count1, 'workflow': workflow1,
                  'release_status': 'NA'}
             F.append(d)
-                 
+       
+    F.sort(key = lambda x: x['case'])
+     
     return F
 
 
-
-
+def get_library_design(library_source):
+    '''
+    (str) -> str
     
+    
+    
+
+    Returns
+    -------
+    None.
+
+    '''
+
+    library_design = {'WT': 'Whole Transcriptome', 'WG': 'Whole Genome', 'TS': 'Targeted Sequencing',
+                      'TR': 'Total RNA', 'SW': 'Shallow Whole Genome', 'SM': 'smRNA', 'SC': 'Single Cell',
+                      'NN': 'Unknown', 'MR': 'mRNA', 'EX': 'Exome', 'CT': 'ctDNA', 'CM': 'cfMEDIP',
+                      'CH': 'ChIP-Seq', 'BS': 'Bisulphite Sequencing', 'AS': 'ATAC-Seq'}
+
+    if library_source in library_design:
+        return library_design[library_source]
+    else:
+        return None
+
+
+def get_project_info(project_name):
+    '''
+    (str) -> list
+    
+    Returns a list with project information extracted from database for project_name 
+    
+    Parameters
+    ----------
+    - project_name 9str): Project of interest
+    '''
+    
+    # connect to db
+    conn = connect_to_db()
+    # extract project info
+    projects = conn.execute('SELECT * FROM Projects').fetchall()
+    conn.close()
+    
+    # keep info for project_name
+    project = [i for i in projects if i['project_id'] == project_name][0]
+    
+    return project
+    
+    
+    
+    
+def get_pipelines(project_name):
+    '''
+    (str) -> list
+    
+    Returns a list of pipeline names based on the library codes extracted from database for project_name
+    
+    Parameters
+    ----------
+    - project_name (str) Name of the project of interest
+    '''    
+    
+    # connect to db
+    conn = connect_to_db()
+    # extract library source
+    library_source = conn.execute("SELECT library_type FROM Files WHERE project_id = '{0}';".format(project_name)).fetchall()
+    # get the library definitions
+    pipelines = [get_library_design(j) for j in sorted(list(set([i['library_type'] for i in library_source]))) if get_library_design(j)]
+    conn.close()
+    
+    return pipelines
+    
+    
+
 
 app = Flask(__name__)
 
@@ -1590,29 +1598,24 @@ def index():
 @app.route('/<project_name>')
 def project(project_name):
     
-    # connect to db and extract project info
-    conn = connect_to_db()
-    projects = conn.execute('SELECT * FROM Projects').fetchall()
-    conn.close()
+    # get the project info for project_name from db
+    project = get_project_info(project_name)
+    # get the pipelines from the library definitions in db
+    pipelines = get_pipelines(project_name)
     
-    # keep info for project_name
-    project = [i for i in projects if i['project_id'] == project_name][0]
-    print('project project', list(project))
-
-    
-    return render_template('project.html', project=project)
+    return render_template('project.html', project=project, pipelines=pipelines)
 
 @app.route('/<project_name>/sequencing')
 def sequencing(project_name):
     
-    # get project info
-    conn = connect_to_db()
-    projects = conn.execute('SELECT * FROM Projects').fetchall()
+    # get the project info for project_name from db
+    project = get_project_info(project_name)
     
-    # keep info for project_name
-    project = [i for i in projects if i['project_id'] == project_name][0]
-
-    print('project sequencing', list(project))
+    # get the pipelines from the library definitions in db
+    pipelines = get_pipelines(project_name)
+    
+    
+    conn = connect_to_db()
 
     # files = conn.execute("SELECT Files.file, Files.workflow, Files.version, Files.wfrun_id, \
     #                      Files.attributes, FilesQC.status from Files JOIN FilesQC WHERE Files.project_id = '{0}' \
@@ -1633,7 +1636,7 @@ def sequencing(project_name):
     # find and group pairs of fastqs
     sequences = group_sequences(files)
 
-    return render_template('sequencing.html', project=project, sequences=sequences)
+    return render_template('sequencing.html', project=project, sequences=sequences, pipelines=pipelines)
 
 
 
