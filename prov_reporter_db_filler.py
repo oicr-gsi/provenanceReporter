@@ -12,6 +12,7 @@ import requests
 import gzip
 import argparse
 import time
+import traceback
 
 
 def extract_project_info(project_provenance):
@@ -126,46 +127,38 @@ def extract_qc_status_from_nabu(project, database, nabu_api, file_table = 'Files
     return D
 
 
-def collect_qc_info(database, project_provenance, nabu_api, file_table = 'Files'):
+def collect_qc_info(database, project_name, nabu_api, file_table = 'Files'):
     '''
-    (str, str, str, str) -> dict
+    (str, str, str, str, str) -> dict
     
-    Returns a dictionary with QC information for all files in FPR and for all projects defined in Pinery
+    Returns a dictionary with QC information for all files for project_name in FPR
              
     Parameters
     ----------
     - database (str): Path to the database file
     - file_table (str): Table in database storing file information. Default is Files 
-    - project_provenance (str): Pinery API: 'http://pinery.gsi.oicr.on.ca/sample/projects'
     - nabu_api (str): URL of the nabu API: 'http://gsi-dcc.oicr.on.ca:3000'
     '''
         
-    # make a list of projects defined in Pinery
-    projects = list(extract_project_info(project_provenance).keys())
-    
-    to_remove = [i for i in projects if i not in ['HCCCFD','KLCS', 'HLCS']]
-    for i in to_remove:
-        projects.remove(i)             
-    
-    # collect QC information for all files in each project
+    # collect QC information for all files in project
     D = {}
-    for project in projects:
-        qc = extract_qc_status_from_nabu(project, database, nabu_api, file_table)
-        assert project not in D
-        D[project] = qc[project]
+    qc = extract_qc_status_from_nabu(project_name, database, nabu_api, file_table)
+    assert project not in D
+    D[project] = qc[project]
     
     return D
 
 
-def collect_file_info_from_fpr(fpr):
+def collect_file_info_from_fpr(fpr, project_name):
     '''
-    (str) -> dict
+    (str, str) -> dict
 
-    Returns a dictionary with file information extracted from File Provenance Report
+    Returns a dictionary with file information for project_name extracted from File Provenance Report
         
     Parameters
     ----------
     - fpr (str): Path to File Provenance Report file
+    - project_name (str): Name of project of interest 
     '''
 
     infile = open_fpr(fpr)
@@ -180,13 +173,9 @@ def collect_file_info_from_fpr(fpr):
             line = line.split('\t')
             # get project and initiate dict
             project = line[1]
-            
-            if project not in ['HCCCFD','KLCS', 'HLCS']:
+            # keep only file info for project_name
+            if project != project_name:
                 continue             
-    
-            
-            
-            
             if project not in D:
                 D[project] = {}
             # get file path
@@ -266,16 +255,17 @@ def open_fpr(fpr):
     return infile
 
 
-def get_workflow_relationships(fpr):
+def get_workflow_relationships(fpr, project_name):
     '''
     (str, str) -> (dict, dict, dict)
 
     Returns a tuple with dictionaries with worklow information, parent file ids for each workflow,
-    and workflow id for each file and project of interest
+    and workflow id for each file from project of interest
     
     Parameters
     ----------
     - fpr (str): Path to the File Provenance Report
+    - project_name (str): Name of project of interest
     '''
 
     F, P, W = {}, {}, {}
@@ -284,8 +274,7 @@ def get_workflow_relationships(fpr):
     infile = open_fpr(fpr)
     # skip header
     infile.readline()
-    
-    
+       
     for line in infile:
         line = line.rstrip()
         if line:
@@ -293,13 +282,8 @@ def get_workflow_relationships(fpr):
             # get project name
             project = line[1]
             
-            if project not in ['HCCCFD','KLCS', 'HLCS']:
+            if project != project_name:
                 continue
-                        
-    
-            
-            
-            
             
             # get workflow, workflow version and workflow run accession
             workflow, workflow_version, workflow_run = line[30], line[31], line[36]
@@ -343,11 +327,6 @@ def get_workflow_relationships(fpr):
     
     infile.close()
     
-    print(len(W))
-    print(len(P))
-    print(len(F))
-    
-    
     return W, P, F        
 
 
@@ -368,19 +347,6 @@ def identify_parent_children_workflows(P, F):
     # parents record parent-child workflow relationships
     # children record child-parent workflow relationships
     parents, children = {}, {}
-    
-    
-    to_remove = [i for i in P if i not in ['HCCCFD','KLCS', 'HLCS']]
-    for i in to_remove:
-        del P[i]             
-    
-    
-    
-    
-    
-    
-    
-    
     
     for project in P:
         if project not in children:
@@ -473,15 +439,16 @@ def collect_lims_info(sample_provenance):
     return D    
 
 
-def extract_workflow_info(fpr):
+def extract_workflow_info(fpr, project_name):
     '''
-    (str) -> dict
+    (str, str) -> dict
     
-    Returns a dictionary with library input information for all workflows for each project
+    Returns a dictionary with library input information for all workflows for project_name
     
     Parameters
     ----------
     - fpr (str): Path to the File Provenance Report
+    - project_name (str): Name of project of interest
     '''
 
     # create a dict to store workflow input libraries
@@ -497,13 +464,10 @@ def extract_workflow_info(fpr):
             line = line.split('\t')
             # get project name
             project = line[1]
-            
-            if project in ['HCCCFD','KLCS', 'HLCS']:
+            # keep only info for project name
+            if project != project_name:
                 continue             
     
-            
-            
-                        
             # get sample name
             sample = line[7]
             # get workflow name and workflow run accession
@@ -681,9 +645,9 @@ def initiate_db(database):
 
 
 
-def add_project_info_to_db(database, project_provenance, table = 'Projects'):
+def add_project_info_to_db(database, project_provenance, project_name, table = 'Projects'):
     '''
-    (str, str, str) -> None
+    (str, str, str, str) -> None
     
     Add project information into Projects table of database
        
@@ -691,6 +655,7 @@ def add_project_info_to_db(database, project_provenance, table = 'Projects'):
     ----------
     - database (str): Path to the database file
     - project_provenance (str): Pinery API, http://pinery.gsi.oicr.on.ca/sample/projects
+    - project_name (str): Name of project of interest
     - table (str): Name of Table in database. Default is Projects
     '''
 
@@ -701,13 +666,10 @@ def add_project_info_to_db(database, project_provenance, table = 'Projects'):
     # get project info
     projects = extract_project_info(project_provenance)
     
-    to_remove = [i for i in projects if i not in ['HCCCFD','KLCS', 'HLCS']]
+    to_remove = [i for i in projects if i != project_name]
     for i in to_remove:
         del projects[i]             
-    
-    
-    
-    
+        
     # get existing records
     cur.execute('SELECT {0}.project_id FROM {0}'.format(table))
     records = cur.fetchall()
@@ -729,17 +691,17 @@ def add_project_info_to_db(database, project_provenance, table = 'Projects'):
             # insert project info
             cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(vals)))
             conn.commit()
-    # remove any projects in database not anymore defined in pinery    
-    for project in records:
-        if project not in projects:
-            cur.execute('DELETE FROM {0} WHERE project_id=\"{1}\"'.format(table, projects))
-            conn.commit()
+    # # remove any projects in database not anymore defined in pinery    
+    # for project in records:
+    #     if project not in projects:
+    #         cur.execute('DELETE FROM {0} WHERE project_id=\"{1}\"'.format(table, projects))
+    #         conn.commit()
     conn.close()
 
 
 
 
-def add_workflows(workflows, database, table = 'Workflows'):
+def add_workflows(workflows, database, project_name, table = 'Workflows'):
     '''
     (dict, str, str) -> None
     
@@ -749,6 +711,7 @@ def add_workflows(workflows, database, table = 'Workflows'):
     ----------
     - workflows (dict): Dictionary with workflow information
     - database (str): Path to the database file
+    - project_name (str): Name of project of interest
     - workflow_table (str): Name of the table storing workflow information. Default is Workflows
     '''
        
@@ -757,7 +720,7 @@ def add_workflows(workflows, database, table = 'Workflows'):
     cur = conn.cursor()
     
     #get existing records
-    cur.execute('SELECT {0}.wfrun_id, {0}.project_id FROM {0}'.format(table))
+    cur.execute("SELECT {0}.wfrun_id, {0}.project_id FROM {0} WHERE project_id = '{1}';".format(table, project_name))
     records = cur.fetchall()
     
     # get column names
@@ -785,18 +748,18 @@ def add_workflows(workflows, database, table = 'Workflows'):
     # remove any workflows not defined anymore in FPR    
     for (workflow_run, project) in records:
         if project not in workflows:
-            cur.execute('DELETE FROM {0} WHERE project_id=\"{1}\"'.format(table, project))
+            cur.execute("DELETE FROM {0} WHERE project_id='{1}';".format(table, project))
             conn.commit()
         elif workflow_run not in workflows[project]:
-            cur.execute('DELETE FROM {0} WHERE wfrun_id = \"{1}\" AND project_id=\"{2}\"'.format(table, workflow_run, project))
+            cur.execute("DELETE FROM {0} WHERE wfrun_id = '{1}' AND project_id = '{2}';".format(table, workflow_run, project))
             conn.commit()
     conn.close()
 
 
     
-def add_workflow_relationships(D, database, table):    
+def add_workflow_relationships(D, database, project_name, table):    
     '''
-    (dict, str, str)
+    (dict, str, str, str) -> None
     
     Inserts or updates parent-children workflow relatiionships to table Children in database
     
@@ -804,6 +767,7 @@ def add_workflow_relationships(D, database, table):
     ----------    
     - D (dict): Dictionary with children-parents (Parents table) or parent-children (Children table) workflow relationships
     - database (str): Path to the database file
+    - project_name (str): name of project of interest
     - table (str): Name of the table storing children-parents workflow relationships
     '''
     
@@ -813,9 +777,9 @@ def add_workflow_relationships(D, database, table):
     
     #get existing records
     if table == 'Parents':
-        cur.execute('SELECT {0}.children_id, {0}.parents_id, {0}.project_id FROM {0}'.format(table))
+        cur.execute("SELECT {0}.children_id, {0}.parents_id, {0}.project_id FROM {0} WHERE {0}.project_id = '{1}';".format(table, project_name))
     elif table == 'Children':
-        cur.execute('SELECT {0}.parents_id, {0}.children_id, {0}.project_id FROM {0}'.format(table))
+        cur.execute("SELECT {0}.parents_id, {0}.children_id, {0}.project_id FROM {0} WHERE {0}.project_id = '{1}';".format(table, project_name))
     records = cur.fetchall()
     
     # get column names
@@ -832,26 +796,26 @@ def add_workflow_relationships(D, database, table):
     # remove any workflow relationships not defined anymore in FPR    
     for (i, j, project) in records:
         if project not in D:
-            cur.execute('DELETE FROM {0} WHERE project_id=\"{1}\"'.format(table, project))
+            cur.execute("DELETE FROM {0} WHERE project_id = '{1}';".format(table, project))
             conn.commit()
         elif i not in D[project]:
             if table == 'Parents':
-                cmd1 = 'DELETE FROM {0} WHERE children_id = \"{1}\" AND project_id=\"{2}\"'.format(table, i, project)
+                cmd1 = "DELETE FROM {0} WHERE children_id = '{1}' AND project_id = '{2}';".format(table, i, project)
             elif table == 'Children':
-                cmd1 = 'DELETE FROM {0} WHERE parents_id = \"{1}\" AND project_id=\"{2}\"'.format(table, i, project)
+                cmd1 = "DELETE FROM {0} WHERE parents_id = '{1}' AND project_id = '{2}';".format(table, i, project)
             cur.execute(cmd1)
             conn.commit()
         elif j not in D[project][i]:
             if table == 'Parents':
-                cmd2 = 'DELETE FROM {0} WHERE children_id = \"{1}\" AND parents_id = \"{2}\" AND project_id=\"{3}\"'.format(table, i, j, project)
+                cmd2 = "DELETE FROM {0} WHERE children_id = '{1}' AND parents_id = '{2}' AND project_id = '{3}';".format(table, i, j, project)
             elif table == 'Children':
-                cmd2 = 'DELETE FROM {0} WHERE parents_id = \"{1}\" AND children_id = \"{2}\" AND project_id=\"{3}\"'.format(table, i, j, project)
+                cmd2 = "DELETE FROM {0} WHERE parents_id = '{1}' AND children_id = '{2}' AND project_id = '{3}';".format(table, i, j, project)
             cur.execute(cmd2)            
             conn.commit()
     conn.close()
 
 
-def add_workflows_info_to_db(fpr, database, workflow_table = 'Workflows', parent_table = 'Parents', children_table = 'Children'):
+def add_workflows_info_to_db(fpr, database, project_name, workflow_table = 'Workflows', parent_table = 'Parents', children_table = 'Children'):
     '''
     (str, str, str, str, str) -> None
     
@@ -861,42 +825,43 @@ def add_workflows_info_to_db(fpr, database, workflow_table = 'Workflows', parent
     ----------    
     - fpr (str): Path to the File Provenance Report
     - database (str): Path to the database file
+    - project_name (str): Name of project of interest
     - workflow_table (str): Name of the table storing workflow information. Default is Workflows
     - parent_table (str): Name of the table storing parents-children workflow relationships. Default is Parents
     - children_table (str): Name of the table storing children-parents workflow relationships. Default is Children
     '''
 
     # get the workflow inputs and workflow info
-    workflows, parents, files = get_workflow_relationships(fpr)
+    workflows, parents, files = get_workflow_relationships(fpr, project_name)
     
     # identify parent-children workflow relationships
     parent_workflows, children_workflows = identify_parent_children_workflows(parents, files)
 
     # add workflow info
-    add_workflows(workflows, database, workflow_table)
+    add_workflows(workflows, database, project_name, workflow_table)
         
     # add parents-children workflow relationships
-    add_workflow_relationships(parent_workflows, database, parent_table)    
+    add_workflow_relationships(parent_workflows, database, project_name, parent_table)    
        
     # add children-parents workflow relationships    
-    add_workflow_relationships(children_workflows, database, children_table)    
+    add_workflow_relationships(children_workflows, database, project_name, children_table)    
        
     
     
-def add_file_info_to_db(database, table, fpr, project_provenance, nabu_api, file_table = 'Files'):
+def add_file_info_to_db(database, project_name, table, fpr, nabu_api, file_table = 'Files'):
     '''
-    (str, str, str, str, str, str) -> None
+    (str, str, str, str, str, str, str) -> None
     
     Inserts or updates file QC information in database's FilesQC table
        
     Parameters
     ----------
     - database (str): Path to the database file
+    - project_name (str): Name of project of interest
     - table (str): Table in database storing the QC or file information.
                    Accepted values are FilesQC or Files
     - fpr (str): Path to the File Provenance Report
     - file_table (str): Table in database storing file information. Default is Files 
-    - project_provenance (str): Pinery API: 'http://pinery.gsi.oicr.on.ca/sample/projects'
     - nabu_api (str): URL of the nabu API: 'http://gsi-dcc.oicr.on.ca:3000'
     '''
 
@@ -905,17 +870,17 @@ def add_file_info_to_db(database, table, fpr, project_provenance, nabu_api, file
     # check if adding QC info or file info
     if table == 'FilesQC':
         # adding file QC information
-        D = collect_qc_info(database, project_provenance, nabu_api, file_table)
+        D = collect_qc_info(database, project_name, nabu_api, file_table)
     elif table == 'Files':
         # collect file info from FPR
-        D = collect_file_info_from_fpr(fpr)
+        D = collect_file_info_from_fpr(fpr, project_name)
     
     # connect to db
     conn = sqlite3.connect(database)
     cur = conn.cursor()
         
     # get existing records
-    cur.execute('SELECT {0}.file_swid FROM {0}'.format(table))
+    cur.execute("SELECT {0}.file_swid FROM {0} WHERE {0}.project_id = '{1}';".format(table, project_name))
     records = cur.fetchall()
     records = [i[0] for i in records]
     
@@ -936,7 +901,7 @@ def add_file_info_to_db(database, table, fpr, project_provenance, nabu_api, file
             if file_swid in records:
                 # update QC info
                 for i in range(1, len(column_names)):
-                    cur.execute("UPDATE {0} SET {1} = '{2}' WHERE file_swid='{3}'".format(table, column_names[i], L[i], file_swid))  
+                    cur.execute("UPDATE {0} SET {1} = '{2}' WHERE file_swid='{3}' AND project_id = '{4}';".format(table, column_names[i], L[i], file_swid, project))  
                     conn.commit()
             else:
                 # insert project info
@@ -946,44 +911,38 @@ def add_file_info_to_db(database, table, fpr, project_provenance, nabu_api, file
     # remove any file in database not anymore defined in Nabu    
     for file_swid in records:
         if file_swid not in file_swids:
-            cur.execute('DELETE FROM {0} WHERE file_swid=\"{1}\"'.format(table, file_swid))
+            cur.execute("DELETE FROM {0} WHERE file_swid='{1}' AND project_id = '{2}';".format(table, file_swid, project_name))
             conn.commit()
     conn.close()
 
 
 
-def add_library_info_to_db(database, sample_provenance, table = 'Libraries'):
+def add_library_info_to_db(database, project_name, sample_provenance, table = 'Libraries'):
     '''
-    (str, str, str) -> None
+    (str, str, str, str) -> None
     
     Inserts or updates library information in Libraries table of database    
     
     Parameters
     ----------
     - database (str): Path to the databae file
+    - project_name (str): Name of project of interest
     - table (str): Table storing library in database. Default is Libraries
     - sample_provenance (str): URL of the sample provenance API: 'http://pinery.gsi.oicr.on.ca/provenance/v9/sample-provenance'
     '''
     
     # collect lims information
     lims = collect_lims_info(sample_provenance)
-    
-    
-    to_remove = [i for i in lims if i not in ['HCCCFD','KLCS', 'HLCS']]
+    to_remove = [i for i in lims if i != project_name]
     for i in to_remove:
         del lims[i]             
-    
-    
-    
-    
-    
     
     # connect to db
     conn = sqlite3.connect(database)
     cur = conn.cursor()
        
     # get existing records
-    cur.execute('SELECT {0}.library FROM {0}'.format(table))
+    cur.execute("SELECT {0}.library FROM {0} WHERE project_id = '{1}';".format(table, project_name))
     records = cur.fetchall()
     records = [i[0] for i in records]
 
@@ -1005,7 +964,7 @@ def add_library_info_to_db(database, sample_provenance, table = 'Libraries'):
                 if library in records:
                     # update QC info
                     for i in range(1, len(column_names)):
-                        cur.execute("UPDATE {0} SET {1} = '{2}' WHERE library='{3}'".format(table, column_names[i], L[i], library))  
+                        cur.execute("UPDATE {0} SET {1} = '{2}' WHERE library='{3}' AND project_id = '{4}';".format(table, column_names[i], L[i], library, project))  
                         conn.commit()
                 else:
                     # insert project info
@@ -1015,13 +974,13 @@ def add_library_info_to_db(database, sample_provenance, table = 'Libraries'):
     # remove any library in database not anymore defined in Pinery    
     for library in records:
        if library not in libraries:
-           cur.execute('DELETE FROM {0} WHERE library=\"{1}\"'.format(table, library))
+           cur.execute("DELETE FROM {0} WHERE library = '{1}' AND project_id = '{2}';".format(table, library, project_name))
            conn.commit()
     conn.close()
 
 
 
-def add_workflow_inputs_to_db(database, fpr, table = 'Workflow_Inputs'):
+def add_workflow_inputs_to_db(database, fpr, project_name, table = 'Workflow_Inputs'):
     '''
     (str, str, str) -> None
     
@@ -1031,11 +990,12 @@ def add_workflow_inputs_to_db(database, fpr, table = 'Workflow_Inputs'):
     ----------
     - database (str): Path to the databae file
     - fpr (str): Path to the File Provenance Report
+    - project_name (str): Name of project of interest
     - table (str): Table storing library in database. Default is Libraries
     '''
 
     # collect information about library inputs
-    libraries = extract_workflow_info(fpr)
+    libraries = extract_workflow_info(fpr, project_name)
     
     # connect to db
     conn = sqlite3.connect(database)
@@ -1043,10 +1003,10 @@ def add_workflow_inputs_to_db(database, fpr, table = 'Workflow_Inputs'):
        
     # get existing records
     #cur.execute('SELECT {0}.library, {0}.run, {0}.lane, {0}.wfrun_id FROM {0}'.format(table))
-    cur.execute('SELECT * FROM {0}'.format(table))
+    cur.execute("SELECT * FROM {0} WHERE project_id = '{1}';".format(table, project_name))
     records = cur.fetchall()
 
-    data = cur.execute('SELECT * FROM {0}'.format(table))
+    data = cur.execute("SELECT * FROM {0} WHERE project_id = '{1}';".format(table, project_name))
     column_names = [column[0] for column in data.description]
         
     # make a list of (library, run, lane)
@@ -1103,31 +1063,72 @@ if __name__ == '__main__':
     # initiate database
     start1 = time.time()
     initiate_db(args.database)
-    start = time.time()
+    # make a list of projects
+    projects = list(extract_project_info(args.project_provenance).keys())
+    print('{0} projects in provenance'.format(len(projects)))
     # add or update information in tables
-    #add_project_info_to_db(args.database, args.project_provenance, 'Projects')
-    end = time.time()
-    print('added data to Projects', end - start)
-    start = time.time()
-    #add_workflows_info_to_db(args.fpr, args.database, 'Workflows', 'Parents', 'Children')
-    end = time.time()
-    print('added data to Workflows', end - start)
-    start = time.time()
-    #add_file_info_to_db(args.database, 'FilesQC', args.fpr, args.project_provenance, args.nabu, 'Files')
-    end = time.time()
-    print('added data to FilesQC', end - start)
-    start = time.time()
-    #add_file_info_to_db(args.database, 'Files', args.fpr, args.project_provenance, args.nabu, 'Files')
-    end = time.time()
-    print('added data to Files', end - start)
-    start = time.time()
-    #add_library_info_to_db(args.database, args.sample_provenance, 'Libraries')
-    end = time.time()
-    print('added data to Libraries', end - start)
-    start = time.time()
-    add_workflow_inputs_to_db(args.database, args.fpr, 'Workflow_Inputs')
-    end = time.time()
-    print('added data to Workflow_Inputs', end - start)
-    end1 = time.time()
-    print('added info to db', end1 - start1)
+    for project in projects:
+        print('adding data for {0}'.format(project))
+        # add project info
+        try:
+            start = time.time()
+            add_project_info_to_db(args.database, args.project_provenance, project, 'Projects')
+            end = time.time()
+            print('added data to Projects', end - start)
+        except:
+            print('could not add project info for {0}'.format(project))
+            print(traceback.format_exc())
+           
+        # add workflow info
+        try:
+            start = time.time()
+            add_workflows_info_to_db(args.fpr, args.database, project, 'Workflows', 'Parents', 'Children')
+            end = time.time()
+            print('added data to Workflows', end - start)
+        except:
+            print('could not add workflow info for {0}'.format(project))
+            print(traceback.format_exc()) 
+        
+        # add file QC info
+        try:
+            start = time.time()
+            add_file_info_to_db(args.database, project, 'FilesQC', args.fpr, args.nabu, 'Files')
+            end = time.time()
+            print('added data to FilesQC', end - start)
+        except:
+            print('could not add file QC info for {0}'.format(project))
+            print(traceback.format_exc())
+            
+        # add file info
+        try:
+            start = time.time()
+            add_file_info_to_db(args.database, project, 'Files', args.fpr, args.nabu, 'Files')
+            end = time.time()
+            print('added data to Files', end - start)
+        except:
+            print('could not add file info for {0}'.format(project))
+            print(traceback.format_exc())
+            
+        # add library info
+        try:
+            start = time.time()
+            add_library_info_to_db(args.database, project, args.sample_provenance, 'Libraries')
+            end = time.time()
+            print('added data to Libraries', end - start)
+        except:
+            print('could not add library info for {0}'.format(project))
+            print(traceback.format_exc())
+            
+        # add workflow input
+        try:
+            start = time.time()
+            add_workflow_inputs_to_db(args.database, args.fpr, project, 'Workflow_Inputs')
+            end = time.time()
+            print('added data to Workflow_Inputs', end - start)
+        except:
+            print('could not add worklow input info for {0})'.format(project))
+            print(traceback.format_exc())
+        
+        end1 = time.time()
+        print('added info to db', end1 - start1)
     
