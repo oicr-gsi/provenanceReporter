@@ -10,12 +10,21 @@
 
 
 {% block content %}
-   <div class="project_title">
-     <p>{% block title %}{{ project['project_id'] }} {% endblock %}</p>
-   </div>    
 
-<table id="project_table">
-   <tr>
+  <div class="project_title">
+    <p>{% block title %}{{ project['project_id'] }} {% endblock %}
+      {% if sequences %}
+        <span style="font-size:30px; font-style:normal;"> Showing sequence information for {{ sequences|length }} cases</span>
+      {% else %}
+        <span style="font-size:30px; font-style:normal;"> No sequence information to display</span>
+      {% endif %}  
+    </p>   
+  </div> 
+
+  {% if sequences %}
+  
+  <table id="project_table">
+   <thead>
      <th>Cases</th>
      <th>Samples</th>
      <th>Libraries</th>     
@@ -24,7 +33,7 @@
      <th>Read Counts</th>
      <th>Workflow</th> 
      <th>Release status</th>
-   </tr>     
+   </thead>     
 
    {% for i in sequences %}
      <tr>
@@ -45,4 +54,8 @@
    {% endfor %}               
    </table>
 
+  {% endif %}
+
+
+   
 {% endblock %}
