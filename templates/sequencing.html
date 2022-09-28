@@ -23,6 +23,10 @@
 
   {% if sequences %}
   
+   <div style="margin-left:auto;margin-right:auto;margin-top:80px;padding-bottom:7px;max-width:300px;position:relative">
+     <input type="text" id="search_table"  onkeyup="searchFunction()" placeholder="Search.." title="Type in a keyword">
+   </div>
+
   <table id="project_table">
    <thead>
      <th>Cases</th>
@@ -53,6 +57,31 @@
      </tr>
    {% endfor %}               
    </table>
+
+  
+   <script>
+   function searchFunction() {
+   var input, filter, table, tr, td, i, txtValue;
+   input = document.getElementById("search_table");
+   filter = input.value.toUpperCase();
+   table = document.getElementById("project_table");
+   tr = table.getElementsByTagName("tr");
+   for (i = 1; i < tr.length; i++) {
+   td= tr[i];
+     if (td) {
+       txtValue = td.textContent || td.innerText;
+       if (txtValue.toUpperCase().indexOf(filter) > -1) {
+         tr[i].style.display = "";
+       } else {
+         tr[i].style.display = "none";
+         }
+     }       
+    }
+   }
+   </script> 
+
+
+
 
   {% endif %}
 
