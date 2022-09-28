@@ -1458,7 +1458,7 @@ def connect_to_db():
     This database contains information extracted from FPR
     '''
     
-    conn = sqlite3.connect('prov_report_test.db')
+    conn = sqlite3.connect('prov_report.db')
     conn.row_factory = sqlite3.Row
     return conn
 
