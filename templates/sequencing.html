@@ -10,16 +10,16 @@
 
 
 {% block content %}
-
   <div class="project_title">
     <p>{% block title %}{{ project['project_id'] }} {% endblock %}
       {% if sequences %}
-        <span style="font-size:30px; font-style:normal;"> Showing sequence information for {{ sequences|length }} cases</span>
+        <span style="font-size:30px; font-style:normal;"> Displaying sequence information for <span id ="count"> {{ sequences|length }} </span> records</span>
       {% else %}
         <span style="font-size:30px; font-style:normal;"> No sequence information to display</span>
       {% endif %}  
     </p>   
-  </div> 
+    
+</div> 
 
   {% if sequences %}
   
@@ -62,6 +62,7 @@
    <script>
    function searchFunction() {
    var input, filter, table, tr, td, i, txtValue;
+   var rowCount = 0    
    input = document.getElementById("search_table");
    filter = input.value.toUpperCase();
    table = document.getElementById("project_table");
@@ -72,16 +73,15 @@
        txtValue = td.textContent || td.innerText;
        if (txtValue.toUpperCase().indexOf(filter) > -1) {
          tr[i].style.display = "";
+         rowCount++;
        } else {
          tr[i].style.display = "none";
          }
      }       
     }
+   document.getElementById("count").innerHTML = rowCount
    }
-   </script> 
-
-
-
+  </script>
 
   {% endif %}
 
