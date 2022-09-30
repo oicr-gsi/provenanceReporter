@@ -1721,7 +1721,9 @@ def whole_genome_sequencing(project_name):
     # get samples and libraries for the most recent bmpp run for each case in project
     cases = get_call_ready_cases(data)
     
-    return render_template('Whole_Genome_Sequencing.html', routes = routes, project=project, cases=cases, pipelines=pipelines)
+    samples = sorted(list(cases.keys()))
+    
+    return render_template('Whole_Genome_Sequencing.html', routes = routes, project=project, samples=samples, cases=cases, pipelines=pipelines)
 
 
 
