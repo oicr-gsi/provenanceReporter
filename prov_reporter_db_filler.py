@@ -15,6 +15,7 @@ import time
 import traceback
 
 
+
 def extract_project_info(project_provenance):
     '''
     (str) -> dict
@@ -178,6 +179,13 @@ def collect_file_info_from_fpr(fpr, project_name):
                 continue             
             if project not in D:
                 D[project] = {}
+            # get creation date
+            creation_date = line[0]
+            # convert creation date into epoch time
+            # remove milliseconds
+            creation_date = creation_date.split('.')[0]
+            pattern = '%Y-%m-%d %H:%M:%S'
+            creation_date = int(time.mktime(time.strptime(creation_date, pattern)))
             # get file path
             file = line[46]
             # get md5sums
@@ -208,8 +216,10 @@ def collect_file_info_from_fpr(fpr, project_name):
             # get workflow run accession
             workflow_run = line[36]
             # collect file info
-            D[project][file_swid] = {'md5sum': md5sum, 'workflow': workflow, 'version': version,
-                   'wfrun_id': workflow_run, 'file': file, 'library_type': library_type, 'attributes': attributes}
+            D[project][file_swid] = {'creation_date': creation_date, 'md5sum': md5sum,
+                                     'workflow': workflow, 'version': version,
+                                     'wfrun_id': workflow_run, 'file': file,
+                                     'library_type': library_type, 'attributes': attributes}
     infile.close()
     return D
 
@@ -509,7 +519,7 @@ def define_column_names():
                     'Parents': ['children_id', 'parents_id', 'project_id'],
                     'Children': ['parents_id', 'children_id', 'project_id'],
                     'Projects': ['project_id', 'pipeline', 'description', 'active', 'contact_name', 'contact_email'],
-                    'Files': ['file_swid', 'project_id', 'md5sum', 'workflow', 'version', 'wfrun_id', 'file', 'library_type', 'attributes'],
+                    'Files': ['file_swid', 'project_id', 'md5sum', 'workflow', 'version', 'wfrun_id', 'file', 'library_type', 'attributes', 'creation_date'],
                     'FilesQC': ['file_swid', 'project_id', 'skip', 'user', 'date', 'status', 'reference', 'fresh'],
                     'Libraries': ['library', 'sample', 'tissue_type', 'ext_id', 'tissue_origin',
                                   'library_type', 'prep', 'tissue_prep', 'sample_received_date', 'group_id', 'group_id_description', 'project_id'],
@@ -533,7 +543,7 @@ def define_column_types():
                                   'TEXT', 'VARCHAR(128)', 'VARCHAR(256)', 'VARCHAR(256)'],
                     'Files': ['VARCHAR(572) PRIMARY KEY NOT NULL UNIQUE', 'VARCHAR(128)',
                               'VARCHAR(256)', 'VARCHAR(128)', 'VARCHAR(128)',
-                              'VARCHAR(572)', 'TEXT', 'VARCHAR(128)', 'TEXT'],
+                              'VARCHAR(572)', 'TEXT', 'VARCHAR(128)', 'TEXT', 'INT'],
                     'FilesQC': ['VARCHAR(572) PRIMARY KEY NOT NULL UNIQUE', 'VARCHAR(128)',
                                 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)',
                                 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)'],
