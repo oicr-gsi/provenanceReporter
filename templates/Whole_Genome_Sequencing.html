@@ -17,9 +17,9 @@
   <div class="project_title">
     <p>{% block title %}{{ project['project_id'] }} {% endblock %}
       {% if cases %}
-        <span style="font-size:30px; font-style:normal;"> Displaying sequence information for <span id ="count"> {{ cases|length }} </span> records</span>
+        <span style="font-size:30px; font-style:normal;"> Details of the most recent call ready workflow for <span id ="count"> {{ cases|length }} </span> cases</span>
       {% else %}
-        <span style="font-size:30px; font-style:normal;"> No sequence information to display</span>
+        <span style="font-size:30px; font-style:normal;"> No cases to display</span>
       {% endif %}  
     </p>   
     
