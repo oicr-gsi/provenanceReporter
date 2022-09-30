@@ -5,19 +5,19 @@
  <a href="{{ url_for('project', project_name=project['project_id']) }}">{{ project['project_id'] }}</a>
  {% for i in pipelines %}
    {% if i in routes %}
-     <a href="{{ url_for(routes[i], project_name=project['project_id']) }}">{{i}}</a>
+       <a href="{{ url_for(routes[i], project_name=project['project_id']) }}">{{i}}</a>
    {% else %}
-     <a href="#{{i}}">{{i}}</a>
+       <a href="#{{i}}">{{i}}</a>
    {% endif %}  
-  {% endfor %}   
+ {% endfor %}   
 {% endblock %}
 
 
 {% block content %}
   <div class="project_title">
     <p>{% block title %}{{ project['project_id'] }} {% endblock %}
-      {% if sequences %}
-        <span style="font-size:30px; font-style:normal;"> Displaying sequence information for <span id ="count"> {{ sequences|length }} </span> records</span>
+      {% if cases %}
+        <span style="font-size:30px; font-style:normal;"> Displaying sequence information for <span id ="count"> {{ cases|length }} </span> records</span>
       {% else %}
         <span style="font-size:30px; font-style:normal;"> No sequence information to display</span>
       {% endif %}  
@@ -25,7 +25,7 @@
     
 </div> 
 
-  {% if sequences %}
+  {% if cases %}
   
    <div style="margin-left:auto;margin-right:auto;margin-top:80px;padding-bottom:7px;max-width:300px;position:relative">
      <input type="text" id="search_table"  onkeyup="searchFunction()" placeholder="Search.." title="Type in a keyword">
@@ -36,28 +36,25 @@
      <th>Cases</th>
      <th>Samples</th>
      <th>Libraries</th>     
-     <th>Runs</th>
-     <th>Files</th>
-     <th>Read Counts</th>
-     <th>Workflow</th> 
-     <th>Release status</th>
+     <th>Worfklow id</th>
    </thead>     
 
-   {% for i in sequences %}
+   {% for i in cases %}
      <tr>
-       <td> {{i['case']}} </td>
-       <td> {{i['sample']}} </td>
-       <td> {{i['library']}} </td>
-       <td> {{i['run']}} </td>
+       <td> {{i}} </td>
        <td>
-         {% for item in i['files'] %}
+         {% for item in cases[i]['samples'] %}
            {{item}}
            <br>
-         {% endfor %}                    
-       </td>        
-       <td> {{i['read_count']}} </td>
-       <td> {{i['workflow']}} </td>
-       <td> {{i['release_status']}} </td>
+         {% endfor %}       
+       </td>
+       <td>
+         {% for item in cases[i]['libraries'] %}
+           {{item}}
+           <br>
+         {% endfor %}
+       </td>
+       <td> {{cases[i]['wfrun_id']}} </td>
      </tr>
    {% endfor %}               
    </table>

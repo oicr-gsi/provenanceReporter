@@ -1458,7 +1458,7 @@ def connect_to_db():
     This database contains information extracted from FPR
     '''
     
-    conn = sqlite3.connect('prov_report.db')
+    conn = sqlite3.connect('prov_report_test.db')
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -1580,6 +1580,60 @@ def get_pipelines(project_name):
     
     return pipelines
     
+
+
+def get_call_ready_cases(data):
+    '''
+    (list) -> dict
+
+    Returns a dictionary with samples and libraries and bamMergePreprocessing
+    workflow id for each case in a project
+
+    Parameters
+    ----------
+    - data (list): List of sqlite3.Row extracted from the database and sample information for bamMergePreprocessing workflow iterations
+    '''
+    
+    L = []
+    for i in data:
+        if dict(i) not in L:
+            L.append(dict(i))
+    
+    # group info for each case
+    D = {}
+    for i in L:
+        case = i['sample']
+        creation_date = i['creation_date']
+        wfrun_id = i['wfrun_id']
+        sample = '_'.join([case, i['tissue_origin'], i['tissue_type'], i['group_id']])
+        library = i['library'] 
+        if case in D:
+            # get the sample name and library name
+            # compare creation time and workflow run_id
+            if D[case]['creation_date'] < creation_date:
+                # update with most recent information
+                D[case]['samples'] = [sample]
+                D[case]['libraries'] = [library]
+                D[case]['wfrun_id'] = wfrun_id
+            elif D[case]['creation_date'] == creation_date:
+                if D[case]['wfrun_id'] == wfrun_id:
+                    D[case]['samples'].append(sample)
+                    D[case]['libraries'].append(library)
+        else:
+            D[case] = {'libraries': [library],
+                       'samples': [sample],
+                       'wfrun_id': wfrun_id,
+                       'creation_date': creation_date}
+    for i in D:
+        D[i]['libraries'] = list(set(D[i]['libraries']))
+        D[i]['samples'] = list(set(D[i]['samples']))
+        
+    return D
+
+
+# map pipelines to views
+routes = {'Whole Genome': 'whole_genome_sequencing'}
+
     
 
 
@@ -1603,7 +1657,7 @@ def project(project_name):
     # get the pipelines from the library definitions in db
     pipelines = get_pipelines(project_name)
     
-    return render_template('project.html', project=project, pipelines=pipelines)
+    return render_template('project.html', routes=routes, project=project, pipelines=pipelines)
 
 @app.route('/<project_name>/sequencing')
 def sequencing(project_name):
@@ -1636,10 +1690,38 @@ def sequencing(project_name):
     # find and group pairs of fastqs
     sequences = group_sequences(files)
 
-    return render_template('sequencing.html', project=project, sequences=sequences, pipelines=pipelines)
+    return render_template('sequencing.html', routes=routes, project=project, sequences=sequences, pipelines=pipelines)
 
 
 
+@app.route('/<project_name>/whole_genome_sequencing')
+def whole_genome_sequencing(project_name):
+    
+    # get the project info for project_name from db
+    project = get_project_info(project_name)
+    
+    # get the pipelines from the library definitions in db
+    pipelines = get_pipelines(project_name)
+        
+    conn = connect_to_db()
+
+    # extract sample, library and workflow information for call ready workflow bamMergePreprocessing
+    data = conn.execute("SELECT Files.creation_date, Libraries.library, Libraries.sample, \
+                         Libraries.ext_id, Libraries.group_id, Libraries.tissue_type, \
+                         Libraries.tissue_origin, Workflow_Inputs.run, Workflow_Inputs.lane, \
+                         Workflow_Inputs.platform, Workflows.wf, Workflows.wfv, Workflows.wfrun_id \
+                         from Files JOIN Libraries JOIN Workflow_Inputs JOIN Workflows \
+                         WHERE Files.project_id = '{0}' AND Libraries.project_id = '{0}' \
+                         AND Workflow_Inputs.project_id = '{0}' AND Workflows.project_id = '{0}' \
+                         AND Files.wfrun_id = Workflow_Inputs.wfrun_id  AND Workflow_Inputs.wfrun_id = Workflows.wfrun_id AND Workflow_Inputs.library = Libraries.library \
+                         AND LOWER(Workflows.wf) = 'bammergepreprocessing'".format(project_name)).fetchall()
+    
+    conn.close()
+
+    # get samples and libraries for the most recent bmpp run for each case in project
+    cases = get_call_ready_cases(data)
+    
+    return render_template('Whole_Genome_Sequencing.html', routes = routes, project=project, cases=cases, pipelines=pipelines)
 
 
 

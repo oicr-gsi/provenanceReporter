@@ -3,7 +3,11 @@
 {% block link %}
  <a href="{{ url_for('sequencing', project_name=project['project_id']) }}">Sequencing</a>  
  {% for i in pipelines %}
-   <a href="#{{i}}">{{i}}</a>
+   {% if i in routes %}
+       <a href="{{ url_for(routes[i], project_name=project['project_id']) }}">{{i}}</a>
+   {% else %}
+       <a href="#{{i}}">{{i}}</a>
+   {% endif %}  
  {% endfor %}  
 {% endblock %}
 
