@@ -41,20 +41,24 @@
 
    {% for i in samples %}
      <tr>
-       <td> {{i}} </td>
+       <td>
+         <a class="project_links" href="#{{i}}">{{i}}</a>
+       </td>
        <td>
          {% for item in cases[i]['samples'] %}
-           {{item}}
+           <a class="project_links" href="#item">{{item}}</a>
            <br>
          {% endfor %}       
        </td>
        <td>
          {% for item in cases[i]['libraries'] %}
-           {{item}}
+           <a class="project_links" href="#item">{{item}}</a>
            <br>
          {% endfor %}
        </td>
-       <td> {{cases[i]['wfrun_id']}} </td>
+       <td>
+         <a class="project_links" href="#{{cases[i]['wfrun_id']}}">{{cases[i]['wfrun_id']}}</a>
+       </td>
      </tr>
    {% endfor %}               
    </table>
