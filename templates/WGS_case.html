@@ -1,0 +1,46 @@
+{% extends 'project_base.html' %}
+
+
+{% block link %}
+ <a href="{{ url_for('project', project_name=project['project_id']) }}">{{ project['project_id'] }}</a>
+ {% for i in pipelines %}
+   {% if i in routes %}
+       <a href="{{ url_for(routes[i], project_name=project['project_id']) }}">{{i}}</a>
+   {% else %}
+       <a href="#{{i}}">{{i}}</a>
+   {% endif %}  
+ {% endfor %}   
+{% endblock %}
+
+
+{% block content %}
+  <div class="project_title">
+    <p>
+      {% block title %} {{ sample_case }} {% endblock %}
+      <span style="font-size:30px; font-style:normal;"> Whole Genome Sequencing pipeline </span>
+    </p>  
+  </div> 
+
+  <table id="project_table">
+   <thead>
+     <th>BMPP workflow</th>
+     <th>Files</th>     
+     <th>Samples</th>
+     <th>Tissue type</th>     
+     <th>Tissue Origin</th>
+     <th>Libraries</th>
+   </thead>     
+
+   <tr>
+     <td rowspan="3">{{bmpp_id}}</td>
+     <td rowspan="3"> {{bmpp_files}} </td>       
+      {% for i in bmpp_info %}
+       <td>{{i.0}}</td>
+       <td>{{i.1}}</td>
+       <td>{{i.2}}</td>
+       <td>{{i.3}}</td>
+      </tr>   
+      {% endfor %} 
+  </table>
+
+{% endblock %}
