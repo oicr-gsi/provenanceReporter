@@ -46,7 +46,7 @@
        </td>
        <td>
          {% for item in cases[i]['samples'] %}
-           <a class="project_links" href="#item">{{item}}</a>
+           <a class="project_links" href="{{ url_for('wgs_case', project_name=project['project_id'], case=i)}}">{{item}}</a>
            <br>
          {% endfor %}       
        </td>
