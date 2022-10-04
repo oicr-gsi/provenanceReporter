@@ -301,7 +301,7 @@ def get_workflow_relationships(fpr, project_name):
             file_swid = line[44]
             input_files = line[38]
             if input_files:
-                input_files = sorted(input_files.split(';'))
+                input_files = sorted(input_files.split(','))
             else:
                 input_files = []
                    
@@ -1075,6 +1075,7 @@ if __name__ == '__main__':
     initiate_db(args.database)
     # make a list of projects
     projects = list(extract_project_info(args.project_provenance).keys())
+    
     print('{0} projects in provenance'.format(len(projects)))
     # add or update information in tables
     for project in projects:
