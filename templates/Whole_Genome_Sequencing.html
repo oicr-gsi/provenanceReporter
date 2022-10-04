@@ -6,7 +6,9 @@
  <a href="{{ url_for('sequencing', project_name=project['project_id']) }}">Sequencing</a>
  {% for i in pipelines %}
    {% if i in routes %}
-       <a href="{{ url_for(routes[i], project_name=project['project_id']) }}">{{i}}</a>
+       {% if i != 'Whole Genome' %}
+         <a href="{{ url_for(routes[i], project_name=project['project_id']) }}">{{i}}</a>
+       {% endif %}
    {% else %}
        <a href="#{{i}}">{{i}}</a>
    {% endif %}  
