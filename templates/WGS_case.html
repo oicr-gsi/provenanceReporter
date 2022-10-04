@@ -21,7 +21,7 @@
     </p>  
   </div> 
 
-  <table id="project_table">
+  <table id="simple_table">
    <thead>
      <th>BMPP workflow</th>
      <th>Files</th>     
@@ -32,15 +32,15 @@
    </thead>     
 
    <tr>
-     <td rowspan="3">{{bmpp_id}}</td>
-     <td rowspan="3"> {{bmpp_files}} </td>       
-      {% for i in bmpp_info %}
+     <td rowspan="{{bmpp_info|length}}">{{bmpp_id}}</td>
+     <td rowspan="{{bmpp_info|length}}"> {{bmpp_files}} </td>     
+     {% for i in bmpp_info %}
        <td>{{i.0}}</td>
        <td>{{i.1}}</td>
        <td>{{i.2}}</td>
        <td>{{i.3}}</td>
-      </tr>   
-      {% endfor %} 
+      </tr> 
+      {% endfor %}
   </table>
 
 {% endblock %}
