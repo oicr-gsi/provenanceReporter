@@ -26,6 +26,7 @@
    <thead>
      <th>BMPP workflow</th>
      <th>Files</th>     
+     <th>Fastq release status</th>
      <th>Samples</th>
      <th>Tissue type</th>     
      <th>Tissue Origin</th>
@@ -35,6 +36,11 @@
    <tr>
      <td rowspan="{{bmpp_info|length}}">{{bmpp_id}}</td>
      <td rowspan="{{bmpp_info|length}}"> {{bmpp_files}} </td>     
+     {% if fastq_release_status %}
+       <td rowspan="{{bmpp_info|length}}", style="width: 40%; padding: 3px; text-align: left"><img src="{{ url_for('static', filename='images/yes.png') }}" alt="released" title="release_status" style="padding-right: 8px; padding-left:0px; width:10; height:10"></td>     
+     {% else %}
+       <td rowspan="{{bmpp_info|length}}", style="width: 40%; padding: 3px; text-align: left"><img src="{{ url_for('static', filename='images/no.png') }}" alt="not_released" title="release_status" style="padding-right: 8px; padding-left:0px; width:10; height:10"></td>     
+     {% endif %}
      {% for i in bmpp_info %}
        <td>{{i.0}}</td>
        <td>{{i.1}}</td>
@@ -43,5 +49,36 @@
       </tr> 
       {% endfor %}
   </table>
+
+
+  {% if downstream_workflows %}
+ 
+
+   <table id="simple_table">
+     <thead>
+       <th>Normal sample</th>
+       <th>Tmour sample</th>     
+       <th>mutect2</th>
+       <th>variantEffectPredictor</th>
+       <th>varscan</th>     
+       <th>sequenza</th>
+       <th>delly</th>
+       <th>mavis</th>
+     </thead>     
+
+     {% for i in downstream_workflows %}
+     <tr>
+       <td>{{i.0}}</td>
+       <td>{{i.1}}</td>
+       <td>{{i.2}}</td>     
+       <td>{{i.3}}</td>
+       <td>{{i.4}}</td>
+       <td>{{i.5}}</td>
+       <td>{{i.6}}</td>
+       <td>{{i.7}}</td>
+     </tr>
+     {% endfor %}  
+   </table>
+  {% endif %}
 
 {% endblock %}
