@@ -1458,7 +1458,8 @@ def connect_to_db():
     This database contains information extracted from FPR
     '''
     
-    conn = sqlite3.connect('prov_report_test.db')
+    #conn = sqlite3.connect('prov_report_test.db')
+    conn = sqlite3.connect('prov.test.db')
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -1514,13 +1515,11 @@ def get_library_design(library_source):
     '''
     (str) -> str
     
+    Returns the description of library_source as defined in MISO
     
-    
-
-    Returns
-    -------
-    None.
-
+    Parameters
+    ----------
+    - library_source (str): Code of the library source as defined in MISO
     '''
 
     library_design = {'WT': 'Whole Transcriptome', 'WG': 'Whole Genome', 'TS': 'Targeted Sequencing',
@@ -1635,13 +1634,6 @@ def get_call_ready_cases(data):
     return D
 
 
-
-
-
-
-
-
-
 def get_bmpp_files(data):
     '''
     (list) -> (str, str, list)
@@ -1718,6 +1710,229 @@ def get_bmpp_files(data):
             L.append(line)
     
     return wfrun_id, bmpp_files, L
+
+
+
+def get_parent_workflow_info(project_name, workflow_id):
+    '''
+    (str, str) -> list
+    
+    Returns a list of parent workflow ids (i.e immediate upstream workflow) upstream of the 
+    workflow defined by workflow_id for a given project_name
+    
+    Parameters
+    ----------
+    - project_name (str): Name of project of interest
+    - bmpp_id (str): bamMergePreprocessing workflow id 
+    '''
+    
+    conn = connect_to_db()
+    
+    data = conn.execute("SELECT Parents.parents_id FROM Parents WHERE Parents.project_id = '{0}' \
+                        AND Parents.children_id = '{1}'".format(project_name, workflow_id)).fetchall()
+    
+    L = list(set([i['parents_id'] for i in data]))
+    
+    conn.close()
+    
+    return L
+
+
+def get_child_workflow_info(project_name, workflow_id):
+    '''
+    (str, str) -> list
+    
+    Returns a list with information about each child workflow (i.e workflow immediately downstream) 
+    of workflow identified by workflow_id. 
+    
+    Parameters
+    ----------
+    - project_name (str): Name of project of interest
+    - bmpp_id (str): bamMergePreprocessing workflow id 
+    '''
+    
+    conn = connect_to_db()
+    
+    data = conn.execute("SELECT Workflows.wf, Parents.children_id FROM Parents JOIN Workflows \
+                        WHERE Parents.project_id = '{0}' AND Workflows.project_id = '{0}' \
+                        AND Parents.parents_id = '{1}' AND Workflows.wfrun_id = Parents.children_id".format(project_name, workflow_id)).fetchall()
+    
+    data = list(set(data))
+        
+    conn.close()
+    
+    return data
+
+
+def bmpp_input_raw_seq_status(project_name, bmpp_id):
+    '''
+    (str, str) -> bool
+
+    Returns True if all the input fastqs, excepting fastqs from import workflows, 
+    to the bmpp workflow run bmpp_id have been released and False otherwise
+    
+    Parameters
+    ----------
+    - project_name (str): Name of project of interest
+    - bmpp_id (str): bamMergePreprocessing workflow id 
+    '''
+    
+    # get bwamem input workflow ids
+    bwamem_ids = get_parent_workflow_info(project_name, bmpp_id)
+    # get the fastq-generating worflow ids
+    fastqs_workflow_ids = []
+    for workflow_id in bwamem_ids:
+        fastqs_workflow_ids.extend(get_parent_workflow_info(project_name, workflow_id))
+    
+    fastqs_workflow_ids = list(set(fastqs_workflow_ids))
+    
+    conn = connect_to_db()
+    
+    # track release status of all fastqs 
+    D = {}
+    
+    
+    
+    ##### COMMENTED CODE TO WORK AROUND NABU ####
+    
+    # get the file swids of the fastq-generating workflows
+    for workflow_id in fastqs_workflow_ids:
+        # data = conn.execute("SELECT Workflows.wf, Files.file_swid, FilesQC.status  \
+        #                       FROM Workflows JOIN Files JOIN FilesQC WHERE Files.project_id = '{0}' \
+        #                       AND Workflows.project_id = '{0}' AND FilesQC.project_id = '{0}' AND  \
+        #                       Files.wfrun_id = '{1}' AND FilesQC.file_swid = Files.file_swid AND \
+        #                       Workflows.wfrun_id = '{1}';".format(project_name, workflow_id)).fetchall()
+            
+        # # skip import workflows because fastqs from these workflow may not need to be shared back
+        # for i in data:
+        #     if 'import' not in i['wf'].lower():
+        #         assert i['file_swid'] not in D
+        #         D[i['file_swid']] = i['status']
+    
+        
+        data = conn.execute("SELECT Workflows.wf, Files.file_swid FROM Workflows JOIN Files \
+                            WHERE Files.project_id = '{0}' AND Workflows.project_id = '{0}' AND \
+                            Files.wfrun_id = '{1}' AND Workflows.wfrun_id = '{1}';".format(project_name, workflow_id)).fetchall()
+        for i in data:
+            if 'import' not in i['wf'].lower():
+                assert i['file_swid'] not in D
+                D[i['file_swid']] = 'NA'
+             
+    if D:
+        if all(map(lambda x: x.lower() == 'pass', D.values())):
+            return True
+        else:
+            return False
+    else:
+        return False
+       
+        
+    conn.close()
+    
+    
+
+def group_bmpp_downstream_workflows(project_name, bmpp_id):
+    '''
+    (str, str) -> list
+
+    Returns a list of bmpp downstream workflows for each normal/tumour sample pairs for a
+    given case identified by the bmpp workflow
+
+    Parameters
+    ----------
+    - project_name (str): Name of project of interest
+    - bmpp_id (str): bamMergePreprocessing workflow id 
+    '''
+    
+    conn = connect_to_db()
+    
+    # grab information about bmpp downstream workflows excluding QC workflows
+    data = conn.execute("SELECT Workflow_Inputs.library, Libraries.sample, Libraries.ext_id, \
+                        Libraries.group_id, Libraries.tissue_type, Libraries.tissue_origin, \
+                        Workflows.wf, Parents.children_id FROM Libraries JOIN Parents JOIN Workflows \
+                        JOIN Workflow_Inputs WHERE Parents.project_id = '{0}' AND \
+                        Workflows.wfrun_id = Parents.children_id AND Parents.parents_id = '{1}' \
+                        AND Workflow_Inputs.project_id = '{0}' AND Workflow_Inputs.wfrun_id = Parents.children_id AND \
+                        Workflow_inputs.Library = Libraries.library AND \
+                        LOWER(Workflows.wf) NOT IN ('wgsmetrics_call_ready', 'insertsizemetrics_call_ready', \
+                        'bamqc_call_ready');".format(project_name, bmpp_id)).fetchall()
+    
+    data = list(set(data))
+    conn.close()
+    
+    expected_workflows = ['mutect2', 'variantEffectPredictor', 'varscan', 'sequenza', 'delly', 'mavis']
+    
+    D = {}
+    
+    if data:
+        # group samples for each workflow run
+        for i in range(len(data) -1):
+            for j in range(i+1, len(data)):
+                if data[i]['children_id'] == data[j]['children_id']:
+                    # consider only tumor/normal pairs
+                    if data[i]['tissue_type'] == 'R' or data[j]['tissue_type'] == 'R':
+                        if data[i]['tissue_type'] == 'R':
+                            normal, tumour = i, j
+                        elif data[j]['tissue_type'] == 'R':
+                            normal, tumour = j, i
+                    
+                        normal_sample = '_'.join([data[normal]['sample'], data[normal]['tissue_origin'], data[normal]['tissue_type'], data[normal]['group_id']])
+                        tumour_sample = '_'.join([data[tumour]['sample'], data[tumour]['tissue_origin'], data[tumour]['tissue_type'], data[tumour]['group_id']])
+                        sample = normal_sample +';' + tumour_sample
+                    
+                        libraries = ';'.join(sorted([data[i]['library'], data[j]['library']]))
+                    
+                        if libraries not in D:
+                            D[libraries] = {'sample': sample}
+                        else:
+                            assert D[libraries]['sample'] == sample
+                        
+                        workflow = data[i]['wf'].split('_')[0]
+                        if libraries not in D:
+                            D[libraries] = {}
+                        if 'workflows' not in D[libraries]:
+                            D[libraries]['workflows'] = {}
+                        D[libraries]['workflows'][workflow] = data[i]['children_id']
+                    
+                        # get downstream workflow
+                        L = get_child_workflow_info(project_name, data[i]['children_id'])
+                        if L:
+                            assert len(L) == 1
+                            downtream_workflow =  L[0]['wf'].split('_')[0]
+                            D[libraries]['workflows'][downtream_workflow] = L[0]['children_id']
+                        
+                    
+        for libraries in D:
+            for workflow in expected_workflows:
+                if workflow not in D[libraries]['workflows']:
+                    D[libraries]['workflows'][workflow] = 'NA'
+                
+    # make a list
+    samples = sorted(D.keys())
+    
+    L = []
+    for i in samples:
+        normal, tumour = D[i]['sample'].split(';')
+        d = [normal, tumour]
+        for workflow in expected_workflows:
+            d.append(D[i]['workflows'][workflow])
+        if d not in L:
+            L.append(d)
+    return L            
+    
+    
+
+
+def get_bmpp_downstream_workflows(project_name, bmpp_id):
+    '''
+    
+    
+    '''
+
+    pass
+
+
+
     
     
 # map pipelines to views
@@ -1824,9 +2039,8 @@ def wgs_case(project_name, case):
     # get the pipelines from the library definitions in db
     pipelines = get_pipelines(project_name)
         
-    conn = connect_to_db()
-
     # extract sample, library and workflow information for call ready workflow bamMergePreprocessing
+    conn = connect_to_db()
     data = conn.execute("SELECT Files.creation_date, Files.file, Libraries.library, Libraries.sample, \
                          Libraries.ext_id, Libraries.group_id, Libraries.tissue_type, \
                          Libraries.tissue_origin, Workflow_Inputs.run, Workflow_Inputs.lane, \
@@ -1836,49 +2050,26 @@ def wgs_case(project_name, case):
                          AND Workflow_Inputs.project_id = '{0}' AND Workflows.project_id = '{0}' \
                          AND Files.wfrun_id = Workflow_Inputs.wfrun_id  AND Workflow_Inputs.wfrun_id = Workflows.wfrun_id AND Workflow_Inputs.library = Libraries.library \
                          AND LOWER(Workflows.wf) = 'bammergepreprocessing'AND Libraries.sample ='{1}'".format(project_name, case)).fetchall()
-    
     conn.close()
 
     # get sample, library and file info for for the most recent bmpp run for case in project
     bmpp_id, bmpp_files, bmpp_info = get_bmpp_files(data)
     
-    
-    
- #    <table id="project_table">
- # <thead>
- #   <th>BMPP workflow</th>
- #   <th>Samples</th>
- #   <th>Tissue type</th>     
- #   <th>Tissue Origin</th>
- #   <th>Libraries</th>
- #   <th>Files</th>
- # </thead>     
+    # get QC status of bmpp input fastq files
+    fastq_status = bmpp_input_raw_seq_status(project_name, bmpp_id)
 
- # {% for case in bmpp_files %}
- #     {% for sample in bmpp_files[case]['samples'] %}
- #       <tr>
- #         <td>{{bmpp_files[case]['wfrun_id']}}</td>     
- #         <td> {{sample}} </td>
- #         <td> {{ bmpp_files[case]['samples'][sample]['tissue_type'] }} </td>
- #         <td> {{ bmpp_files[case]['samples'][sample]['tissue_origin'] }} </td>
- #         {% for library in bmpp_files[case]['samples'][sample]['libraries'] %}  
- #           <td> {{ library }} </td>
- #         {% endfor %}
- #         <td>
- #           {% for file in bmpp_files[case]['files'] %}
- #             {{ file }}
- #             <br>
- #           {% endfor %}
- #         </td>
-              
- #     {% endfor %}
- #     </tr>
- # {% endfor %}               
- # </table>
+    # get the bmpp downstream workflows
+    downstream_workflows = group_bmpp_downstream_workflows(project_name, bmpp_id)
+
+
+
+
+
 
     
-    
-    
-    return render_template('WGS_case.html', routes = routes, bmpp_info=bmpp_info, bmpp_id=bmpp_id, bmpp_files=bmpp_files, sample_case=case, project=project, pipelines=pipelines)
+    return render_template('WGS_case.html', routes = routes, fastq_status=fastq_status,
+                           bmpp_info=bmpp_info, bmpp_id=bmpp_id, bmpp_files=bmpp_files,
+                           sample_case=case, project=project, pipelines=pipelines,
+                           downstream_workflows=downstream_workflows)
 
 
