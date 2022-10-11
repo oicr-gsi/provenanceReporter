@@ -19,8 +19,18 @@
     <p>
       {% block title %} {{ sample_case }} {% endblock %}
       <span style="font-size:30px; font-style:normal;"> Whole Genome Sequencing pipeline </span>
+      {% if bmpp_info %}
+        <button id="download_button">Download json</button>
+      {% endif %}
     </p>  
   </div> 
+
+
+
+
+
+
+
 
   <table id="simple_table">
    <thead>
