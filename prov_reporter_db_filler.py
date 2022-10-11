@@ -13,7 +13,7 @@ import gzip
 import argparse
 import time
 import traceback
-
+import os
 
 
 def extract_project_info(project_provenance):
@@ -192,6 +192,10 @@ def collect_file_info_from_fpr(fpr, project_name):
             md5sum = line[47]
             # get file_swid
             file_swid = line[44]
+            
+            # keep only unique string. file swid doesn't match workflow inout file swids
+            file_swid = os.path.basename(file_swid)
+            
             # get the library type
             library_type = line[17]
             if library_type:
@@ -265,6 +269,7 @@ def open_fpr(fpr):
     return infile
 
 
+
 def get_workflow_relationships(fpr, project_name):
     '''
     (str, str) -> (dict, dict, dict)
@@ -299,12 +304,18 @@ def get_workflow_relationships(fpr, project_name):
             workflow, workflow_version, workflow_run = line[30], line[31], line[36]
             # get file swid
             file_swid = line[44]
+            
+            # keep only unique string. file swid doesn't match file swid of worklow input files
+            file_swid = os.path.basename(file_swid)
+            
             input_files = line[38]
             if input_files:
-                input_files = sorted(input_files.split(','))
+                #input_files = sorted(input_files.split(','))
+            
+                input_files = sorted(list(set((map(lambda x: os.path.basename(x), input_files.split(','))))))
             else:
                 input_files = []
-                   
+            
             # get workflow attributes
             attributes = line[37]
             if attributes:
@@ -341,12 +352,54 @@ def get_workflow_relationships(fpr, project_name):
 
 
 
+
+
+# def identify_parent_children_workflows(P, F):
+#     '''
+#     (dict, dict, dict) -> (dict, dict)     
+    
+#     Returns a tuple with dictionaries of children: parents workflows and parents: children workflow  
+#     relationsips for a given project
+        
+#     Parameters
+#     ----------
+#     - P (dict): Input file ids for each workflow run id
+#     - F (dict): Map of file id and workflow id
+#     '''
+    
+#     # parents record parent-child workflow relationships
+#     # children record child-parent workflow relationships
+#     parents, children = {}, {}
+    
+#     for project in P:
+#         if project not in children:
+#             children[project] = {}
+#         for workflow in P[project]:
+#             parent_workflows = sorted(list(set([F[project][i] for i in P[project][workflow] if i in F[project]])))
+#             children[project][workflow] = parent_workflows
+    
+#     for project in children:
+#         if project not in parents:
+#             parents[project] = {}
+#         for workflow in children[project]:
+#             for parent_workflow in children[project][workflow]:
+#                 if parent_workflow not in parents[project]:
+#                     parents[project][parent_workflow] = [workflow]
+#                 else:
+#                     parents[project][parent_workflow].append(workflow)
+    
+#     for project in parents:
+#         for workflow in parents[project]:
+#             parents[project][workflow] = sorted(list(set(parents[project][workflow])))
+    
+#     return parents, children
+
+
 def identify_parent_children_workflows(P, F):
     '''
-    (dict, dict, dict) -> (dict, dict)     
+    (dict, dict, dict) -> dict     
     
-    Returns a tuple with dictionaries of children: parents workflows and parents: children workflow  
-    relationsips for a given project
+    Returns a dictionary of children: parents workflows relationsips for a given project
         
     Parameters
     ----------
@@ -354,34 +407,25 @@ def identify_parent_children_workflows(P, F):
     - F (dict): Map of file id and workflow id
     '''
     
-    # parents record parent-child workflow relationships
-    # children record child-parent workflow relationships
-    parents, children = {}, {}
+    # parents record child-parent workflow relationships
+    parents = {}
     
     for project in P:
-        if project not in children:
-            children[project] = {}
         for workflow in P[project]:
-            parent_workflows = sorted(list(set([F[project][i] for i in P[project][workflow] if i in F[project]])))
-            children[project][workflow] = parent_workflows
-    
-    for project in children:
-        if project not in parents:
-            parents[project] = {}
-        for workflow in children[project]:
-            for parent_workflow in children[project][workflow]:
-                if parent_workflow not in parents[project]:
-                    parents[project][parent_workflow] = [workflow]
-                else:
-                    parents[project][parent_workflow].append(workflow)
-    
-    for project in parents:
-        for workflow in parents[project]:
-            parents[project][workflow] = sorted(list(set(parents[project][workflow])))
-    
-    return parents, children
+            if P[project][workflow]:
+                parent_workflows = sorted(list(set([F[project][i] for i in P[project][workflow] if i in F[project]])))
+            else:
+                parent_workflows = ['NA']
+            if project not in parents:
+                parents[project] = {}
+            if workflow in parents[project]:
+                assert parents[project][workflow] == parent_workflows
+            else:
+                parents[project][workflow] = parent_workflows
+        
+    return parents
 
-
+    
 def get_provenance_data(provenance):
     '''
     (str) -> list
@@ -507,6 +551,26 @@ def extract_workflow_info(fpr, project_name):
     return D            
 
 
+# def define_column_names():
+#     '''
+#     (None) -> dict
+
+#     Returns a dictionary with column names for each table in database
+#     '''
+
+#     # create dict to store column names for each table {table: [column names]}
+#     column_names = {'Workflows': ['wfrun_id', 'wf', 'wfv', 'project_id', 'attributes'],
+#                     'Parents': ['children_id', 'parents_id', 'project_id'],
+#                     'Children': ['parents_id', 'children_id', 'project_id'],
+#                     'Projects': ['project_id', 'pipeline', 'description', 'active', 'contact_name', 'contact_email'],
+#                     'Files': ['file_swid', 'project_id', 'md5sum', 'workflow', 'version', 'wfrun_id', 'file', 'library_type', 'attributes', 'creation_date'],
+#                     'FilesQC': ['file_swid', 'project_id', 'skip', 'user', 'date', 'status', 'reference', 'fresh'],
+#                     'Libraries': ['library', 'sample', 'tissue_type', 'ext_id', 'tissue_origin',
+#                                   'library_type', 'prep', 'tissue_prep', 'sample_received_date', 'group_id', 'group_id_description', 'project_id'],
+#                     'Workflow_Inputs': ['library', 'run', 'lane', 'wfrun_id', 'limskey', 'barcode', 'platform', 'project_id']}
+        
+#     return column_names
+
 def define_column_names():
     '''
     (None) -> dict
@@ -516,8 +580,7 @@ def define_column_names():
 
     # create dict to store column names for each table {table: [column names]}
     column_names = {'Workflows': ['wfrun_id', 'wf', 'wfv', 'project_id', 'attributes'],
-                    'Parents': ['children_id', 'parents_id', 'project_id'],
-                    'Children': ['parents_id', 'children_id', 'project_id'],
+                    'Parents': ['parents_id', 'children_id', 'project_id'],
                     'Projects': ['project_id', 'pipeline', 'description', 'active', 'contact_name', 'contact_email'],
                     'Files': ['file_swid', 'project_id', 'md5sum', 'workflow', 'version', 'wfrun_id', 'file', 'library_type', 'attributes', 'creation_date'],
                     'FilesQC': ['file_swid', 'project_id', 'skip', 'user', 'date', 'status', 'reference', 'fresh'],
@@ -526,6 +589,36 @@ def define_column_names():
                     'Workflow_Inputs': ['library', 'run', 'lane', 'wfrun_id', 'limskey', 'barcode', 'platform', 'project_id']}
         
     return column_names
+
+
+
+# def define_column_types():
+#     '''
+#     (None) -> dict
+
+#     Returns a dictionary with column types for each table in database
+#     '''
+
+#     # create dict to store column names for each table {table: [column names]}
+#     column_types = {'Workflows': ['VARCHAR(572)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'TEXT'],
+#                     'Parents': ['VARCHAR(572)', 'VARCHAR(572)', 'VARCHAR(128)'],
+#                     'Children': ['VARCHAR(572)', 'VARCHAR(572)', 'VARCHAR(128)'],
+#                     'Projects': ['VARCHAR(128) PRIMARY KEY NOT NULL UNIQUE', 'VARCHAR(128)',
+#                                   'TEXT', 'VARCHAR(128)', 'VARCHAR(256)', 'VARCHAR(256)'],
+#                     'Files': ['VARCHAR(572) PRIMARY KEY NOT NULL UNIQUE', 'VARCHAR(128)',
+#                               'VARCHAR(256)', 'VARCHAR(128)', 'VARCHAR(128)',
+#                               'VARCHAR(572)', 'TEXT', 'VARCHAR(128)', 'TEXT', 'INT'],
+#                     'FilesQC': ['VARCHAR(572) PRIMARY KEY NOT NULL UNIQUE', 'VARCHAR(128)',
+#                                 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)',
+#                                 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)'],
+#                     'Libraries': ['VARCHAR(256) PRIMARY KEY NOT NULL', 'VARCHAR(128)',
+#                                   'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)',
+#                                   'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 
+#                                   'VARCHAR(256)', 'VARCHAR(128)', 'VARCHAR(256)', 'VARCHAR(128)'],
+#                     'Workflow_Inputs': ['VARCHAR(128)', 'VARCHAR(256)', 'INTEGER', 'VARCHAR(572)', 
+#                                         'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)']}
+    
+#     return column_types
 
 
 def define_column_types():
@@ -538,7 +631,6 @@ def define_column_types():
     # create dict to store column names for each table {table: [column names]}
     column_types = {'Workflows': ['VARCHAR(572)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'TEXT'],
                     'Parents': ['VARCHAR(572)', 'VARCHAR(572)', 'VARCHAR(128)'],
-                    'Children': ['VARCHAR(572)', 'VARCHAR(572)', 'VARCHAR(128)'],
                     'Projects': ['VARCHAR(128) PRIMARY KEY NOT NULL UNIQUE', 'VARCHAR(128)',
                                   'TEXT', 'VARCHAR(128)', 'VARCHAR(256)', 'VARCHAR(256)'],
                     'Files': ['VARCHAR(572) PRIMARY KEY NOT NULL UNIQUE', 'VARCHAR(128)',
@@ -555,6 +647,83 @@ def define_column_types():
                                         'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)']}
     
     return column_types
+
+
+
+
+
+
+# def create_table(database, table):
+#     '''
+#     (str, str) -> None
+    
+#     Creates a table in database
+    
+#     Parameters
+#     ----------
+#     - database (str): Name of the database
+#     - table (str): Table name
+#     '''
+    
+#     # get the column names
+#     column_names = define_column_names()[table]
+#     # get the column types
+#     column_types = define_column_types()[table]    
+    
+#     # define table format including constraints    
+#     table_format = ', '.join(list(map(lambda x: ' '.join(x), list(zip(column_names, column_types)))))
+
+
+#     if table  in ['Workflows', 'Parents', 'Children', 'Files', 'FilesQC', 'Libraries', 'Workflow_Inputs']:
+#         constraints = '''FOREIGN KEY (project_id)
+#             REFERENCES Projects (project_id)
+#             ON DELETE CASCADE ON UPDATE CASCADE'''
+#         table_format = table_format + ', ' + constraints 
+    
+#     if table in ['Parents', 'Children']:
+#         constraints = '''FOREIGN KEY (parents_id)
+#           REFERENCES Workflows (wfrun_id)
+#           ON DELETE CASCADE ON UPDATE CASCADE,
+#           FOREIGN KEY (children_id)
+#               REFERENCES Workflows (wfrun_id)
+#               ON DELETE CASCADE ON UPDATE CASCADE''' 
+#         table_format = table_format + ', ' + constraints
+    
+#     if table == 'Parents':
+#         table_format = table_format + ', PRIMARY KEY (children_id, parents_id, project_id)'
+    
+#     if table == 'Children':
+#         table_format = table_format + ', PRIMARY KEY (parents_id, children_id, project_id)'
+    
+#     if table == 'Worklows':
+#         table_format = table_format + ', PRIMARY KEY (wfrun_id, project_id)'
+        
+#     if table == 'Files':
+#         constraints = '''FOREIGN KEY (wfrun_id)
+#             REFERENCES Workflows (wfrun_id)
+#             ON DELETE CASCADE ON UPDATE CASCADE,
+#             FOREIGN KEY (file_swid)
+#                REFERENCES FilesQC (file_swid)
+#                ON DELETE CASCADE ON UPDATE CASCADE'''
+#         table_format = table_format + ', ' + constraints
+    
+#     if table == 'Workflow_Inputs':
+#         constraints = '''FOREIGN KEY (wfrun_id)
+#             REFERENCES Workflows (wfrun_id)
+#             ON DELETE CASCADE ON UPDATE CASCADE,
+#             FOREIGN KEY (library)
+#               REFERENCES Libraries (library)
+#               ON DELETE CASCADE ON UPDATE CASCADE'''
+#         table_format = table_format + ', ' + constraints
+            
+#     # connect to database
+#     conn = sqlite3.connect(database)
+#     cur = conn.cursor()
+#     # create table
+#     cmd = 'CREATE TABLE {0} ({1})'.format(table, table_format)
+#     cur.execute(cmd)
+#     conn.commit()
+#     conn.close()
 
 
 def create_table(database, table):
@@ -578,26 +747,20 @@ def create_table(database, table):
     table_format = ', '.join(list(map(lambda x: ' '.join(x), list(zip(column_names, column_types)))))
 
 
-    if table  in ['Workflows', 'Parents', 'Children', 'Files', 'FilesQC', 'Libraries', 'Workflow_Inputs']:
+    if table  in ['Workflows', 'Parents', 'Files', 'FilesQC', 'Libraries', 'Workflow_Inputs']:
         constraints = '''FOREIGN KEY (project_id)
             REFERENCES Projects (project_id)
             ON DELETE CASCADE ON UPDATE CASCADE'''
         table_format = table_format + ', ' + constraints 
     
-    if table in ['Parents', 'Children']:
+    if table == 'Parents':
         constraints = '''FOREIGN KEY (parents_id)
           REFERENCES Workflows (wfrun_id)
           ON DELETE CASCADE ON UPDATE CASCADE,
           FOREIGN KEY (children_id)
               REFERENCES Workflows (wfrun_id)
               ON DELETE CASCADE ON UPDATE CASCADE''' 
-        table_format = table_format + ', ' + constraints
-    
-    if table == 'Parents':
-        table_format = table_format + ', PRIMARY KEY (children_id, parents_id, project_id)'
-    
-    if table == 'Children':
-        table_format = table_format + ', PRIMARY KEY (parents_id, children_id, project_id)'
+        table_format = table_format + ', ' + constraints + ', PRIMARY KEY (parents_id, children_id, project_id)'
     
     if table == 'Worklows':
         table_format = table_format + ', PRIMARY KEY (wfrun_id, project_id)'
@@ -630,6 +793,28 @@ def create_table(database, table):
     conn.close()
 
 
+# def initiate_db(database):
+#     '''
+#     (str) -> None
+    
+#     Create tables in database
+    
+#     Parameters
+#     ----------
+#     - database (str): Path to the database file
+#     '''
+    
+#     # check if table exists
+#     conn = sqlite3.connect(database)
+#     cur = conn.cursor()
+#     cur.execute("SELECT name FROM sqlite_master WHERE type='table';")
+#     tables = cur.fetchall()
+#     tables = [i[0] for i in tables]    
+#     conn.close()
+#     for i in ['Projects', 'Workflows', 'Parents', 'Children', 'Files', 'FilesQC', 'Libraries', 'Workflow_Inputs']:
+#         if i not in tables:
+#             create_table(database, i)
+
 
 def initiate_db(database):
     '''
@@ -649,9 +834,10 @@ def initiate_db(database):
     tables = cur.fetchall()
     tables = [i[0] for i in tables]    
     conn.close()
-    for i in ['Projects', 'Workflows', 'Parents', 'Children', 'Files', 'FilesQC', 'Libraries', 'Workflow_Inputs']:
+    for i in ['Projects', 'Workflows', 'Parents', 'Files', 'FilesQC', 'Libraries', 'Workflow_Inputs']:
         if i not in tables:
             create_table(database, i)
+
 
 
 
@@ -767,18 +953,77 @@ def add_workflows(workflows, database, project_name, table = 'Workflows'):
 
 
     
-def add_workflow_relationships(D, database, project_name, table):    
+# def add_workflow_relationships(D, database, project_name, table):    
+#     '''
+#     (dict, str, str, str) -> None
+    
+#     Inserts or updates parent-children workflow relatiionships to table Children in database
+    
+#     Parameters
+#     ----------    
+#     - D (dict): Dictionary with children-parents (Parents table) or parent-children (Children table) workflow relationships
+#     - database (str): Path to the database file
+#     - project_name (str): name of project of interest
+#     - table (str): Name of the table storing children-parents workflow relationships
+#     '''
+    
+#     # connect to db
+#     conn = sqlite3.connect(database)
+#     cur = conn.cursor()
+    
+#     #get existing records
+#     if table == 'Parents':
+#         cur.execute("SELECT {0}.children_id, {0}.parents_id, {0}.project_id FROM {0} WHERE {0}.project_id = '{1}';".format(table, project_name))
+#     elif table == 'Children':
+#         cur.execute("SELECT {0}.parents_id, {0}.children_id, {0}.project_id FROM {0} WHERE {0}.project_id = '{1}';".format(table, project_name))
+#     records = cur.fetchall()
+    
+#     # get column names
+#     column_names = define_column_names()[table]
+    
+#     for project in D:
+#         for i in D[project]:
+#             for j in D[project][i]:
+#                 if (i, j, project) not in records:
+#                     # insert data into table
+#                     cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), (i, j, project)))
+#                     conn.commit()
+                            
+#     # remove any workflow relationships not defined anymore in FPR    
+#     for (i, j, project) in records:
+#         if project not in D:
+#             cur.execute("DELETE FROM {0} WHERE project_id = '{1}';".format(table, project))
+#             conn.commit()
+#         elif i not in D[project]:
+#             if table == 'Parents':
+#                 cmd1 = "DELETE FROM {0} WHERE children_id = '{1}' AND project_id = '{2}';".format(table, i, project)
+#             elif table == 'Children':
+#                 cmd1 = "DELETE FROM {0} WHERE parents_id = '{1}' AND project_id = '{2}';".format(table, i, project)
+#             cur.execute(cmd1)
+#             conn.commit()
+#         elif j not in D[project][i]:
+#             if table == 'Parents':
+#                 cmd2 = "DELETE FROM {0} WHERE children_id = '{1}' AND parents_id = '{2}' AND project_id = '{3}';".format(table, i, j, project)
+#             elif table == 'Children':
+#                 cmd2 = "DELETE FROM {0} WHERE parents_id = '{1}' AND children_id = '{2}' AND project_id = '{3}';".format(table, i, j, project)
+#             cur.execute(cmd2)            
+#             conn.commit()
+#     conn.close()
+
+
+
+def add_workflow_relationships(parent_workflows, database, project_name, table = 'Parents'):    
     '''
     (dict, str, str, str) -> None
     
-    Inserts or updates parent-children workflow relatiionships to table Children in database
+    Inserts or updates parent-children workflow relatiionships to table Parents in database
     
     Parameters
     ----------    
-    - D (dict): Dictionary with children-parents (Parents table) or parent-children (Children table) workflow relationships
+    - D (dict): Dictionary with children-parents workflow relationships 
     - database (str): Path to the database file
     - project_name (str): name of project of interest
-    - table (str): Name of the table storing children-parents workflow relationships
+    - table (str): Name of the table storing parents-children workflow relationships
     '''
     
     # connect to db
@@ -786,43 +1031,39 @@ def add_workflow_relationships(D, database, project_name, table):
     cur = conn.cursor()
     
     #get existing records
-    if table == 'Parents':
-        cur.execute("SELECT {0}.children_id, {0}.parents_id, {0}.project_id FROM {0} WHERE {0}.project_id = '{1}';".format(table, project_name))
-    elif table == 'Children':
-        cur.execute("SELECT {0}.parents_id, {0}.children_id, {0}.project_id FROM {0} WHERE {0}.project_id = '{1}';".format(table, project_name))
+    cur.execute("SELECT {0}.parents_id, {0}.children_id, {0}.project_id FROM {0} WHERE {0}.project_id = '{1}';".format(table, project_name))
     records = cur.fetchall()
-    
+        
     # get column names
     column_names = define_column_names()[table]
     
-    for project in D:
-        for i in D[project]:
-            for j in D[project][i]:
-                if (i, j, project) not in records:
+    for project in parent_workflows:
+        for workflow in parent_workflows[project]:
+            for parent in parent_workflows[project][workflow]:
+                if (parent, workflow, project) not in records:
                     # insert data into table
-                    cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), (i, j, project)))
+                    cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), (parent, workflow, project)))
                     conn.commit()
                             
-    # remove any workflow relationships not defined anymore in FPR    
-    for (i, j, project) in records:
-        if project not in D:
-            cur.execute("DELETE FROM {0} WHERE project_id = '{1}';".format(table, project))
-            conn.commit()
-        elif i not in D[project]:
-            if table == 'Parents':
-                cmd1 = "DELETE FROM {0} WHERE children_id = '{1}' AND project_id = '{2}';".format(table, i, project)
-            elif table == 'Children':
-                cmd1 = "DELETE FROM {0} WHERE parents_id = '{1}' AND project_id = '{2}';".format(table, i, project)
-            cur.execute(cmd1)
-            conn.commit()
-        elif j not in D[project][i]:
-            if table == 'Parents':
-                cmd2 = "DELETE FROM {0} WHERE children_id = '{1}' AND parents_id = '{2}' AND project_id = '{3}';".format(table, i, j, project)
-            elif table == 'Children':
-                cmd2 = "DELETE FROM {0} WHERE parents_id = '{1}' AND children_id = '{2}' AND project_id = '{3}';".format(table, i, j, project)
-            cur.execute(cmd2)            
-            conn.commit()
-    conn.close()
+    # # remove any workflow relationships not defined anymore in FPR    
+    # for (i, j, project) in records:
+    #     if project not in parent_workflows:
+    #         cur.execute("DELETE FROM {0} WHERE project_id = '{1}';".format(table, project))
+    #         conn.commit()
+    #     elif i not in parent_workflows[project].values():
+    #         cur.execute("DELETE FROM {0} WHERE parents_id = '{1}' AND project_id = '{2}';".format(table, i, project))
+    #         conn.commit()
+    #     elif j not in parent_workflows[project]:
+    #         cur.execute("DELETE FROM {0} WHERE children_id = '{1}' AND parents_id = '{2}' AND project_id = '{3}';".format(table, i, j, project))
+    #         conn.commit()
+    # conn.close()
+
+
+
+
+
+
+
 
 
 def add_workflows_info_to_db(fpr, database, project_name, workflow_table = 'Workflows', parent_table = 'Parents', children_table = 'Children'):
@@ -844,17 +1085,20 @@ def add_workflows_info_to_db(fpr, database, project_name, workflow_table = 'Work
     # get the workflow inputs and workflow info
     workflows, parents, files = get_workflow_relationships(fpr, project_name)
     
+    # create a dict {workflow: [parent workflows]}
+    parent_workflows = identify_parent_children_workflows(parents, files)
+
     # identify parent-children workflow relationships
-    parent_workflows, children_workflows = identify_parent_children_workflows(parents, files)
+    #parent_workflows, children_workflows = identify_parent_children_workflows(parents, files)
 
     # add workflow info
     add_workflows(workflows, database, project_name, workflow_table)
         
-    # add parents-children workflow relationships
+    # add parents-children workflow relationships to Parents table
     add_workflow_relationships(parent_workflows, database, project_name, parent_table)    
        
     # add children-parents workflow relationships    
-    add_workflow_relationships(children_workflows, database, project_name, children_table)    
+    #add_workflow_relationships(children_workflows, database, project_name, children_table)    
        
     
     
@@ -1075,6 +1319,8 @@ if __name__ == '__main__':
     initiate_db(args.database)
     # make a list of projects
     projects = list(extract_project_info(args.project_provenance).keys())
+    
+    projects = ['HCCCFD']
     
     print('{0} projects in provenance'.format(len(projects)))
     # add or update information in tables
