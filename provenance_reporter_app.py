@@ -2056,8 +2056,15 @@ def format_dowmstream_workflow_files(D, bmpp_id):
     for libraries in D:
         for i in D[libraries]:
             if i['workflow_id'] != 'NA':
+                if i['attributes']:
+                    attributes = i['attributes'].replace("\\\"", "").replace('\\', '')
+                    attributes = json.loads(attributes)
+                    if 'reference' in attributes:
+                        attributes = attributes['reference'].replace('"', '')
+                else:
+                    attributes = 'NA'
                 L = [i['workflow_id'], i['workflow'], i['creation_date'],
-                     i['attributes'], ['bamMergePreprocessing', bmpp_id], [os.path.dirname(i['files'][0])] + sorted(map(lambda x: os.path.basename(x), i['files']))]
+                     attributes, ['bamMergePreprocessing', bmpp_id], [os.path.dirname(i['files'][0])] + sorted(map(lambda x: os.path.basename(x), i['files']))]
                 downstream_workflow_files.append(L)
     return downstream_workflow_files
 
