@@ -2038,7 +2038,7 @@ def format_bmpp_dowmstream_workflows(D):
 
 
 
-def format_dowmstream_workflow_files(D, bmpp_id):
+def format_dowmstream_workflow_files(D, project_name, bmpp_id):
     '''
     (dict, str) -> list    
     
@@ -2048,9 +2048,17 @@ def format_dowmstream_workflow_files(D, bmpp_id):
     Parameters
     ----------
     - D (dict): Dictionary with information about bmpp downstream workflows
+    - project_name (str): name of project of interest
     - bmpp_id (str): Specific bmpp workflow run id
     '''
 
+    parent_workflows = {'variantEffectPredictor': 'mutect2',
+                        'sequenza': 'varscan',
+                        'mavis': 'delly',
+                        'mutect2': 'bamMergePreprocessing',
+                        'varscan': 'bamMergePreprocessing',
+                        'delly': 'bamMergePreprocessing'}
+                        
     # get the workflow files
     downstream_workflow_files = []
     for libraries in D:
@@ -2063,8 +2071,10 @@ def format_dowmstream_workflow_files(D, bmpp_id):
                         attributes = attributes['reference'].replace('"', '')
                 else:
                     attributes = 'NA'
+                # get parent workflow
+                parent_workflow_id = get_parent_workflows(project_name, i['workflow_id'])[0]
                 L = [i['workflow_id'], i['workflow'], i['creation_date'],
-                     attributes, ['bamMergePreprocessing', bmpp_id], [os.path.dirname(i['files'][0])] + sorted(map(lambda x: os.path.basename(x), i['files']))]
+                     attributes, [parent_workflows[i['workflow']], parent_workflow_id], [os.path.dirname(i['files'][0])] + sorted(map(lambda x: os.path.basename(x), i['files']))]
                 downstream_workflow_files.append(L)
     return downstream_workflow_files
 
@@ -2202,7 +2212,7 @@ def wgs_case(project_name, case):
     D = get_bmpp_downstream_workflows(project_name, bmpp_id)
     downstream_workflows = format_bmpp_dowmstream_workflows(D)
     # get the workflow files
-    downstream_workflow_files = format_dowmstream_workflow_files(D, bmpp_id)
+    downstream_workflow_files = format_dowmstream_workflow_files(D, project_name, bmpp_id)
     
        
     return render_template('WGS_case.html', routes = routes, fastq_status=fastq_status,
