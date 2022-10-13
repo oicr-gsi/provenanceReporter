@@ -1691,7 +1691,7 @@ def get_bmpp_files(data):
                            'creation_date': creation_date,
                            'files': [file]}
     for case in D:
-        D[case]['files'] = sorted(list(map(lambda x: os.path.basename(x), list(set(D[case]['files'])))))
+        D[case]['files'] = [os.path.dirname(D[case]['files'][0])] + sorted(list(map(lambda x: os.path.basename(x), list(set(D[case]['files'])))))
         for sample in D[case]['samples']:
             D[case]['samples'][sample]['libraries'] = list(set(D[case]['samples'][sample]['libraries']))
     
@@ -1701,6 +1701,7 @@ def get_bmpp_files(data):
     case = case[0]
         
     bmpp_files = '\n'.join(D[case]['files'])
+        
     wfrun_id = D[case]['wfrun_id']
     # organize library and sample info for table
     L = []
