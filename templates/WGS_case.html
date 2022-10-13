@@ -26,12 +26,6 @@
   </div> 
 
 
-
-
-
-
-
-
   <table id="simple_table">
    <thead>
      <th>BMPP workflow</th>
@@ -90,5 +84,47 @@
      {% endfor %}  
    </table>
   {% endif %}
+
+
+  {% if downstream_workflow_files %}
+  
+  <table id="simple_table">
+     <thead>
+       <th>Workflow Run id</th>
+       <th>Workflow</th>     
+       <th>Run date</th>
+       <th>Tags</th>
+       <th>Parent</th>     
+       <th>Files</th>
+     </thead>     
+
+     {% for i in downstream_workflow_files %}
+     <tr>
+       <td>{{i.0}}</td>
+       <td>{{i.1}}</td>
+       <td>{{i.2}}</td>  
+       <td>{{i.3}}</td>
+       <td>   
+         {% for item in i.4 %}
+           {{item}}
+           <br>
+         {% endfor %}
+       </td>       
+       <td>
+         {% for item in i.5 %}
+           {{item}}
+           <br> 
+         {% endfor %}       
+       </td>
+     </tr>
+     {% endfor %}  
+   </table>
+  {% endif %}
+
+
+
+
+
+
 
 {% endblock %}
