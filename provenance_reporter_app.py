@@ -283,10 +283,10 @@ def get_bmpp_files(data):
 
 def get_parent_workflows(project_name, workflow_id):
     '''
-    (str, str) -> list
+    (str, str) -> dict
     
-    Returns a list of parent workflow ids (i.e immediate upstream workflow) upstream of the 
-    workflow defined by workflow_id for a given project_name
+    Returns a dictionary with workflow name, list of workflow_ids that are all parent of 
+    workflow_id (i.e immediate upstream workflow) for a given project_name
     
     Parameters
     ----------
@@ -295,23 +295,29 @@ def get_parent_workflows(project_name, workflow_id):
     '''
     
     conn = connect_to_db()
+    data = conn.execute("SELECT Workflows.wf, Parents.parents_id FROM Parents JOIN Workflows \
+                        WHERE Parents.project_id = '{0}' AND Workflows.project_id = '{0}' \
+                        AND Parents.children_id = '{1}' AND Workflows.wfrun_id = Parents.parents_id;".format(project_name, workflow_id)).fetchall()
+    data= list(set(data))
     
-    data = conn.execute("SELECT Parents.parents_id FROM Parents WHERE Parents.project_id = '{0}' \
-                        AND Parents.children_id = '{1}'".format(project_name, workflow_id)).fetchall()
-    
-    L = list(set([i['parents_id'] for i in data]))
-    
+    D = {}
+    for i in data:
+        if i['wf'] in D:
+            D[i['wf']].append(i['parents_id'])
+            D[i['wf']] = list(set(D[i['wf']]))
+        else:
+            D[i['wf']] = [i['parents_id']]
     conn.close()
     
-    return L
+    return D
 
 
 def get_children_workflows(project_name, workflow_id):
     '''
     (str, str) -> list
     
-    Returns a list of children workflows (i.e workflow immediately downstream) 
-    of workflow identified by workflow_id. 
+    Returns a dictionary with workflow name, list of workflow_ids that are all children of 
+    workflow_id (i.e immediate downstream workflow) for a given project_name
     
     Parameters
     ----------
@@ -321,14 +327,21 @@ def get_children_workflows(project_name, workflow_id):
     
     conn = connect_to_db()
     
-    data = conn.execute("SELECT Parents.children_id FROM Parents WHERE Parents.project_id = '{0}' \
-                        AND Parents.parents_id = '{1}';".format(project_name, workflow_id)).fetchall()
+    data = conn.execute("SELECT Workflows.wf, Parents.children_id FROM Parents JOIN Workflows \
+                        WHERE Parents.project_id = '{0}' AND Workflows.project_id = '{0}' \
+                        AND Parents.parents_id = '{1}' AND Workflows.wfrun_id = Parents.children_id;".format(project_name, workflow_id)).fetchall()
+    data= list(set(data))
     
-    L = list(set([i['children_id'] for i in data]))
-        
+    D = {}
+    for i in data:
+        if i['wf'] in D:
+            D[i['wf']].append(i['children_id'])
+            D[i['wf']] = list(set(D[i['wf']]))
+        else:
+            D[i['wf']] = [i['children_id']]
     conn.close()
     
-    return L
+    return D
 
 
 def get_workflow_files(project_name, workflow_id):
@@ -359,36 +372,25 @@ def get_workflow_files(project_name, workflow_id):
     return L, creation_date
 
 
-
 def filter_out_QC_workflows(project_name, workflows):
     '''
-    (str, list) -> list
+    (str, dict) -> dict
     
-    Returns a list of workflow ids removed from QC workflows
-    
+    Returns a dictionary of workflow name, list of workflow ids removing any QC workflows
+        
     Parameters
     ----------
     - project_name (str): name of project of interest
-    - workflows (list): List of workflow ids
+    - workflows (dict): Dictionary of workflow, list of workflow ids that are either parent or children of an other workflow
     '''
 
-    conn = connect_to_db()
+    to_remove = [i for i in workflows if i.lower() in ['wgsmetrics_call_ready', 'insertsizemetrics_call_ready', 
+                         'bamqc_call_ready', 'calculatecontamination']]
+    for i in to_remove:
+        del workflows[i]
+    return workflows
 
-    L = []
-    for workflow_id in workflows:
-        data = conn.execute("SELECT Workflows.wfrun_id FROM Workflows WHERE Workflows.project_id = '{0}'\
-                            AND Workflows.wfrun_id = '{1}' AND LOWER(Workflows.wf) NOT IN ('wgsmetrics_call_ready', 'insertsizemetrics_call_ready', \
-                            'bamqc_call_ready');".format(project_name, workflow_id)).fetchall()
-        if data:
-            assert len(data) == 1
-            L.append(data[0]['wfrun_id'])
-        
-    conn.close()
     
-    return L
-
-
-
 def bmpp_input_raw_seq_status(project_name, bmpp_id):
     '''
     (str, str) -> bool
@@ -403,12 +405,14 @@ def bmpp_input_raw_seq_status(project_name, bmpp_id):
     '''
     
     # get bwamem input workflow ids
-    bwamem_ids = get_parent_workflows(project_name, bmpp_id)
+    d = get_parent_workflows(project_name, bmpp_id)
+    bwamem_ids = d['bwaMem']
     # get the fastq-generating worflow ids
     fastqs_workflow_ids = []
     for workflow_id in bwamem_ids:
-        fastqs_workflow_ids.extend(get_parent_workflows(project_name, workflow_id))
-    
+        d = get_parent_workflows(project_name, workflow_id)
+        for i in d:
+            fastqs_workflow_ids.extend(d[i])
     fastqs_workflow_ids = list(set(fastqs_workflow_ids))
     
     conn = connect_to_db()
@@ -455,15 +459,6 @@ def bmpp_input_raw_seq_status(project_name, bmpp_id):
     conn.close()
     
 
-
-
-
-
-
-
-
-
-
 def get_workflow_info(project_name, workflow_id):
     '''
     (str, str) -> dict
@@ -505,10 +500,16 @@ def get_workflow_info(project_name, workflow_id):
         sample = normal_sample +';' + tumour_sample
                     
         libraries = ';'.join([data[normal]['library'], data[tumour]['library']])
-                    
-        D[libraries] = {'sample': sample, 'workflow': data[0]['wf'].split('_')[0],
-                        'workflow_id': data[0]['wfrun_id'], 'version': data[0]['wfv'], 'attributes': data[0]['attributes']}
-        
+
+        attributes = data[0]['attributes'].replace("\\\"", "").replace('\\', '')
+        attributes = json.loads(attributes)
+        if 'reference' in attributes:
+            attributes = attributes['reference'].replace('"', '')
+                
+        D[libraries] = {'sample': sample, 'workflow': data[0]['wf'],
+                        'workflow_id': data[0]['wfrun_id'], 'version': data[0]['wfv'],
+                        'attributes': attributes}
+           
     conn.close()
     
     return D
@@ -532,125 +533,48 @@ def get_bmpp_downstream_workflows(project_name, bmpp_id):
     # filter out QC workflows
     downstream_workflows = filter_out_QC_workflows(project_name, downstream_workflows)
 
-    # make a list of expected workflows
-    expected_workflows = {'mutect2': 'variantEffectPredictor',
-                          'varscan': 'sequenza',
-                          'delly': 'mavis'}
-    
     D = {}
     
-    for workflow_id in downstream_workflows:
-        # group all downstream workflows per library pair
-        d = get_workflow_info(project_name, workflow_id)
-        assert d
-        libraries = list(d.keys())[0]
-        # get the downstream workflow (ie mavis, VEP, delly)
-        child_workflow = get_children_workflows(project_name, workflow_id)
-        child_workflow = filter_out_QC_workflows(project_name, child_workflow)
-        if child_workflow:
-            child_workflow = child_workflow[0]    
-            w = get_workflow_info(project_name, child_workflow)
-        else:
-            w = {}
-            w[libraries] = {'sample': d[libraries]['sample'], 
-                            'workflow': expected_workflows[d[libraries]['workflow']],
-                            'workflow_id': 'NA', 'version': 'NA', 'attributes': 'NA'}       
-        if libraries not in D:
-            D[libraries] = []
-        D[libraries].append(d[libraries])
-        D[libraries].append(w[libraries])
+    for workflow in downstream_workflows:
+        for workflow_id in downstream_workflows[workflow]:
+            # group all downstream workflows per library pair
+            d = get_workflow_info(project_name, workflow_id)
+            assert d
+            libraries = list(d.keys())[0]
+            if libraries not in D:
+                D[libraries] = {}
+            D[libraries][d[libraries]['workflow']] = d[libraries] 
+            # get the downstream workflow (ie mavis, VEP, delly)
+            child_workflow = get_children_workflows(project_name, workflow_id)
+            child_workflow = filter_out_QC_workflows(project_name, child_workflow)
+            if child_workflow:
+                for i in child_workflow:
+                    for j in child_workflow[i]:
+                        w = get_workflow_info(project_name, j)
+                        if w:
+                            D[libraries][w[libraries]['workflow']] = w[libraries]
     
-    # sort workflows   
-    expected_workflows = ['mutect2', 'variantEffectPredictor', 'varscan', 'sequenza', 'delly', 'mavis']
+    # add parent workflows
     for libraries in D:
-        a = [0 for i in range(len(D[libraries]))]
-        for i in D[libraries]:
-            j = expected_workflows.index(i['workflow'])
-            a[j] = i
-        D[libraries] = a
-    
-    # get the files for each workflow
+        for workflow in D[libraries]:
+            parent_workflow = get_parent_workflows(project_name, D[libraries][workflow]['workflow_id'])
+            if 'parent' not in D[libraries][workflow]:
+                D[libraries][workflow]['parent'] = []
+            if parent_workflow not in D[libraries][workflow]['parent']:
+                D[libraries][workflow]['parent'].append(parent_workflow)
+        
+   # get the files for each workflow
     for libraries in D:
-        for i in range(len(D[libraries])):
-            files, creation_date = get_workflow_files(project_name, D[libraries][i]['workflow_id'])
-            D[libraries][i]['files'] = files
+        for workflow in D[libraries]:
+            files, creation_date = get_workflow_files(project_name, D[libraries][workflow]['workflow_id'])
+            D[libraries][workflow]['files'] = files
             # convert epoch time to standard time
             if creation_date:
                 creation_date = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(int(creation_date)))
-            D[libraries][i]['creation_date'] = creation_date
+            D[libraries][workflow]['creation_date'] = creation_date
     
     return D
 
-
-def format_bmpp_dowmstream_workflows(D):
-    '''
-    (dict) -> list
-    
-    Returns a list with information about workflows downstream a specific bmpp workflow run 
-    to display in the html table
-    
-    Parameters
-    ----------
-    - D (dict): Dictionary with information about bmpp downstream workflows
-    '''
-
-    downstream_workflows = []
-    for libraries in D:
-        normal, tumour = D[libraries][0]['sample'].split(';')
-        d = [normal, tumour]
-        for i in D[libraries]:
-            d.append(i['workflow_id'])
-        downstream_workflows.append(d)      
-    return downstream_workflows
-
-
-
-def format_dowmstream_workflow_files(D, project_name, bmpp_id):
-    '''
-    (dict, str) -> list    
-    
-    Returns a list with information and files generated by workflows downstream pecific bmpp workflow run bmpp_id
-    to display in the html table
-    
-    Parameters
-    ----------
-    - D (dict): Dictionary with information about bmpp downstream workflows
-    - project_name (str): name of project of interest
-    - bmpp_id (str): Specific bmpp workflow run id
-    '''
-
-    parent_workflows = {'variantEffectPredictor': 'mutect2',
-                        'sequenza': 'varscan',
-                        'mavis': 'delly',
-                        'mutect2': 'bamMergePreprocessing',
-                        'varscan': 'bamMergePreprocessing',
-                        'delly': 'bamMergePreprocessing'}
-                        
-    # get the workflow files
-    downstream_workflow_files = []
-    for libraries in D:
-        for i in D[libraries]:
-            if i['workflow_id'] != 'NA':
-                if i['attributes']:
-                    attributes = i['attributes'].replace("\\\"", "").replace('\\', '')
-                    attributes = json.loads(attributes)
-                    if 'reference' in attributes:
-                        attributes = attributes['reference'].replace('"', '')
-                else:
-                    attributes = 'NA'
-                # get parent workflow
-                parent_workflow_id = get_parent_workflows(project_name, i['workflow_id'])[0]
-                L = [i['workflow_id'], i['workflow'], i['creation_date'],
-                     attributes, [parent_workflows[i['workflow']], parent_workflow_id], [os.path.dirname(i['files'][0])] + sorted(map(lambda x: os.path.basename(x), i['files']))]
-                downstream_workflow_files.append(L)
-    return downstream_workflow_files
-
-
-
-
-
-
-    
 
 # map pipelines to views
 routes = {'Whole Genome': 'whole_genome_sequencing'}
@@ -776,16 +700,16 @@ def wgs_case(project_name, case):
     fastq_status = bmpp_input_raw_seq_status(project_name, bmpp_id)
 
     # get the bmpp downstream workflows
-    D = get_bmpp_downstream_workflows(project_name, bmpp_id)
-    downstream_workflows = format_bmpp_dowmstream_workflows(D)
-    # get the workflow files
-    downstream_workflow_files = format_dowmstream_workflow_files(D, project_name, bmpp_id)
+    bmpp_children_workflows = get_bmpp_downstream_workflows(project_name, bmpp_id)
     
-       
+    for libraries in bmpp_children_workflows:
+        for workflow in bmpp_children_workflows[libraries]:
+            if bmpp_children_workflows[libraries][workflow]['files']:
+                files = [os.path.dirname(bmpp_children_workflows[libraries][workflow]['files'][0])] + sorted(map(lambda x: os.path.basename(x), bmpp_children_workflows[libraries][workflow]['files']))
+                bmpp_children_workflows[libraries][workflow]['files'] = files
+    
+    
     return render_template('WGS_case.html', routes = routes, fastq_status=fastq_status,
-                           bmpp_info=bmpp_info, bmpp_id=bmpp_id, bmpp_files=bmpp_files,
-                           sample_case=case, project=project, pipelines=pipelines,
-                           downstream_workflows=downstream_workflows,
-                           downstream_workflow_files=downstream_workflow_files)
-
-
+                            bmpp_info=bmpp_info, bmpp_id=bmpp_id, bmpp_files=bmpp_files,
+                            sample_case=case, project=project, pipelines=pipelines,
+                            bmpp_children_workflows=bmpp_children_workflows)

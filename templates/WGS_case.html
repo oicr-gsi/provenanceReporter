@@ -55,9 +55,8 @@
   </table>
 
 
-  {% if downstream_workflows %}
+  {% if bmpp_children_workflows %}
  
-
    <table id="simple_table">
      <thead>
        <th>Normal sample</th>
@@ -70,24 +69,58 @@
        <th>mavis</th>
      </thead>     
 
-     {% for i in downstream_workflows %}
+     {% for i in bmpp_children_workflows %}
+       {% set normal,tumour = i.split(';') %}     
      <tr>
-       <td>{{i.0}}</td>
-       <td>{{i.1}}</td>
-       <td>{{i.2}}</td>     
-       <td>{{i.3}}</td>
-       <td>{{i.4}}</td>
-       <td>{{i.5}}</td>
-       <td>{{i.6}}</td>
-       <td>{{i.7}}</td>
+       <td>{{normal}}</td>
+       <td>{{tumour}}</td>
+       <td>
+         {% if 'mutect2_matched' in bmpp_children_workflows[i] %}
+           {{bmpp_children_workflows[i]['mutect2_matched']['workflow_id']}}
+         {% else %}
+           NA 
+         {% endif %}        
+       </td>     
+       <td>
+         {% if 'variantEffectPredictor_matched' in bmpp_children_workflows[i] %}
+           {{bmpp_children_workflows[i]['variantEffectPredictor_matched']['workflow_id']}}
+         {% else %}
+           NA 
+         {% endif %}
+       </td>
+       <td>
+         {% if 'varscan' in bmpp_children_workflows[i] %}
+           {{bmpp_children_workflows[i]['varscan']['workflow_id']}}
+         {% else %}
+           NA       
+         {% endif %}
+       </td>
+       <td>
+         {% if 'sequenza' in bmpp_children_workflows[i] %}
+           {{bmpp_children_workflows[i]['sequenza']['workflow_id']}}
+         {% else %}
+           NA       
+         {% endif %}
+       </td>
+       <td>
+         {% if 'delly_matched' in bmpp_children_workflows[i] %}
+           {{bmpp_children_workflows[i]['delly_matched']['workflow_id']}}
+         {% else %}
+           NA       
+         {% endif %}
+       </td>
+       <td>
+         {% if 'mavis' in bmpp_children_workflows[i] %}
+           {{bmpp_children_workflows[i]['mavis']['workflow_id']}}
+         {% else %}
+           NA       
+         {% endif %}
+       </td>
      </tr>
      {% endfor %}  
    </table>
-  {% endif %}
-
-
-  {% if downstream_workflow_files %}
   
+
   <table id="simple_table">
      <thead>
        <th>Workflow Run id</th>
@@ -98,33 +131,31 @@
        <th>Files</th>
      </thead>     
 
-     {% for i in downstream_workflow_files %}
-     <tr>
-       <td>{{i.0}}</td>
-       <td>{{i.1}}</td>
-       <td>{{i.2}}</td>  
-       <td>{{i.3}}</td>
-       <td>   
-         {% for item in i.4 %}
-           {{item}}
-           <br>
-         {% endfor %}
-       </td>       
-       <td>
-         {% for item in i.5 %}
-           {{item}}
-           <br> 
-         {% endfor %}       
-       </td>
-     </tr>
+     {% for i in bmpp_children_workflows %}
+       {% for workflow in bmpp_children_workflows[i] %}
+         <tr>
+           <td>{{bmpp_children_workflows[i][workflow]['workflow_id']}}</td>
+           <td>{{workflow}}</td>
+           <td>{{bmpp_children_workflows[i][workflow]['creation_date']}}</td>  
+           <td>{{bmpp_children_workflows[i][workflow]['attributes']}}</td>
+           <td>
+             {% for j in bmpp_children_workflows[i][workflow]['parent'] %}
+               {% for k in j %}
+                 {{k}}: {{j[k].0}}
+                 <br>
+               {% endfor %}
+             {% endfor %}
+           </td>       
+           <td>
+             {% for item in bmpp_children_workflows[i][workflow]['files'] %}
+               {{item}}
+               <br> 
+             {% endfor %}       
+           </td>
+         </tr>
+       {% endfor %}  
      {% endfor %}  
-   </table>
+  </table>
   {% endif %}
-
-
-
-
-
-
 
 {% endblock %}
