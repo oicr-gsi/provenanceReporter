@@ -172,6 +172,11 @@ def get_call_ready_cases(data):
         creation_date = i['creation_date']
         wfrun_id = i['wfrun_id']
         sample = '_'.join([case, i['tissue_origin'], i['tissue_type'], i['group_id']])
+        if i['group_id']:
+            sample = '_'.join([case, i['tissue_origin'], i['tissue_type'], i['group_id']])
+        else:
+            sample = '_'.join([case, i['tissue_origin'], i['tissue_type']])
+                
         library = i['library'] 
         # keep only bmpp workflows processing sequences from Novaseq instruments
         platform = i['platform']
@@ -224,7 +229,10 @@ def get_bmpp_files(data):
         case = i['sample']
         creation_date = i['creation_date']
         wfrun_id = i['wfrun_id']
-        sample = '_'.join([case, i['tissue_origin'], i['tissue_type'], i['group_id']])
+        if i['group_id']:
+            sample = '_'.join([case, i['tissue_origin'], i['tissue_type'], i['group_id']])
+        else:
+            sample = '_'.join([case, i['tissue_origin'], i['tissue_type']])
         tissue_type = i['tissue_type']
         tissue_origin = i['tissue_origin']
         library = i['library'] 
