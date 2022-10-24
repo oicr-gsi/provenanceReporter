@@ -384,8 +384,8 @@ def filter_out_QC_workflows(project_name, workflows):
     - workflows (dict): Dictionary of workflow, list of workflow ids that are either parent or children of an other workflow
     '''
 
-    to_remove = [i for i in workflows if i.lower() in ['wgsmetrics_call_ready', 'insertsizemetrics_call_ready', 
-                         'bamqc_call_ready', 'calculatecontamination']]
+    to_remove = [i for i in workflows if i.lower().split('_')[0] in ['wgsmetrics', 'insertsizemetrics', 
+                         'bamqc', 'calculatecontamination', 'callability']]
     for i in to_remove:
         del workflows[i]
     return workflows
@@ -649,18 +649,16 @@ def whole_genome_sequencing(project_name):
     pipelines = get_pipelines(project_name)
         
     conn = connect_to_db()
-
-    # extract sample, library and workflow information for call ready workflow bamMergePreprocessing
+    #extract sample, library and workflow information for call ready workflow bamMergePreprocessing
     data = conn.execute("SELECT Files.creation_date, Libraries.library, Libraries.sample, \
-                         Libraries.ext_id, Libraries.group_id, Libraries.tissue_type, \
-                         Libraries.tissue_origin, Workflow_Inputs.run, Workflow_Inputs.lane, \
-                         Workflow_Inputs.platform, Workflows.wf, Workflows.wfv, Workflows.wfrun_id \
-                         from Files JOIN Libraries JOIN Workflow_Inputs JOIN Workflows \
-                         WHERE Files.project_id = '{0}' AND Libraries.project_id = '{0}' \
-                         AND Workflow_Inputs.project_id = '{0}' AND Workflows.project_id = '{0}' \
-                         AND Files.wfrun_id = Workflow_Inputs.wfrun_id  AND Workflow_Inputs.wfrun_id = Workflows.wfrun_id AND Workflow_Inputs.library = Libraries.library \
-                         AND LOWER(Workflows.wf) = 'bammergepreprocessing'".format(project_name)).fetchall()
-    
+                          Libraries.ext_id, Libraries.group_id, Libraries.tissue_type, \
+                          Libraries.tissue_origin, Workflow_Inputs.run, Workflow_Inputs.lane, \
+                          Workflow_Inputs.platform, Workflows.wf, Workflows.wfv, Workflows.wfrun_id \
+                          from Files JOIN Libraries JOIN Workflow_Inputs JOIN Workflows \
+                          WHERE Files.project_id = '{0}' AND Libraries.project_id = '{0}' \
+                          AND Workflow_Inputs.project_id = '{0}' AND Workflows.project_id = '{0}' \
+                          AND Files.wfrun_id = Workflow_Inputs.wfrun_id  AND Workflow_Inputs.wfrun_id = Workflows.wfrun_id AND Workflow_Inputs.library = Libraries.library \
+                          AND LOWER(SUBSTRING(Workflows.wf, 1, 21)) = 'bammergepreprocessing';".format(project_name)).fetchall()
     conn.close()
 
     # get samples and libraries for the most recent bmpp run for each case in project
@@ -690,7 +688,7 @@ def wgs_case(project_name, case):
                          WHERE Files.project_id = '{0}' AND Libraries.project_id = '{0}' \
                          AND Workflow_Inputs.project_id = '{0}' AND Workflows.project_id = '{0}' \
                          AND Files.wfrun_id = Workflow_Inputs.wfrun_id  AND Workflow_Inputs.wfrun_id = Workflows.wfrun_id AND Workflow_Inputs.library = Libraries.library \
-                         AND LOWER(Workflows.wf) = 'bammergepreprocessing'AND Libraries.sample ='{1}'".format(project_name, case)).fetchall()
+                         AND LOWER(SUBSTRING(Workflows.wf, 1, 21)) = 'bammergepreprocessing' AND Libraries.sample ='{1}'".format(project_name, case)).fetchall()
     conn.close()
 
     # get sample, library and file info for for the most recent bmpp run for case in project
