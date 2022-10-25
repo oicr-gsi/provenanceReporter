@@ -708,7 +708,7 @@ def whole_genome_sequencing(project_name):
                           WHERE Files.project_id = '{0}' AND Libraries.project_id = '{0}' \
                           AND Workflow_Inputs.project_id = '{0}' AND Workflows.project_id = '{0}' \
                           AND Files.wfrun_id = Workflow_Inputs.wfrun_id  AND Workflow_Inputs.wfrun_id = Workflows.wfrun_id AND Workflow_Inputs.library = Libraries.library \
-                          AND LOWER(SUBSTRING(Workflows.wf, 1, 21)) = 'bammergepreprocessing';".format(project_name)).fetchall()
+                          AND LOWER(SUBSTR(Workflows.wf, 1, 21)) = 'bammergepreprocessing';".format(project_name)).fetchall()
     conn.close()
 
     # get samples and libraries for the most recent bmpp run for each case in project
