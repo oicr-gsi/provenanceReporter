@@ -74,48 +74,12 @@
      <tr>
        <td>{{normal}}</td>
        <td>{{tumour}}</td>
-       <td>
-         {% if 'mutect2_matched' in bmpp_children_workflows[i] %}
-           {{bmpp_children_workflows[i]['mutect2_matched']['workflow_id']}}
-         {% else %}
-           NA 
-         {% endif %}        
-       </td>     
-       <td>
-         {% if 'variantEffectPredictor_matched' in bmpp_children_workflows[i] %}
-           {{bmpp_children_workflows[i]['variantEffectPredictor_matched']['workflow_id']}}
-         {% else %}
-           NA 
-         {% endif %}
-       </td>
-       <td>
-         {% if 'varscan' in bmpp_children_workflows[i] %}
-           {{bmpp_children_workflows[i]['varscan']['workflow_id']}}
-         {% else %}
-           NA       
-         {% endif %}
-       </td>
-       <td>
-         {% if 'sequenza' in bmpp_children_workflows[i] %}
-           {{bmpp_children_workflows[i]['sequenza']['workflow_id']}}
-         {% else %}
-           NA       
-         {% endif %}
-       </td>
-       <td>
-         {% if 'delly_matched' in bmpp_children_workflows[i] %}
-           {{bmpp_children_workflows[i]['delly_matched']['workflow_id']}}
-         {% else %}
-           NA       
-         {% endif %}
-       </td>
-       <td>
-         {% if 'mavis' in bmpp_children_workflows[i] %}
-           {{bmpp_children_workflows[i]['mavis']['workflow_id']}}
-         {% else %}
-           NA       
-         {% endif %}
-       </td>
+       <td>{{ 'mutect2' | find_workflow_id(bmpp_children_workflows, i) }}</td>     
+       <td>{{ 'variantEffectPredictor' | find_workflow_id(bmpp_children_workflows, i) }}</td>
+       <td>{{ 'varscan' | find_workflow_id(bmpp_children_workflows, i) }}</td>
+       <td>{{ 'sequenza' | find_workflow_id(bmpp_children_workflows, i) }}</td>
+       <td>{{ 'delly' | find_workflow_id(bmpp_children_workflows, i) }}</td>
+       <td>{{ 'mavis' | find_workflow_id(bmpp_children_workflows, i) }}</td>
      </tr>
      {% endfor %}  
    </table>

@@ -584,6 +584,15 @@ def get_bmpp_downstream_workflows(project_name, bmpp_id):
     return D
 
 
+
+
+    
+    
+    
+
+
+
+
 # map pipelines to views
 routes = {'Whole Genome': 'whole_genome_sequencing'}
 
@@ -591,6 +600,39 @@ routes = {'Whole Genome': 'whole_genome_sequencing'}
 
 
 app = Flask(__name__)
+
+
+@app.template_filter()
+def find_workflow_id(generic_name, bmpp_children_workflows, library):
+    '''
+    (str, str, dict, str) -> str
+    
+    Returns the workflow id of a workflow that has generic name as substring and
+    NA if no workflow has generic name as substring.
+            
+    Parameters
+    ----------
+    - generic_name (str): Generic workflow name, may be substring of workflow name in bmpp_children_workflows
+    - bmpp_children_workflows (dict): Dictionary with downstream workflow information
+    - library (str): Libraries of interest
+    '''
+    
+    # make a list of downstream workflows for that bmpp run
+    L = list(bmpp_children_workflows[library].keys())
+    # create a same size list of generic name workflows
+    workflows = [generic_name] * len(L)
+    
+    # define function to identify generic workflow as subtring of workflow name
+    is_workflow = lambda x,y: x.split('_')[0].lower() == y.lower()
+    
+    # check if generic workflow is substring of bmpp children workflows 
+    found = list(map(is_workflow, L, workflows))
+    if any(found):
+        return bmpp_children_workflows[library][L[found.index(True)]]['workflow_id']
+    else:
+        return 'NA'
+    
+
 
 @app.route('/')
 def index():
@@ -713,7 +755,6 @@ def wgs_case(project_name, case):
             if bmpp_children_workflows[libraries][workflow]['files']:
                 files = [os.path.dirname(bmpp_children_workflows[libraries][workflow]['files'][0])] + sorted(map(lambda x: os.path.basename(x), bmpp_children_workflows[libraries][workflow]['files']))
                 bmpp_children_workflows[libraries][workflow]['files'] = files
-    
     
     return render_template('WGS_case.html', routes = routes, fastq_status=fastq_status,
                             bmpp_info=bmpp_info, bmpp_id=bmpp_id, bmpp_files=bmpp_files,
