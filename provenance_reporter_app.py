@@ -738,7 +738,7 @@ def wgs_case(project_name, case):
                          WHERE Files.project_id = '{0}' AND Libraries.project_id = '{0}' \
                          AND Workflow_Inputs.project_id = '{0}' AND Workflows.project_id = '{0}' \
                          AND Files.wfrun_id = Workflow_Inputs.wfrun_id  AND Workflow_Inputs.wfrun_id = Workflows.wfrun_id AND Workflow_Inputs.library = Libraries.library \
-                         AND LOWER(SUBSTRING(Workflows.wf, 1, 21)) = 'bammergepreprocessing' AND Libraries.sample ='{1}'".format(project_name, case)).fetchall()
+                         AND LOWER(SUBSTR(Workflows.wf, 1, 21)) = 'bammergepreprocessing' AND Libraries.sample ='{1}'".format(project_name, case)).fetchall()
     conn.close()
 
     # get sample, library and file info for for the most recent bmpp run for case in project
