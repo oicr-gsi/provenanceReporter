@@ -181,3 +181,8 @@ img {
   border-radius: 8px;
   margin-left:25px; 
 }
+
+#download_button a {
+    color: white;
+    text-decoration: none;
+}
