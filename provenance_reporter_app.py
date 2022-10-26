@@ -7,7 +7,7 @@ Created on Tue May  3 14:32:40 2022
 
 import sqlite3
 import json
-from flask import Flask, render_template, request, url_for, flash, redirect
+from flask import Flask, render_template, request, url_for, flash, redirect, Response
 from werkzeug.exceptions import abort
 import requests
 import gzip
@@ -719,6 +719,7 @@ def whole_genome_sequencing(project_name):
     return render_template('Whole_Genome_Sequencing.html', routes = routes, project=project, samples=samples, cases=cases, pipelines=pipelines)
 
 
+
 @app.route('/<project_name>/whole_genome_sequencing/<case>')
 def wgs_case(project_name, case):
     
@@ -759,4 +760,36 @@ def wgs_case(project_name, case):
     return render_template('WGS_case.html', routes = routes, fastq_status=fastq_status,
                             bmpp_info=bmpp_info, bmpp_id=bmpp_id, bmpp_files=bmpp_files,
                             sample_case=case, project=project, pipelines=pipelines,
-                            bmpp_children_workflows=bmpp_children_workflows)
+                            bmpp_children_workflows=bmpp_children_workflows, case=case)
+
+
+
+@app.route('/download_bmpp_data/<project_name>/<case>/<bmpp_id>')
+def get_bmpp_data(project_name, case, bmpp_id):
+    '''
+    
+    
+    '''
+    
+    # get bmpp downstream workflow info
+    bmpp_children_workflows = get_bmpp_downstream_workflows(project_name, bmpp_id)
+    
+    # format bmpp downstream workflow info for DARE
+    D = {}
+    for i in bmpp_children_workflows:
+        for workflow in bmpp_children_workflows[i]:
+            sample = bmpp_children_workflows[i][workflow]['sample']
+            workflow_id = bmpp_children_workflows[i][workflow]['workflow_id']
+            version = bmpp_children_workflows[i][workflow]['version']    
+            if sample not in D:
+                D[sample] = {}
+            D[sample][workflow] = {"workflow_id": workflow_id, "workflow_version": version}
+    
+    # send the json to outoutfile                    
+    return Response(
+        response=json.dumps(D),
+        mimetype="application/json",
+        status=200,
+        headers={"Content-disposition": "attachment; filename={0}_WGS_{1}_{2}.json".format(project_name, case, bmpp_id)})
+
+

@@ -20,7 +20,7 @@
       {% block title %} {{ sample_case }} {% endblock %}
       <span style="font-size:30px; font-style:normal;"> Whole Genome Sequencing pipeline </span>
       {% if bmpp_info %}
-        <button id="download_button">Download json</button>
+        <button id="download_button"><a href="{{url_for('get_bmpp_data', project_name=project['project_id'], case=case, bmpp_id=bmpp_id)}}">Download json</a></button>
       {% endif %}
     </p>  
   </div> 
