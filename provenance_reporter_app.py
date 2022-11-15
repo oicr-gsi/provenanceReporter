@@ -26,7 +26,7 @@ def connect_to_db():
     '''
     
     #conn = sqlite3.connect('prov_report_test.db')
-    conn = sqlite3.connect('prov.test.db')
+    conn = sqlite3.connect('prov.test.nabu.db')
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -59,6 +59,7 @@ def group_sequences(L):
         file1, file2 = L[i]['file'], L[i+1]['file']
         run1, run2 = L[i]['run'] + '_' + str(L[i]['lane']), L[i+1]['run'] + '_' + str(L[i+1]['lane'])
         platform1, platform2 = L[i]['platform'], L[i+1]['platform']
+        status1, status2 = L[i]['status'], L[i+1]['status']
         read_count1 = json.loads(L[i]['attributes'])['read_count'] if 'read_count' in json.loads(L[i]['attributes']) else 'NA' 
         read_count2 = json.loads(L[i+1]['attributes'])['read_count'] if 'read_count' in json.loads(L[i+1]['attributes']) else 'NA' 
 
@@ -70,7 +71,7 @@ def group_sequences(L):
             
             d = {'case': case1, 'sample': sample1, 'library': library1, 'run': run1,
                  'files': [file1, file2], 'read_count': read_count1, 'workflow': workflow1,
-                 'release_status': 'NA'}
+                 'release_status': status1}
             F.append(d)
        
     F.sort(key = lambda x: x['case'])
@@ -428,35 +429,25 @@ def bmpp_input_raw_seq_status(project_name, bmpp_id):
     # track release status of all fastqs 
     D = {}
     
-    
-    
-    ##### COMMENTED CODE TO WORK AROUND NABU ####
-    
     # get the file swids of the fastq-generating workflows
     for workflow_id in fastqs_workflow_ids:
-        # data = conn.execute("SELECT Workflows.wf, Files.file_swid, FilesQC.status  \
-        #                       FROM Workflows JOIN Files JOIN FilesQC WHERE Files.project_id = '{0}' \
-        #                       AND Workflows.project_id = '{0}' AND FilesQC.project_id = '{0}' AND  \
-        #                       Files.wfrun_id = '{1}' AND FilesQC.file_swid = Files.file_swid AND \
-        #                       Workflows.wfrun_id = '{1}';".format(project_name, workflow_id)).fetchall()
+        data = conn.execute("SELECT Workflows.wf, Files.file_swid, FilesQC.status  \
+                              FROM Workflows JOIN Files JOIN FilesQC WHERE Files.project_id = '{0}' \
+                              AND Workflows.project_id = '{0}' AND FilesQC.project_id = '{0}' AND  \
+                              Files.wfrun_id = '{1}' AND FilesQC.file_swid = Files.file_swid AND \
+                              Workflows.wfrun_id = '{1}';".format(project_name, workflow_id)).fetchall()
             
         # # skip import workflows because fastqs from these workflow may not need to be shared back
-        # for i in data:
-        #     if 'import' not in i['wf'].lower():
-        #         assert i['file_swid'] not in D
-        #         D[i['file_swid']] = i['status']
-    
-        
-        data = conn.execute("SELECT Workflows.wf, Files.file_swid FROM Workflows JOIN Files \
-                            WHERE Files.project_id = '{0}' AND Workflows.project_id = '{0}' AND \
-                            Files.wfrun_id = '{1}' AND Workflows.wfrun_id = '{1}';".format(project_name, workflow_id)).fetchall()
         for i in data:
             if 'import' not in i['wf'].lower():
                 assert i['file_swid'] not in D
-                D[i['file_swid']] = 'NA'
-             
+                D[i['file_swid']] = i['status']
+    
+    
+    conn.close()
+    
     if D:
-        if all(map(lambda x: x.lower() == 'pass', D.values())):
+        if all(map(lambda x: x.lower() == 'pass', list(D.values()))):
             return True
         else:
             return False
@@ -464,9 +455,6 @@ def bmpp_input_raw_seq_status(project_name, bmpp_id):
         return False
        
         
-    conn.close()
-    
-
 def get_workflow_info(project_name, workflow_id):
     '''
     (str, str) -> dict
@@ -666,19 +654,14 @@ def sequencing(project_name):
     
     conn = connect_to_db()
 
-    # files = conn.execute("SELECT Files.file, Files.workflow, Files.version, Files.wfrun_id, \
-    #                      Files.attributes, FilesQC.status from Files JOIN FilesQC WHERE Files.project_id = '{0}' \
-    #                      AND FilesQC.project_id = '{0}' AND Files.file_swid = FilesQC.file_swid ;".format(project_name)).fetchall()
-     
-    # extract file information for fastq-generating workflows
     files = conn.execute("SELECT Files.file, Files.workflow, Files.version, Files.wfrun_id, Files.attributes, \
-                         Workflow_Inputs.run, Workflow_Inputs.lane, Workflow_Inputs.platform, \
+                         FilesQC.status, Workflow_Inputs.run, Workflow_Inputs.lane, Workflow_Inputs.platform, \
                          Libraries.library, Libraries.sample, Libraries.ext_id, Libraries.group_id \
-                         from Files JOIN Workflow_Inputs JOIN Libraries WHERE Files.project_id = '{0}' \
+                         from Files JOIN FilesQC JOIN Workflow_Inputs JOIN Libraries WHERE Files.project_id = '{0}' \
+                         AND FilesQC.project_id = '{0}' AND FilesQC.file_swid = Files.file_swid \
                          AND Workflow_Inputs.project_id = '{0}' AND Libraries.project_id = '{0}' \
                          AND Files.wfrun_id = Workflow_Inputs.wfrun_id AND Workflow_Inputs.library = Libraries.library \
                          AND LOWER(Files.workflow) in ('casava', 'bcl2fastq', 'fileimportforanalysis', 'fileimport', 'import_fastq');".format(project_name)).fetchall()
-    
     conn.close()
 
 
