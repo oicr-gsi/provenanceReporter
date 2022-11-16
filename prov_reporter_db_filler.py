@@ -144,14 +144,14 @@ def get_project_workflows(project, database, workflow_table = 'Workflows'):
     return workflows
 
 
-def add_missing_QC_status(D, project, database, file_table = 'Files'):
+def add_missing_QC_status(D, project, database, table = 'Files'):
     '''
     (dict, str, str, str) -> dict
     
     - D (dict): Dictionary with QC information for project files
     - project (str): Name of project of interest
     - database (str): Path to the database file
-    - file_table (str): Table in database storing file information. Default is Files
+    - table (str): Table in database storing file information. Default is Files
     - nabu_api (str): URL of the nabu API
     '''
     
@@ -160,7 +160,7 @@ def add_missing_QC_status(D, project, database, file_table = 'Files'):
     # add empty values to qc fields if qc not available
     conn = sqlite3.connect(database)
     cur = conn.cursor()
-    cur.execute('SELECT {0}.file_swid FROM {0} WHERE {0}.project_id = \"{1}\"'.format(file_table, project))
+    cur.execute('SELECT {0}.file_swid FROM {0} WHERE {0}.project_id = \"{1}\"'.format(table, project))
     records = cur.fetchall()
     records = [i[0] for i in records]
     conn.close()
@@ -185,8 +185,7 @@ def collect_qc_info(project, database, nabu_api):
     - nabu_api (str): URL of the nabu API
     '''
 
-    
-    # tracj qc info for all files in project
+    # track qc info for all files in project
     D = {project: {}}
 
     # make a list of workflows for project
@@ -699,8 +698,26 @@ def initiate_db(database):
 
 
 
+def delete_project_records(database, table, project_name):
+    '''
+    (str, str, str) -> None
+    
+    Delete all records for project_name from the database table 
+    
+    Parameters
+    ----------
+    - database (str): Path to the database file
+    - project_name (str): Name of project of interest
+    - table (str): Name of Table in database. Default is Projects
+    '''
+    
+    conn = sqlite3.connect(database)
+    conn.row_factory = sqlite3.Row
+    conn.execute('DELETE from {0} WHERE project_id = "{1}";'.format(table, project_name))
+    conn.close()
 
-def add_project_info_to_db(database, project_provenance, project_name, table = 'Projects'):
+
+def add_project_info_to_db(database, project_provenance, project, table = 'Projects'):
     '''
     (str, str, str, str) -> None
     
@@ -710,45 +727,30 @@ def add_project_info_to_db(database, project_provenance, project_name, table = '
     ----------
     - database (str): Path to the database file
     - project_provenance (str): Pinery API, http://pinery.gsi.oicr.on.ca/sample/projects
-    - project_name (str): Name of project of interest
+    - project (str): Name of project of interest
     - table (str): Name of Table in database. Default is Projects
     '''
+
+    # delete all project records 
+    delete_project_records(database, table, project)
+
+    # get project info
+    projects = extract_project_info(project_provenance)
+    projects = {project: projects[project]}
+                 
+    # get column names
+    column_names = define_column_names()[table]
 
     # connect to db
     conn = sqlite3.connect(database)
     cur = conn.cursor()
-            
-    # get project info
-    projects = extract_project_info(project_provenance)
-    projects = projects[project_name]
-                 
-        
-    # get existing records
-    cur.execute('SELECT {0}.project_id FROM {0}'.format(table))
-    records = cur.fetchall()
-    records = [i[0] for i in records]
-
-    # get column names
-    column_names = define_column_names()[table]
-
-    # add or update data
-    for project in projects:
-        # order values according to column names
-        vals = [projects[project][i] for i in column_names]
-        if project in records:
-            # update project info
-            for i in projects[project]:
-                cur.execute("UPDATE {0} SET {1} = '{2}' WHERE project_id='{3}'".format(table, i, projects[project][i], project))  
-                conn.commit()
-        else:
-            # insert project info
-            cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(vals)))
-            conn.commit()
-    # # remove any projects in database not anymore defined in pinery    
-    # for project in records:
-    #     if project not in projects:
-    #         cur.execute('DELETE FROM {0} WHERE project_id=\"{1}\"'.format(table, projects))
-    #         conn.commit()
+    
+    # order values according to column names
+    vals = [projects[project][i] for i in column_names]
+    # insert project info
+    cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(vals)))
+    conn.commit()
+    
     conn.close()
 
 
@@ -767,45 +769,24 @@ def add_workflows(workflows, database, project_name, table = 'Workflows'):
     - project_name (str): Name of project of interest
     - workflow_table (str): Name of the table storing workflow information. Default is Workflows
     '''
+    
+    # delete records
+    delete_project_records(database, table, project_name)
+    
+    # get column names
+    column_names = define_column_names()[table]
        
     # connect to db
     conn = sqlite3.connect(database)
     cur = conn.cursor()
     
-    #get existing records
-    cur.execute("SELECT {0}.wfrun_id, {0}.project_id FROM {0} WHERE project_id = '{1}';".format(table, project_name))
-    records = cur.fetchall()
-    
-    # get column names
-    column_names = define_column_names()[table]
-    
-    # make a list of fields to update
-    to_update = [i for i in column_names]
-    to_update.remove('project_id')
-    to_update.remove('wfrun_id')
-    
-    for project in workflows:
-        for workflow_run in workflows[project]:
-            if (workflow_run, project) in records:
-                # update workflows info
-                for i in to_update:
-                    cur.execute("UPDATE {0} SET {1} = '{2}' WHERE wfrun_id='{3}' AND project_id ='{4}'".format(table, i, workflows[project][workflow_run][i], workflow_run, project))
-                    conn.commit()
-            else:
-                # insert data into table
-                values = [workflows[project][workflow_run][i] for i in column_names if i in workflows[project][workflow_run]]
-                values.insert(-1, project)
-                cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(values)))
-                conn.commit()
+    for workflow_run in workflows[project_name]:
+        # insert data into table
+        values = [workflows[project_name][workflow_run][i] for i in column_names if i in workflows[project_name][workflow_run]]
+        values.insert(-1, project_name)
+        cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(values)))
+        conn.commit()
         
-    # remove any workflows not defined anymore in FPR    
-    for (workflow_run, project) in records:
-        if project not in workflows:
-            cur.execute("DELETE FROM {0} WHERE project_id='{1}';".format(table, project))
-            conn.commit()
-        elif workflow_run not in workflows[project]:
-            cur.execute("DELETE FROM {0} WHERE wfrun_id = '{1}' AND project_id = '{2}';".format(table, workflow_run, project))
-            conn.commit()
     conn.close()
 
 
@@ -823,44 +804,23 @@ def add_workflow_relationships(parent_workflows, database, project_name, table =
     - table (str): Name of the table storing parents-children workflow relationships
     '''
     
+    # delete records for project in table
+    delete_project_records(database, table, project_name)
+    
+    # get column names
+    column_names = define_column_names()[table]
+    
     # connect to db
     conn = sqlite3.connect(database)
     cur = conn.cursor()
     
-    #get existing records
-    cur.execute("SELECT {0}.parents_id, {0}.children_id, {0}.project_id FROM {0} WHERE {0}.project_id = '{1}';".format(table, project_name))
-    records = cur.fetchall()
-        
-    # get column names
-    column_names = define_column_names()[table]
-    
-    for project in parent_workflows:
-        for workflow in parent_workflows[project]:
-            for parent in parent_workflows[project][workflow]:
-                if (parent, workflow, project) not in records:
-                    # insert data into table
-                    cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), (parent, workflow, project)))
-                    conn.commit()
+    for workflow in parent_workflows[project_name]:
+        for parent in parent_workflows[project_name][workflow]:
+            # insert data into table
+            cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), (parent, workflow, project)))
+            conn.commit()
                             
-    # # remove any workflow relationships not defined anymore in FPR    
-    # for (i, j, project) in records:
-    #     if project not in parent_workflows:
-    #         cur.execute("DELETE FROM {0} WHERE project_id = '{1}';".format(table, project))
-    #         conn.commit()
-    #     elif i not in parent_workflows[project].values():
-    #         cur.execute("DELETE FROM {0} WHERE parents_id = '{1}' AND project_id = '{2}';".format(table, i, project))
-    #         conn.commit()
-    #     elif j not in parent_workflows[project]:
-    #         cur.execute("DELETE FROM {0} WHERE children_id = '{1}' AND parents_id = '{2}' AND project_id = '{3}';".format(table, i, j, project))
-    #         conn.commit()
-    # conn.close()
-
-
-
-
-
-
-
+    conn.close()
 
 
 def add_workflows_info_to_db(fpr, database, project_name, workflow_table = 'Workflows', parent_table = 'Parents', children_table = 'Children'):
@@ -885,21 +845,55 @@ def add_workflows_info_to_db(fpr, database, project_name, workflow_table = 'Work
     # create a dict {workflow: [parent workflows]}
     parent_workflows = identify_parent_children_workflows(parents, files)
 
-    # identify parent-children workflow relationships
-    #parent_workflows, children_workflows = identify_parent_children_workflows(parents, files)
-
     # add workflow info
     add_workflows(workflows, database, project_name, workflow_table)
         
     # add parents-children workflow relationships to Parents table
     add_workflow_relationships(parent_workflows, database, project_name, parent_table)    
        
-    # add children-parents workflow relationships    
-    #add_workflow_relationships(children_workflows, database, project_name, children_table)    
+
+    
+def add_fileQC_info_to_db(database, project, fpr, nabu_api, table='FilesQC'):
+    '''
+    (str, str, str, str, str) -> None
+    
+    Inserts file QC information in database's FilesQC table
        
+    Parameters
+    ----------
+    - database (str): Path to the database file
+    - project (str): Name of project of interest
+    - fpr (str): Path to the File Provenance Report
+    - nabu_api (str): URL of the nabu API
+    - table (str): Table in database storing the QC or file information. Default is FilesQC
+    '''
+
+    # delete records
+    delete_project_records(database, table, project)
     
+    # collect QC info from nabu
+    D = collect_qc_info(project, database, nabu_api)
+        
+    # connect to db
+    conn = sqlite3.connect(database)
+    cur = conn.cursor()
+        
+    # get column names
+    column_names = define_column_names()[table]
+
+    # add data
+    for file_swid in D[project]:
+        L = [D[project][file_swid][i] for i in column_names if i in D[project][file_swid]]
+        L.insert(0, project)
+        L.insert(0, file_swid)
+        cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
+        conn.commit()
     
-def add_file_info_to_db(database, project_name, table, fpr, nabu_api, file_table = 'Files'):
+    conn.close()
+
+
+
+def add_file_info_to_db(database, project, fpr, nabu_api, table = 'Files'):
     '''
     (str, str, str, str, str, str, str) -> None
     
@@ -908,67 +902,39 @@ def add_file_info_to_db(database, project_name, table, fpr, nabu_api, file_table
     Parameters
     ----------
     - database (str): Path to the database file
-    - project_name (str): Name of project of interest
-    - table (str): Table in database storing the QC or file information.
-                   Accepted values are FilesQC or Files
+    - project (str): Name of project of interest
     - fpr (str): Path to the File Provenance Report
     - file_table (str): Table in database storing file information. Default is Files 
-    - nabu_api (str): URL of the nabu API: 'http://gsi-dcc.oicr.on.ca:3000'
+    - nabu_api (str): URL of the nabu API
+    - table (str): Table in database storing file information. Default is Files
     '''
 
-    assert table in ['Files', 'FilesQC']        
+    # delete records
+    delete_project_records(database, table, project)
 
-    # check if adding QC info or file info
-    if table == 'FilesQC':
-        # adding file QC information
-        D = collect_qc_info(project_name, database, nabu_api)
-    elif table == 'Files':
-        # collect file info from FPR
-        D = collect_file_info_from_fpr(fpr, project_name)
-    
-    # connect to db
-    conn = sqlite3.connect(database)
-    cur = conn.cursor()
-        
-    # get existing records
-    cur.execute("SELECT {0}.file_swid FROM {0} WHERE {0}.project_id = '{1}';".format(table, project_name))
-    records = cur.fetchall()
-    records = [i[0] for i in records]
+    # collect file info from FPR
+    D = collect_file_info_from_fpr(fpr, project)
     
     # get column names
     column_names = define_column_names()[table]
 
-    # make a list of file_swids
-    file_swids = []
-
-    # add or update data
-    for project in D:
-        for file_swid in D[project]:
-            file_swids.append(file_swid)
-            L = [D[project][file_swid][i] for i in column_names if i in D[project][file_swid]]
-            L.insert(0, project)
-            L.insert(0, file_swid)
-                       
-            if file_swid in records:
-                # update QC info
-                for i in range(1, len(column_names)):
-                    cur.execute("UPDATE {0} SET {1} = '{2}' WHERE file_swid='{3}' AND project_id = '{4}';".format(table, column_names[i], L[i], file_swid, project))  
-                    conn.commit()
-            else:
-                # insert project info
-                cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
-                conn.commit()
+    # connect to db
+    conn = sqlite3.connect(database)
+    cur = conn.cursor()
+        
+    # add data
+    for file_swid in D[project]:
+        L = [D[project][file_swid][i] for i in column_names if i in D[project][file_swid]]
+        L.insert(0, project)
+        L.insert(0, file_swid)
+        cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
+        conn.commit()
     
-    # remove any file in database not anymore defined in Nabu    
-    for file_swid in records:
-        if file_swid not in file_swids:
-            cur.execute("DELETE FROM {0} WHERE file_swid='{1}' AND project_id = '{2}';".format(table, file_swid, project_name))
-            conn.commit()
     conn.close()
 
 
 
-def add_library_info_to_db(database, project_name, sample_provenance, table = 'Libraries'):
+def add_library_info_to_db(database, project, sample_provenance, table = 'Libraries'):
     '''
     (str, str, str, str) -> None
     
@@ -977,61 +943,41 @@ def add_library_info_to_db(database, project_name, sample_provenance, table = 'L
     Parameters
     ----------
     - database (str): Path to the databae file
-    - project_name (str): Name of project of interest
+    - project (str): Name of project of interest
     - table (str): Table storing library in database. Default is Libraries
     - sample_provenance (str): URL of the sample provenance API: 'http://pinery.gsi.oicr.on.ca/provenance/v9/sample-provenance'
     '''
     
+    # delete records
+    delete_project_records(database, table, project)
+
     # collect lims information
     lims = collect_lims_info(sample_provenance)
-    to_remove = [i for i in lims if i != project_name]
-    for i in to_remove:
-        del lims[i]             
+    lims = {project: lims[project]}
     
+    # get column names
+    column_names = define_column_names()[table]
+        
     # connect to db
     conn = sqlite3.connect(database)
     cur = conn.cursor()
        
-    # get existing records
-    cur.execute("SELECT {0}.library FROM {0} WHERE project_id = '{1}';".format(table, project_name))
-    records = cur.fetchall()
-    records = [i[0] for i in records]
-
-    # get column names
-    column_names = define_column_names()[table]
-
-    # make a list of libraries
-    libraries = []
-
-    # add or update data
-    for project in lims:
-        for sample in lims[project]:
-            for library in lims[project][sample]:
-                libraries.append(library)
-                L = [lims[project][sample][library][i] for i in column_names if i in lims[project][sample][library]]
-                L.insert(0, sample)
-                L.insert(0, library)
-                L.append(project)
-                if library in records:
-                    # update QC info
-                    for i in range(1, len(column_names)):
-                        cur.execute("UPDATE {0} SET {1} = '{2}' WHERE library='{3}' AND project_id = '{4}';".format(table, column_names[i], L[i], library, project))  
-                        conn.commit()
-                else:
-                    # insert project info
-                    cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
-                    conn.commit()
+    # add data
+    for sample in lims[project]:
+        for library in lims[project][sample]:
+            L = [lims[project][sample][library][i] for i in column_names if i in lims[project][sample][library]]
+            L.insert(0, sample)
+            L.insert(0, library)
+            L.append(project)
+            # insert project info
+            cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
+            conn.commit()
    
-    # remove any library in database not anymore defined in Pinery    
-    for library in records:
-       if library not in libraries:
-           cur.execute("DELETE FROM {0} WHERE library = '{1}' AND project_id = '{2}';".format(table, library, project_name))
-           conn.commit()
     conn.close()
 
 
 
-def add_workflow_inputs_to_db(database, fpr, project_name, table = 'Workflow_Inputs'):
+def add_workflow_inputs_to_db(database, fpr, project, table = 'Workflow_Inputs'):
     '''
     (str, str, str) -> None
     
@@ -1041,59 +987,41 @@ def add_workflow_inputs_to_db(database, fpr, project_name, table = 'Workflow_Inp
     ----------
     - database (str): Path to the databae file
     - fpr (str): Path to the File Provenance Report
-    - project_name (str): Name of project of interest
+    - project (str): Name of project of interest
     - table (str): Table storing library in database. Default is Libraries
     '''
 
+    # delete records
+    delete_project_records(database, table, project)
+
     # collect information about library inputs
-    libraries = extract_workflow_info(fpr, project_name)
+    libraries = extract_workflow_info(fpr, project)
     
     # connect to db
     conn = sqlite3.connect(database)
     cur = conn.cursor()
        
-    # get existing records
-    #cur.execute('SELECT {0}.library, {0}.run, {0}.lane, {0}.wfrun_id FROM {0}'.format(table))
-    cur.execute("SELECT * FROM {0} WHERE project_id = '{1}';".format(table, project_name))
-    records = cur.fetchall()
-
-    data = cur.execute("SELECT * FROM {0} WHERE project_id = '{1}';".format(table, project_name))
+    # get column names
+    data = cur.execute("SELECT * FROM {0} WHERE project_id = '{1}';".format(table, project))
     column_names = [column[0] for column in data.description]
-        
-    # make a list of (library, run, lane)
-    # library, run and lane defines an input to workflow
-    inputs = []
-
+    
     # add or update data
-    for project in libraries:
-        for workflow_run in libraries[project]:
-            for sample in libraries[project][workflow_run]:
-                for i in libraries[project][workflow_run][sample]['libraries']:
-                    library, run, lane = i['library'], i['run'], int(i['lane'])
-                    #key = tuple([library, run, lane, workflow_run])
-                    L = []
-                    for j in column_names:
-                        if j in i:
-                            if j != 'lane':
-                                L.append(i[j])
-                            else:
-                                L.append(int(i[j]))
-                    L.append(project)
-                    L.insert(3, workflow_run)
-                    assert tuple(L) not in inputs
-                    inputs.append(tuple(L))                    
-                                       
-                    if tuple(L) not in records:
-                        # insert project info
-                        cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
-                        conn.commit()
+    for workflow_run in libraries[project]:
+        for sample in libraries[project][workflow_run]:
+            for i in libraries[project][workflow_run][sample]['libraries']:
+                L = []
+                for j in column_names:
+                    if j in i:
+                        if j != 'lane':
+                            L.append(i[j])
+                        else:
+                            L.append(int(i[j]))
+                L.append(project)
+                L.insert(3, workflow_run)
+                # insert project info
+                cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
+                conn.commit()
      
-    # remove any inputs in database not anymore defined in FPR    
-    for k in records:
-       if k not in inputs:
-           library, run, lane, workflow_run, limskey, barcode, platform, project_id = k    
-           cur.execute("DELETE FROM {0} WHERE library='{1}' AND run='{2}' AND lane='{3} AND wfrun_id='{4}' AND limskey='{5}' AND barcode='{6}' AND platform='{7}' AND project_id='{8}'".format(table, library, run, lane, workflow_run, limskey, barcode, platform, project_id))
-           conn.commit()
     conn.close()
 
 
@@ -1153,7 +1081,7 @@ if __name__ == '__main__':
         # add file QC info
         try:
             start = time.time()
-            add_file_info_to_db(args.database, project, 'FilesQC', args.fpr, args.nabu, 'Files')
+            add_fileQC_info_to_db(args.database, project, args.fpr, args.nabu, 'FilesQC')
             end = time.time()
             print('added data to FilesQC', end - start)
         except:
@@ -1163,7 +1091,7 @@ if __name__ == '__main__':
         # add file info
         try:
             start = time.time()
-            add_file_info_to_db(args.database, project, 'Files', args.fpr, args.nabu, 'Files')
+            add_file_info_to_db(args.database, project, args.fpr, args.nabu, 'Files')
             end = time.time()
             print('added data to Files', end - start)
         except:
