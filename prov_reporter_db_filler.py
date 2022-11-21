@@ -843,14 +843,16 @@ def add_workflows_info_to_db(fpr, database, project_name, workflow_table = 'Work
     # get the workflow inputs and workflow info
     workflows, parents, files = get_workflow_relationships(fpr, project_name)
     
-    # create a dict {workflow: [parent workflows]}
-    parent_workflows = identify_parent_children_workflows(parents, files)
+    # check that project is defined in FPR (ie, may be defined in Pinery but no data recorded in FPR)
+    if workflows and parents and files:
+        # create a dict {workflow: [parent workflows]}
+        parent_workflows = identify_parent_children_workflows(parents, files)
 
-    # add workflow info
-    add_workflows(workflows, database, project_name, workflow_table)
+        # add workflow info
+        add_workflows(workflows, database, project_name, workflow_table)
         
-    # add parents-children workflow relationships to Parents table
-    add_workflow_relationships(parent_workflows, database, project_name, parent_table)    
+        # add parents-children workflow relationships to Parents table
+        add_workflow_relationships(parent_workflows, database, project_name, parent_table)    
        
 
     
@@ -874,23 +876,25 @@ def add_fileQC_info_to_db(database, project, fpr, nabu_api, table='FilesQC'):
     
     # collect QC info from nabu
     D = collect_qc_info(project, database, nabu_api)
-        
-    # connect to db
-    conn = sqlite3.connect(database)
-    cur = conn.cursor()
-        
-    # get column names
-    column_names = define_column_names()[table]
-
-    # add data
-    for file_swid in D[project]:
-        L = [D[project][file_swid][i] for i in column_names if i in D[project][file_swid]]
-        L.insert(0, project)
-        L.insert(0, file_swid)
-        cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
-        conn.commit()
     
-    conn.close()
+    # check that data is recorded in nabu for project
+    if D:
+        # connect to db
+        conn = sqlite3.connect(database)
+        cur = conn.cursor()
+        
+        # get column names
+        column_names = define_column_names()[table]
+
+        # add data
+        for file_swid in D[project]:
+            L = [D[project][file_swid][i] for i in column_names if i in D[project][file_swid]]
+            L.insert(0, project)
+            L.insert(0, file_swid)
+            cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
+            conn.commit()
+    
+        conn.close()
 
 
 
@@ -919,19 +923,21 @@ def add_file_info_to_db(database, project, fpr, nabu_api, table = 'Files'):
     # get column names
     column_names = define_column_names()[table]
 
-    # connect to db
-    conn = sqlite3.connect(database)
-    cur = conn.cursor()
+    # check that data is recorded in FPR for project
+    if D:
+        # connect to db
+        conn = sqlite3.connect(database)
+        cur = conn.cursor()
         
-    # add data
-    for file_swid in D[project]:
-        L = [D[project][file_swid][i] for i in column_names if i in D[project][file_swid]]
-        L.insert(0, project)
-        L.insert(0, file_swid)
-        cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
-        conn.commit()
+        # add data
+        for file_swid in D[project]:
+            L = [D[project][file_swid][i] for i in column_names if i in D[project][file_swid]]
+            L.insert(0, project)
+            L.insert(0, file_swid)
+            cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
+            conn.commit()
     
-    conn.close()
+        conn.close()
 
 
 
@@ -954,27 +960,28 @@ def add_library_info_to_db(database, project, sample_provenance, table = 'Librar
 
     # collect lims information
     lims = collect_lims_info(sample_provenance)
-    lims = {project: lims[project]}
     
-    # get column names
-    column_names = define_column_names()[table]
+    # check that data is recorded for that project
+    if project in lims:
+        lims = {project: lims[project]}
+    
+        # get column names
+        column_names = define_column_names()[table]
         
-    # connect to db
-    conn = sqlite3.connect(database)
-    cur = conn.cursor()
-       
-    # add data
-    for sample in lims[project]:
-        for library in lims[project][sample]:
-            L = [lims[project][sample][library][i] for i in column_names if i in lims[project][sample][library]]
-            L.insert(0, sample)
-            L.insert(0, library)
-            L.append(project)
-            # insert project info
-            cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
-            conn.commit()
-   
-    conn.close()
+        # connect to db
+        conn = sqlite3.connect(database)
+        cur = conn.cursor()
+        # add data
+        for sample in lims[project]:
+            for library in lims[project][sample]:
+                L = [lims[project][sample][library][i] for i in column_names if i in lims[project][sample][library]]
+                L.insert(0, sample)
+                L.insert(0, library)
+                L.append(project)
+                # insert project info
+                cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
+                conn.commit()
+        conn.close()
 
 
 
@@ -998,32 +1005,34 @@ def add_workflow_inputs_to_db(database, fpr, project, table = 'Workflow_Inputs')
     # collect information about library inputs
     libraries = extract_workflow_info(fpr, project)
     
-    # connect to db
-    conn = sqlite3.connect(database)
-    cur = conn.cursor()
+    # check that data is recorded in FPR for project
+    if libraries:
+        # connect to db
+        conn = sqlite3.connect(database)
+        cur = conn.cursor()
        
-    # get column names
-    data = cur.execute("SELECT * FROM {0} WHERE project_id = '{1}';".format(table, project))
-    column_names = [column[0] for column in data.description]
+        # get column names
+        data = cur.execute("SELECT * FROM {0} WHERE project_id = '{1}';".format(table, project))
+        column_names = [column[0] for column in data.description]
     
-    # add or update data
-    for workflow_run in libraries[project]:
-        for sample in libraries[project][workflow_run]:
-            for i in libraries[project][workflow_run][sample]['libraries']:
-                L = []
-                for j in column_names:
-                    if j in i:
-                        if j != 'lane':
-                            L.append(i[j])
-                        else:
-                            L.append(int(i[j]))
-                L.append(project)
-                L.insert(3, workflow_run)
-                # insert project info
-                cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
-                conn.commit()
+        # add or update data
+        for workflow_run in libraries[project]:
+            for sample in libraries[project][workflow_run]:
+                for i in libraries[project][workflow_run][sample]['libraries']:
+                    L = []
+                    for j in column_names:
+                        if j in i:
+                            if j != 'lane':
+                                L.append(i[j])
+                            else:
+                                L.append(int(i[j]))
+                    L.append(project)
+                    L.insert(3, workflow_run)
+                    # insert project info
+                    cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
+                    conn.commit()
      
-    conn.close()
+        conn.close()
 
 
 
@@ -1043,12 +1052,12 @@ if __name__ == '__main__':
     # make a list of projects
     L = list(extract_project_info(args.project_provenance).keys())
     
-    projects = ['HCCCFD','WESSLE']
-    for i in L:
-        if 'MOH' in i:
-            projects.append(i)
+    # projects = ['HCCCFD','WESSLE']
+    # for i in L:
+    #     if 'MOH' in i:
+    #         projects.append(i)
     
-    
+    projects = ['KHSMOH']
     
     # initiate database
     start1 = time.time()
