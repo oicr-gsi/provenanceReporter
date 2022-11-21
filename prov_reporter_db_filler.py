@@ -712,8 +712,9 @@ def delete_project_records(database, table, project_name):
     '''
     
     conn = sqlite3.connect(database)
-    conn.row_factory = sqlite3.Row
-    conn.execute('DELETE from {0} WHERE project_id = "{1}";'.format(table, project_name))
+    cur= conn.cursor()
+    cur.execute('DELETE from {0} WHERE project_id = "{1}";'.format(table, project_name))
+    conn.commit()
     conn.close()
 
 
