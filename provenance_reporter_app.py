@@ -26,7 +26,7 @@ def connect_to_db():
     '''
     
     #conn = sqlite3.connect('prov_report_test.db')
-    conn = sqlite3.connect('prov.test.nabu.db')
+    conn = sqlite3.connect('prov.reporter.data.db')
     conn.row_factory = sqlite3.Row
     return conn
 
