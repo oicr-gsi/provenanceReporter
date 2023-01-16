@@ -761,13 +761,24 @@ def get_bmpp_data(project_name, case, bmpp_id):
     D = {}
     for i in bmpp_children_workflows:
         for workflow in bmpp_children_workflows[i]:
-            sample = bmpp_children_workflows[i][workflow]['sample']
+            sample = bmpp_children_workflows[i][workflow]['sample'].replace(';', '.')
             workflow_id = bmpp_children_workflows[i][workflow]['workflow_id']
             version = bmpp_children_workflows[i][workflow]['version']    
             if sample not in D:
                 D[sample] = {}
             D[sample][workflow] = {"workflow_id": workflow_id, "workflow_version": version}
     
+    # add bmpp workflow info
+    conn = connect_to_db()
+    data = conn.execute("SELECT Workflows.wfrun_id, Workflows.wfv, Workflows.wf FROM Workflows \
+                        WHERE Workflows.project_id = '{0}' AND Workflows.wfrun_id = '{1}';".format(project_name, bmpp_id)).fetchall()
+    data = list(set(data))
+    d = dict(data[0])
+    conn.close()
+    
+    for sample in D:
+        D[sample][d['wf']] = {'workflow_id': d['wfrun_id'], 'workflow_version': d['wfv']}
+       
     # send the json to outoutfile                    
     return Response(
         response=json.dumps(D),
