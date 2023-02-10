@@ -447,10 +447,7 @@ def bmpp_input_raw_seq_status(project_name, bmpp_id):
     conn.close()
     
     if D:
-        if all(map(lambda x: x.lower() == 'pass', list(D.values()))):
-            return True
-        else:
-            return False
+        return all(map(lambda x: x.lower() == 'pass', list(D.values())))
     else:
         return False
        

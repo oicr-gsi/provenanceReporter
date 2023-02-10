@@ -14,6 +14,7 @@ import argparse
 import time
 import traceback
 import os
+import subprocess
 
 
 def extract_project_info(project_provenance):
@@ -277,6 +278,73 @@ def collect_file_info_from_fpr(fpr, project_name):
     infile.close()
     return D
 
+
+def extract_projects_from_fpr(fpr):
+    '''
+    (str) -> list
+
+    Returns a list of projects with data in FPR
+        
+    Parameters
+    ----------
+    - fpr (str): Path to File Provenance Report file
+    '''
+
+    infile = open_fpr(fpr)
+    # skip header
+    infile.readline()
+        
+    projects = set()
+    
+    for line in infile:
+        line = line.rstrip()
+        if line:
+            line = line.split('\t')
+            projects.add(line[1])
+    infile.close()
+    projects = list(projects)
+    
+    return projects
+
+
+
+def get_valid_projects(projects, fpr):
+    '''
+    (dict, str) -> list
+    
+    Returns a list of projects defined in Pinery with data available in FPR
+    
+    Parameters
+    ----------
+    - projects (dict): Dictionary with project information extracted from project provenance
+    - fpr (str): Path to the File Provenance Report
+    '''
+    
+    # make a list of projects available in Pinery
+    P = list(projects.keys())
+    # list all projects with data in FPR
+    L = extract_projects_from_fpr(fpr)
+    # keep only projects listed in Pinery with data in FPR
+    projects = list(set(P).intersection(set(L)))
+   
+    return projects
+
+
+def filter_completed_projects(projects):
+    '''
+    (dict) -> dict
+   
+    Returns a dictionary in which only Active projects are kept (ie, Completed projects are removed)
+   
+    Parameters
+    ----------
+    projects (dict): Dictionary with project information extracted from project provenance
+    '''
+
+    to_remove = [i for i in projects if projects[i]['active'].lower() != 'active'] 
+    for i in to_remove:
+        del projects[i]
+    return projects
 
 
 def is_gzipped(file):
@@ -697,6 +765,24 @@ def initiate_db(database):
             create_table(database, i)
 
 
+def remove_table(database, table):
+    '''
+    (str, str) -> None
+    
+    Drop table in database
+    
+    Parameters
+    ----------
+    - database (str): Path to the database file
+    - table (str): Table of interest
+    '''
+    
+    conn = sqlite3.connect(database)
+    cur = conn.cursor()
+    cur.execute("DROP TABLE {0}".format(table))
+    conn.commit()
+    conn.close()
+
 
 def delete_project_records(database, table, project_name):
     '''
@@ -711,12 +797,33 @@ def delete_project_records(database, table, project_name):
     - table (str): Name of Table in database. Default is Projects
     '''
     
-    conn = sqlite3.connect(database)
+    conn = sqlite3.connect(database, timeout=30)
     cur= conn.cursor()
     cur.execute('DELETE from {0} WHERE project_id = "{1}";'.format(table, project_name))
     conn.commit()
     conn.close()
 
+
+def count_project_records(database, table, project_name):
+    '''
+    (str, str, str) -> int
+    
+    Returns the number of records of project_name in database table
+
+    Parameters
+    ----------
+    - database (str): Path to the database file
+    - project_name (str): Name of project of interest
+    - table (str): Name of Table in database. Default is Projects
+    '''
+
+    # make a list of all workflows for a given project
+    conn = sqlite3.connect(database, timeout=30)
+    conn.row_factory = sqlite3.Row
+    data = conn.execute('SELECT * FROM {0} WHERE project_id="{1}"'.format(table, project_name)).fetchall()
+    conn.close()
+    return len(data)
+    
 
 def add_project_info_to_db(database, project_provenance, project, table = 'Projects'):
     '''
@@ -731,9 +838,10 @@ def add_project_info_to_db(database, project_provenance, project, table = 'Proje
     - project (str): Name of project of interest
     - table (str): Name of Table in database. Default is Projects
     '''
-
+    
     # delete all project records 
-    delete_project_records(database, table, project)
+    if count_project_records(database, table, project):
+        delete_project_records(database, table, project)
 
     # get project info
     projects = extract_project_info(project_provenance)
@@ -743,7 +851,7 @@ def add_project_info_to_db(database, project_provenance, project, table = 'Proje
     column_names = define_column_names()[table]
 
     # connect to db
-    conn = sqlite3.connect(database)
+    conn = sqlite3.connect(database,  timeout=30)
     cur = conn.cursor()
     
     # order values according to column names
@@ -772,13 +880,14 @@ def add_workflows(workflows, database, project_name, table = 'Workflows'):
     '''
     
     # delete records
-    delete_project_records(database, table, project_name)
+    if count_project_records(database, table, project_name):
+        delete_project_records(database, table, project_name)
     
     # get column names
     column_names = define_column_names()[table]
        
     # connect to db
-    conn = sqlite3.connect(database)
+    conn = sqlite3.connect(database, timeout=30)
     cur = conn.cursor()
     
     for workflow_run in workflows[project_name]:
@@ -791,7 +900,7 @@ def add_workflows(workflows, database, project_name, table = 'Workflows'):
     conn.close()
 
 
-def add_workflow_relationships(parent_workflows, database, project_name, table = 'Parents'):    
+def add_workflow_relationships(parent_workflows, database, project, table = 'Parents'):    
     '''
     (dict, str, str, str) -> None
     
@@ -801,22 +910,23 @@ def add_workflow_relationships(parent_workflows, database, project_name, table =
     ----------    
     - D (dict): Dictionary with children-parents workflow relationships 
     - database (str): Path to the database file
-    - project_name (str): name of project of interest
+    - project (str): name of project of interest
     - table (str): Name of the table storing parents-children workflow relationships
     '''
     
     # delete records for project in table
-    delete_project_records(database, table, project_name)
+    if count_project_records(database, table, project):
+        delete_project_records(database, table, project)
     
     # get column names
     column_names = define_column_names()[table]
     
     # connect to db
-    conn = sqlite3.connect(database)
+    conn = sqlite3.connect(database, timeout=30)
     cur = conn.cursor()
     
-    for workflow in parent_workflows[project_name]:
-        for parent in parent_workflows[project_name][workflow]:
+    for workflow in parent_workflows[project]:
+        for parent in parent_workflows[project][workflow]:
             # insert data into table
             cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), (parent, workflow, project)))
             conn.commit()
@@ -962,7 +1072,7 @@ def add_library_info_to_db(database, project, sample_provenance, table = 'Librar
     lims = collect_lims_info(sample_provenance)
     
     # check that data is recorded for that project
-    if project in lims:
+    if project in lims and lims[project]:
         lims = {project: lims[project]}
     
         # get column names
@@ -1036,98 +1146,369 @@ def add_workflow_inputs_to_db(database, fpr, project, table = 'Workflow_Inputs')
 
 
 
-if __name__ == '__main__':
 
-    # create top-level parser
-    parser = argparse.ArgumentParser(prog = 'provReporterDb.py', description='Script to add data from FPR, Nabu and Pinery to Provenance Reporter Db')
-    parser.add_argument('-f', '--fpr', dest='fpr', default = '/scratch2/groups/gsi/production/vidarr/vidarr_files_report_latest.tsv.gz', help='Path to the File Provenance Report. Default is /scratch2/groups/gsi/production/vidarr/vidarr_files_report_latest.tsv.gz')
-    parser.add_argument('-n', '--nabu', dest='nabu', default='https://nabu-prod.gsi.oicr.on.ca', help='URL of the Nabu API. Default is https://nabu-prod.gsi.oicr.on.ca')
-    parser.add_argument('-sp', '--sample_provenance', dest='sample_provenance', default = 'http://pinery.gsi.oicr.on.ca/provenance/v9/sample-provenance', help = 'URL of the Sample Provenance in Pinery. Default is http://pinery.gsi.oicr.on.ca/provenance/v9/sample-provenance')
-    parser.add_argument('-pp', '--project_provenance', dest = 'project_provenance', default = 'http://pinery.gsi.oicr.on.ca/sample/projects', help = 'URL of the Project Provenance in Pinery. Default is http://pinery.gsi.oicr.on.ca/sample/projects')
-    parser.add_argument('-d', '--database', dest='database', help='Path to the database file', required=True)
+
+def add_info(args):
+    '''
+    (list) -> None
     
-    # get arguments from the command line
-    args = parser.parse_args()
+    Adds infornation for a given project to the provenance reporter database
     
-    # make a list of projects
-    L = list(extract_project_info(args.project_provenance).keys())
+    Parameters
+    ----------
+    - fpr (str): Path to Path to the File Provenance Report
+    - nabu (str): URL of the Nabu API
+    - sample_provenance (str): URL of the Sample Provenance in Pinery
+    - project_provenance (str): URL of the Project Provenance in Pinery
+    - database (str): Path to the database file
+    - project (str): Name of the project
+    '''
     
-    # projects = ['HCCCFD','WESSLE']
-    # for i in L:
-    #     if 'MOH' in i:
-    #         projects.append(i)
-    
-    projects = ['KHSMOH']
-    
-    # initiate database
-    start1 = time.time()
+    # create database if file doesn't exist
     if os.path.isfile(args.database) == False:
         initiate_db(args.database)
     
-    print('{0} projects in provenance'.format(len(projects)))
-    # add or update information in tables
-    for project in projects:
-        print('adding data for {0}'.format(project))
-        # add project info
-        try:
-            start = time.time()
-            add_project_info_to_db(args.database, args.project_provenance, project, 'Projects')
-            end = time.time()
-            print('added data to Projects', end - start)
-        except:
-            print('could not add project info for {0}'.format(project))
-            print(traceback.format_exc())
-           
-        # add workflow info
-        try:
-            start = time.time()
-            add_workflows_info_to_db(args.fpr, args.database, project, 'Workflows', 'Parents', 'Children')
-            end = time.time()
-            print('added data to Workflows', end - start)
-        except:
-            print('could not add workflow info for {0}'.format(project))
-            print(traceback.format_exc()) 
-        
-        # add file QC info
-        try:
-            start = time.time()
-            add_fileQC_info_to_db(args.database, project, args.fpr, args.nabu, 'FilesQC')
-            end = time.time()
-            print('added data to FilesQC', end - start)
-        except:
-            print('could not add file QC info for {0}'.format(project))
-            print(traceback.format_exc())
-            
-        # add file info
-        try:
-            start = time.time()
-            add_file_info_to_db(args.database, project, args.fpr, args.nabu, 'Files')
-            end = time.time()
-            print('added data to Files', end - start)
-        except:
-            print('could not add file info for {0}'.format(project))
-            print(traceback.format_exc())
-            
-        # add library info
-        try:
-            start = time.time()
-            add_library_info_to_db(args.database, project, args.sample_provenance, 'Libraries')
-            end = time.time()
-            print('added data to Libraries', end - start)
-        except:
-            print('could not add library info for {0}'.format(project))
-            print(traceback.format_exc())
-            
-        # add workflow input
-        try:
-            start = time.time()
-            add_workflow_inputs_to_db(args.database, args.fpr, project, 'Workflow_Inputs')
-            end = time.time()
-            print('added data to Workflow_Inputs', end - start)
-        except:
-            print('could not add worklow input info for {0})'.format(project))
-            print(traceback.format_exc())
-        
-        end1 = time.time()
-        print('added info to db', end1 - start1)
+    # # delete projects from tables
+    # tables = ['Projects', 'Workflows', 'Parents', 'FilesQC', 'Files', 'Libraries', 'Workflow_Inputs']
+    # record_numbers = [count_project_records(args.database, i, args.project) for i in tables]
+    # for i in range(len(tables)):
+    #     if record_numbers[i]:
+    #         delete_project_records(args.database, tables[i], args.project)
     
+    # add project information    
+    add_project_info_to_db(args.database, args.project_provenance, args.project, 'Projects')
+    # add workflow information
+    #add_workflows_info_to_db(args.fpr, args.database, args.project, 'Workflows', 'Parents', 'Children')
+    # # add file QC info
+    # add_fileQC_info_to_db(args.database, args.project, args.fpr, args.nabu, 'FilesQC')
+    # # add file info
+    # add_file_info_to_db(args.database, args.project, args.fpr, args.nabu, 'Files')
+    # # add library information
+    # add_library_info_to_db(args.database, args.project, args.sample_provenance, 'Libraries')
+    # # add workflow input
+    # add_workflow_inputs_to_db(args.database, args.fpr, args.project, 'Workflow_Inputs')
+    
+        
+
+
+def launch_jobs(args):
+    '''
+    (list) -> None
+    
+    Launch qsub jobs to fill the provenance reporter database     
+    
+    Parameters
+    ----------
+    - fpr (str): Path to Path to the File Provenance Report
+    - nabu (str): URL of the Nabu API
+    - sample_provenance (str): URL of the Sample Provenance in Pinery
+    - project_provenance (str): URL of the Project Provenance in Pinery
+    - database (str): Path to the database file
+    - workingdir (str): Name of the directory where qsubs scripts are written
+    - mem (int): Memory allocated to jobs
+    '''
+    
+    # populate database with project information
+    # extract project information from project provenance
+    projects = extract_project_info(args.project_provenance)
+    # filter out completed projects
+    projects = filter_completed_projects(projects)
+    # make a list of projects with data in Prinery and FPR
+    projects = get_valid_projects(projects, args.fpr)
+    
+    # make a directory to save the scripts
+    qsubdir = os.path.join(args.workingdir, 'qsubs')
+    os.makedirs(qsubdir, exist_ok=True)
+    # create a log dir
+    logdir = os.path.join(qsubdir, 'log')
+    os.makedirs(logdir, exist_ok=True)
+    # make a directory to store the project databases
+    databasedir = os.path.join(args.workingdir, 'databases')
+    os.makedirs(databasedir, exist_ok=True)
+    
+    
+    dbfiller = os.path.join(args.workingdir, 'prov_reporter_db_filler.py')
+
+    cmd1 = '/u/rjovelin/SOFT/anaconda3/bin/python3.6 {0} add_project -f {1} -n {2} -sp {3} -pp {4} -d {5} -pr {6}'
+    
+    # record job names and job exit codes    
+    job_exits, job_names = [], []
+
+    for project in projects:
+        database = os.path.join(databasedir, '{0}.db'.format(project))
+        # get name of output file
+        bashScript = os.path.join(qsubdir, '{0}_add_project_info.sh'.format(project))
+        with open(bashScript, 'w') as newfile:
+            newfile.write(cmd1.format(dbfiller, args.fpr, args.nabu, args.sample_provenance, args.project_provenance, database, project))
+                          
+        # launch qsub directly, collect job names and exit codes
+        jobName = '{0}.provdb'.format(project)
+        qsubCmd = "qsub -b y -P gsi -l h_vmem={0}g -N {1} -e {2} -o {2} \"bash {3}\"".format(args.mem, jobName, logdir, bashScript)
+        
+        bashScript = os.path.join(qsubdir, '{0}_add_project_info.qsub'.format(project))
+        with open(bashScript, 'w') as newfile:
+            newfile.write(qsubCmd)
+        
+        
+        
+        
+        # job_names.append(jobName)
+        # job = subprocess.call(qsubCmd, shell=True)
+        # # store job names and exit codes
+        # job_exits.append(job)
+        # job_names.append(jobName)
+    
+        
+    # launch job to copy database to server
+    # cmd2 = '/u/rjovelin/SOFT/anaconda3/bin/python3.6 {0} migrate -d {0} -jc {1} -jn {2} -s {3}'
+    # bashScript = os.path.join(qsubdir, 'migrate_db.sh')
+    # with open(bashScript, 'w') as newfile:
+    #     newfile.write(cmd2.format(dbfiller, args.database, ';'.join(job_exits), ';'.join(job_names), args.server))
+    # qsubCmd = "qsub -b y -P gsi -l h_vmem={0}g -N {1} -e {2} -o {2} \"bash {3}\"".format(args.mem, 'provdb.migration', logdir, bashScript)
+    # job = subprocess.call(qsubCmd, shell=True)
+
+
+
+def collect_project_info(database, table):
+    '''
+    (str, str) -> list
+    
+    Returns a list of sqlite3.Row extracted from table in database
+        
+    Parameters
+    ----------
+    - database (str): Path to sqlite database
+    - table (str): Table of interest in database
+    '''
+    
+    # collect information from project database for table
+    conn = sqlite3.connect(database)
+    conn.row_factory = sqlite3.Row
+    data = conn.execute('SELECT * FROM {0}'.format(table)).fetchall()
+    conn.close()
+    
+    return data       
+    
+    
+def update_database(merged_database, table, data):
+    '''
+    (str, str, list) -> None
+    
+    Update table in merged_database with data for a given project
+    
+    Parameters
+    ----------
+    - merged_database (str): Path to the merged database
+    - table (str): Table of interest in database
+    - data (list): list of sqlite3.Row extracted from table in project database
+    '''
+    
+    # open merged database, add project data into table
+    conn = sqlite3.connect(merged_database,  timeout=30)
+    cur = conn.cursor()
+    # get the column names
+    c = list(zip(*list(dict(data[0]).items())))[0]
+    for i in data:
+        # get values in order of column names    
+        v = list(zip(*list(dict(i).items())))[1]
+        cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, c , v))
+        conn.commit()            
+    conn.close()
+
+
+
+
+
+
+# def merge_databases(merged_database, workingdir):
+#     '''
+    
+    
+    
+#     '''
+    
+#     start = time.time()
+    
+#     # make a list of project databases
+#     databasedir = os.path.join(workingdir, 'databases')
+#     databases = sorted([os.path.join(databasedir, i) for i in os.listdir(databasedir) if i[-3:] == '.db'])
+    
+#     # initiate merged database if file doesn't exist
+#     if os.path.isfile(merged_database) == False:
+#         initiate_db(merged_database)
+    
+#     # loop over tables
+#     tables = ['Projects', 'Workflows', 'Parents', 'Files', 'FilesQC', 'Libraries', 'Workflow_Inputs']
+#     for table in tables:
+#         # drop table and re-initiate table
+#         remove_table(merged_database, table)
+#         create_table(merged_database, table)
+        
+#         # loop over the databases
+#         for db in databases:
+#             print(table, os.path.basename(db))
+#             # collect project info from table
+#             data = collect_project_info(db, table)
+#             # add project data into table of merged_database
+#             update_database(merged_database, table, data)
+   
+#     end = time.time()
+#     print('merged databases', end - start)
+    
+
+
+
+
+
+
+
+
+def merge_two_databases(db1, db2):
+    '''
+    (str, str) -> None
+
+    Merge database db2 into database db1
+    Precondition: the two dababases have the same schema
+    
+    Parameters
+    ---------
+    - db1 (str): Path to database 1
+    - db2 (str): Path to database 2
+    '''
+
+    # connect to db1  
+    conn = sqlite3.connect(db1, timeout=30)
+    # attach database db2
+    conn.execute("ATTACH '" + db2 +  "' as dba")
+    conn.execute("BEGIN")
+    # loop over rows in selected info from db2
+    for row in conn.execute("SELECT * FROM dba.sqlite_master WHERE type='table'"):
+        # combine data into db1
+        combine = "INSERT OR IGNORE INTO "+ row[1] + " SELECT * FROM dba." + row[1]
+        conn.execute(combine)
+    conn.commit()
+    # detach from db2
+    conn.execute("detach database dba")
+    conn.close()
+       
+
+
+def get_project_databases(workingdir):
+    '''
+    (str) -> list
+    
+    Returns a list of file paths for each project database located in directory databases in workingdir
+    
+    Parameters
+    ----------
+    - workingdir (str): Path to the directory containing the folder databases with each project databases
+    '''
+
+    # make a list of project databases
+    databasedir = os.path.join(workingdir, 'databases')
+    databases = sorted([os.path.join(databasedir, i) for i in os.listdir(databasedir) if i[-3:] == '.db'])
+    
+    return databases
+
+def merge_databases(merged_database, workingdir):
+    '''
+    (str, str) -> None    
+    
+    Merge all the project databases located in directory databases of the workingdir into merged_database
+    
+    Parematers
+    ----------
+    - merged_database (str): Path to the merged database
+    - workingdir (str): Path to the directory containing the folder databases with each project databases
+    '''
+    
+    start = time.time()
+    
+    # make a list of project databases
+    databases = get_project_databases(workingdir)
+        
+    # initiate merged database if file doesn't exist
+    if os.path.isfile(merged_database) == False:
+        initiate_db(merged_database)
+    
+    for db in databases:
+        print(os.path.basename(db))
+        merge_two_databases(merged_database, db)
+    
+    end = time.time()
+    print('merged databases', end - start)
+    
+    
+def migrate(args):
+    '''
+    (list) -> None
+    
+    Launch job to copy the database to the server
+    
+    Parameters
+    ----------
+    - database (str): Path to the database file
+    - mem (str): Memory allocated to jobs
+    - server (str): Server running the application
+    - job_names (str): Semi-colon separated list of job names 
+    - job_codes (str): Semi-colon separated list of exit job codes
+    '''
+    
+    # check if jobs are still running
+    
+    
+    # check if jobs suceeded
+    
+    
+    # merge all projects databases
+    merge_databases(args.merged_database, args.workingdir)
+
+    
+
+
+
+
+if __name__ == '__main__':
+
+    
+    # create top-level parser
+    parent_parser = argparse.ArgumentParser(prog = 'prov_reporter_db_filler.py', description='Script to add data to the Provenance Reporter database', add_help=False)
+    parent_parser.add_argument('-f', '--fpr', dest='fpr', default = '/scratch2/groups/gsi/production/vidarr/vidarr_files_report_latest.tsv.gz', help='Path to the File Provenance Report. Default is /scratch2/groups/gsi/production/vidarr/vidarr_files_report_latest.tsv.gz')
+    parent_parser.add_argument('-n', '--nabu', dest='nabu', default='https://nabu-prod.gsi.oicr.on.ca', help='URL of the Nabu API. Default is https://nabu-prod.gsi.oicr.on.ca')
+    parent_parser.add_argument('-sp', '--sample_provenance', dest='sample_provenance', default = 'http://pinery.gsi.oicr.on.ca/provenance/v9/sample-provenance', help = 'URL of the Sample Provenance in Pinery. Default is http://pinery.gsi.oicr.on.ca/provenance/v9/sample-provenance')
+    parent_parser.add_argument('-pp', '--project_provenance', dest = 'project_provenance', default = 'http://pinery.gsi.oicr.on.ca/sample/projects', help = 'URL of the Project Provenance in Pinery. Default is http://pinery.gsi.oicr.on.ca/sample/projects')
+    #parent_parser.add_argument('-d', '--database', dest='database', help='Path to the database file', required=True)
+        
+    main_parser = argparse.ArgumentParser(prog = 'prov_reporter_db_filler.py', description = 'Add data to the Provenance Reporter database')
+    subparsers = main_parser.add_subparsers(title='sub-commands', description='valid sub-commands', dest= 'subparser_name', help = 'sub-commands help')
+    
+    # add project info  
+    project_parser = subparsers.add_parser('add_project', help="Add project information to the Provenance Reporter database", parents = [parent_parser])
+    project_parser.add_argument('-pr', '--project', dest='project', help='Name of the project of interest', required = True)
+    project_parser.add_argument('-d', '--database', dest='database', help='Path to the database file', required=True)
+    project_parser.set_defaults(func=add_info)
+ 
+    # launch jobs to fill db with all projects info
+    fill_parser = subparsers.add_parser('fill_db', help="Run jobs to fill database with information about all active projects.", parents = [parent_parser])
+    fill_parser.add_argument('-wd', '--workingdir', dest='workingdir', help='Name of the directory where qsubs scripts are written', required = True)
+    fill_parser.add_argument('-m', '--memory', dest='mem', default=20, help='Memory allocated to jobs')
+    #fill_parser.add_argument('-d', '--database', dest='database', help='Path to the database file', required=True)
+    fill_parser.set_defaults(func=launch_jobs)
+
+    
+    # launch jobs to fill db with all projects info
+    migrate_parser = subparsers.add_parser('migrate', help="Run job to copy the database to the server", parents=[parent_parser])
+    migrate_parser.add_argument('-m', '--memory', dest='mem', default=20, help='Memory allocated to jobs')
+    migrate_parser.add_argument('-s', '--server', dest='server', help='Server running the application')
+    migrate_parser.add_argument('-jn', '--job_names', dest='job_names', help='Names of the jobs launched to fill the database')
+    migrate_parser.add_argument('-jc', '--job_codes', dest='job_codes', help='Exit codes of the jobs luanched to fill the database')
+    migrate_parser.add_argument('-wd', '--workingdir', dest='workingdir', help='Name of the directory where qsubs scripts are written', required = True)
+    migrate_parser.add_argument('-md', '--merged_database', dest='merged_database', help='Path to the merged database', required = True)
+    migrate_parser.set_defaults(func=migrate)
+
+    # get arguments from the command line
+    args = main_parser.parse_args()
+ 
+    args.func(args)
+    
+
