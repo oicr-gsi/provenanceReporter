@@ -1352,41 +1352,20 @@ def merge_two_databases(db1, db2):
        
 
 
-def get_project_databases(workingdir):
+def merge_databases(merged_database, databases):
     '''
-    (str) -> list
+    (str, list) -> None    
     
-    Returns a list of file paths for each project database located in directory databases in workingdir
-    
-    Parameters
-    ----------
-    - workingdir (str): Path to the directory containing the folder databases with each project databases
-    '''
-
-    # make a list of project databases
-    databasedir = os.path.join(workingdir, 'databases')
-    databases = sorted([os.path.join(databasedir, i) for i in os.listdir(databasedir) if i[-3:] == '.db'])
-    
-    return databases
-
-
-def merge_databases(merged_database, workingdir):
-    '''
-    (str, str) -> None    
-    
-    Merge all the project databases located in directory databases of the workingdir into merged_database
+    Merge all the project databases located into merged_database
     
     Parematers
     ----------
     - merged_database (str): Path to the merged database
-    - workingdir (str): Path to the directory containing the folder databases with each project databases
+    - databases (list): List of paths to the project databases
     '''
     
     start = time.time()
     
-    # make a list of project databases
-    databases = get_project_databases(workingdir)
-        
     # initiate merged database if file doesn't exist
     if os.path.isfile(merged_database) == False:
         initiate_db(merged_database)
@@ -1408,7 +1387,80 @@ def merge_databases(merged_database, workingdir):
     
     end = time.time()
     print('merged databases', end - start)
+
+
+
+def check_running_jobs(jobs):
+    '''
+    (list) -> list
+
+    Returns a list of job names when all jobs have completed
+
+    Parameters
+    ----------
+    - jobs (list): List of job names
+    '''
+
+    completed = []    
+    while len(jobs) != 0:
+        to_remove = []
+        for i in range(len(jobs)):
+            try:
+                subprocess.check_output('qstat -j {0}'.format(jobs[i]), shell=True).rstrip().decode('utf-8')
+            except:
+                # job not running, remove from list 
+                to_remove.append(i)
+        completed.extend([jobs.pop(i) for i in to_remove])
+    return completed
+
+
+def get_job_exit_status(job):
+    '''
+    (str) -> int
     
+    Returns the most recent exit status of job
+
+    Parameters
+    ----------
+    - job (str): Job name     
+    '''    
+
+    try:
+        output = subprocess.check_output('qacct -j {0}'.format(job), shell=True).decode('utf-8').rstrip().split('\n')
+    except:
+        output = ''
+               
+    if output:
+        # record all exit status, the same job may have run multiple times
+        d = {}
+        for i in output:
+            if 'jobname' in i:
+                jobname = i.split()[1]
+                assert job == jobname
+            elif 'end_time' in i:
+                j = i.split()[1:]
+                if len(j) != 0:
+                    # convert to epoch time
+                    if '.' in j[1]:
+                        j[1] = j[1][:j[1].index('.')]
+                    date = '.'.join([j[0].split('/')[1], j[0].split('/')[0], j[0].split('/')[-1]]) + ' ' + j[1]
+                    p = '%d.%m.%Y %H:%M:%S'
+                    date = int(time.mktime(time.strptime(date, p)))
+                else:
+                    date = 0
+            elif 'exit_status' in j:
+                d[date] = j.split()[1]
+        
+        # get the most recent exit status        
+        end_jobs = list(d.keys())
+        end_jobs.sort()
+        exit_status = int(d[end_jobs[-1]])
+    else:
+        exit_status = 1
+    
+    return exit_status
+
+
     
 def migrate(args):
     '''
@@ -1425,14 +1477,24 @@ def migrate(args):
     - job_codes (str): Semi-colon separated list of exit job codes
     '''
     
+    
     # check if jobs are still running
+    jobs = list(map(lambda x: x.strip(), args.job_codes.split(';')))
+    # list of completed jobs to check for success
+    completed = check_running_jobs(jobs)
     
-    
-    # check if jobs suceeded
-    
-    
-    # merge all projects databases
-    merge_databases(args.merged_database, args.workingdir)
+    # make a list of successfully updated project db
+    updated = []
+    databasedir = os.path.join(args.workingdir, 'databases')
+    for job in completed:
+        # get exit status
+        exit_status = get_job_exit_status(job)
+        if exit_status == 0:
+            db =  os.path.join(databasedir, job.split('.')[0] + '.db')
+            updated.append(db)
+            
+    # merge all projects databases that were successfully updated
+    merge_databases(args.merged_database, updated)
 
     
 
