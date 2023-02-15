@@ -636,7 +636,7 @@ def define_column_names():
     # create dict to store column names for each table {table: [column names]}
     column_names = {'Workflows': ['wfrun_id', 'wf', 'wfv', 'project_id', 'attributes'],
                     'Parents': ['parents_id', 'children_id', 'project_id'],
-                    'Projects': ['project_id', 'pipeline', 'description', 'active', 'contact_name', 'contact_email'],
+                    'Projects': ['project_id', 'pipeline', 'description', 'active', 'contact_name', 'contact_email', 'last_updated'],
                     'Files': ['file_swid', 'project_id', 'md5sum', 'workflow', 'version', 'wfrun_id', 'file', 'library_type', 'attributes', 'creation_date'],
                     'FilesQC': ['file_swid', 'project_id', 'skip', 'user', 'date', 'status', 'reference', 'fresh', 'ticket'],
                     'Libraries': ['library', 'sample', 'tissue_type', 'ext_id', 'tissue_origin',
@@ -657,7 +657,7 @@ def define_column_types():
     column_types = {'Workflows': ['VARCHAR(572)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'TEXT'],
                     'Parents': ['VARCHAR(572)', 'VARCHAR(572)', 'VARCHAR(128)'],
                     'Projects': ['VARCHAR(128) PRIMARY KEY NOT NULL UNIQUE', 'VARCHAR(128)',
-                                  'TEXT', 'VARCHAR(128)', 'VARCHAR(256)', 'VARCHAR(256)'],
+                                  'TEXT', 'VARCHAR(128)', 'VARCHAR(256)', 'VARCHAR(256)', 'VARCHAR(256)'],
                     'Files': ['VARCHAR(572) PRIMARY KEY NOT NULL UNIQUE', 'VARCHAR(128)',
                               'VARCHAR(256)', 'VARCHAR(128)', 'VARCHAR(128)',
                               'VARCHAR(572)', 'TEXT', 'VARCHAR(128)', 'TEXT', 'INT'],
@@ -849,6 +849,11 @@ def add_project_info_to_db(database, project_provenance, project, table = 'Proje
                  
     # get column names
     column_names = define_column_names()[table]
+
+    # add time stamp when project data was updated
+    projects[project]['last_updated'] = time.strftime('%Y-%m-%d_%H:%M', time.localtime(time.time()))
+
+
 
     # connect to db
     conn = sqlite3.connect(database,  timeout=30)
@@ -1317,52 +1322,6 @@ def update_database(merged_database, table, data):
 
 
 
-
-
-
-# def merge_databases(merged_database, workingdir):
-#     '''
-    
-    
-    
-#     '''
-    
-#     start = time.time()
-    
-#     # make a list of project databases
-#     databasedir = os.path.join(workingdir, 'databases')
-#     databases = sorted([os.path.join(databasedir, i) for i in os.listdir(databasedir) if i[-3:] == '.db'])
-    
-#     # initiate merged database if file doesn't exist
-#     if os.path.isfile(merged_database) == False:
-#         initiate_db(merged_database)
-    
-#     # loop over tables
-#     tables = ['Projects', 'Workflows', 'Parents', 'Files', 'FilesQC', 'Libraries', 'Workflow_Inputs']
-#     for table in tables:
-#         # drop table and re-initiate table
-#         remove_table(merged_database, table)
-#         create_table(merged_database, table)
-        
-#         # loop over the databases
-#         for db in databases:
-#             print(table, os.path.basename(db))
-#             # collect project info from table
-#             data = collect_project_info(db, table)
-#             # add project data into table of merged_database
-#             update_database(merged_database, table, data)
-   
-#     end = time.time()
-#     print('merged databases', end - start)
-    
-
-
-
-
-
-
-
-
 def merge_two_databases(db1, db2):
     '''
     (str, str) -> None
@@ -1410,6 +1369,7 @@ def get_project_databases(workingdir):
     
     return databases
 
+
 def merge_databases(merged_database, workingdir):
     '''
     (str, str) -> None    
@@ -1431,6 +1391,17 @@ def merge_databases(merged_database, workingdir):
     if os.path.isfile(merged_database) == False:
         initiate_db(merged_database)
     
+    # remove tables
+    conn = sqlite3.connect(merged_database)
+    cur = conn.cursor()
+    cur.execute("SELECT name FROM sqlite_master WHERE type='table';")
+    tables = cur.fetchall()
+    tables = [i[0] for i in tables]
+    for table in tables:
+        # drop table and re-initiate table
+        remove_table(merged_database, table)
+        create_table(merged_database, table)
+              
     for db in databases:
         print(os.path.basename(db))
         merge_two_databases(merged_database, db)
