@@ -1237,7 +1237,7 @@ def launch_jobs(args):
     cmd1 = '/u/rjovelin/SOFT/anaconda3/bin/python3.6 {0} add_project -f {1} -n {2} -sp {3} -pp {4} -d {5} -pr {6}'
     
     # record job names and job exit codes    
-    job_exits, job_names = [], []
+    job_names = []
 
     for project in projects:
         database = os.path.join(databasedir, '{0}.db'.format(project))
@@ -1250,27 +1250,24 @@ def launch_jobs(args):
         jobName = '{0}.provdb'.format(project)
         qsubCmd = "qsub -b y -P gsi -l h_vmem={0}g -N {1} -e {2} -o {2} \"bash {3}\"".format(args.mem, jobName, logdir, bashScript)
         
-        bashScript = os.path.join(qsubdir, '{0}_add_project_info.qsub'.format(project))
-        with open(bashScript, 'w') as newfile:
-            newfile.write(qsubCmd)
-        
-        
-        
-        
+        # bashScript = os.path.join(qsubdir, '{0}_add_project_info.qsub'.format(project))
+        # with open(bashScript, 'w') as newfile:
+        #     newfile.write(qsubCmd)
         # job_names.append(jobName)
-        # job = subprocess.call(qsubCmd, shell=True)
-        # # store job names and exit codes
-        # job_exits.append(job)
-        # job_names.append(jobName)
+        
+        
+        subprocess.call(qsubCmd, shell=True)
+        # store job names
+        job_names.append(jobName)
     
         
     # launch job to copy database to server
-    # cmd2 = '/u/rjovelin/SOFT/anaconda3/bin/python3.6 {0} migrate -d {0} -jc {1} -jn {2} -s {3}'
-    # bashScript = os.path.join(qsubdir, 'migrate_db.sh')
-    # with open(bashScript, 'w') as newfile:
-    #     newfile.write(cmd2.format(dbfiller, args.database, ';'.join(job_exits), ';'.join(job_names), args.server))
-    # qsubCmd = "qsub -b y -P gsi -l h_vmem={0}g -N {1} -e {2} -o {2} \"bash {3}\"".format(args.mem, 'provdb.migration', logdir, bashScript)
-    # job = subprocess.call(qsubCmd, shell=True)
+    cmd2 = '/u/rjovelin/SOFT/anaconda3/bin/python3.6 {0} migrate -md {1} -jn "{2}" -s {3} -wd {4}'
+    bashScript = os.path.join(qsubdir, 'migrate_db.sh')
+    with open(bashScript, 'w') as newfile:
+        newfile.write(cmd2.format(dbfiller, args.merged_database, ';'.join(job_names), args.server, args.workingdir))
+    qsubCmd = "qsub -b y -P gsi -l h_vmem={0}g,h_rt={1}:0:0 -N {2} -e {3} -o {3} \"bash {4}\"".format(args.mem, args.run_time, 'provdb.migration', logdir, bashScript)
+    subprocess.call(qsubCmd, shell=True)
 
 
 
@@ -1405,12 +1402,11 @@ def check_running_jobs(jobs):
     while len(jobs) != 0:
         to_remove = []
         for i in range(len(jobs)):
-            try:
-                subprocess.check_output('qstat -j {0}'.format(jobs[i]), shell=True).rstrip().decode('utf-8')
-            except:
+            exit_code = subprocess.call('qstat -j {0}'.format(jobs[i]), shell=True)
+            if exit_code == 1:
                 # job not running, remove from list 
-                to_remove.append(i)
-        completed.extend([jobs.pop(i) for i in to_remove])
+                to_remove.append(jobs[i])
+        completed.extend([jobs.pop(jobs.index(i)) for i in to_remove])
     return completed
 
 
@@ -1448,8 +1444,8 @@ def get_job_exit_status(job):
                     date = int(time.mktime(time.strptime(date, p)))
                 else:
                     date = 0
-            elif 'exit_status' in j:
-                d[date] = j.split()[1]
+            elif 'exit_status' in i:
+                d[date] = i.split()[1]
         
         # get the most recent exit status        
         end_jobs = list(d.keys())
@@ -1474,12 +1470,11 @@ def migrate(args):
     - mem (str): Memory allocated to jobs
     - server (str): Server running the application
     - job_names (str): Semi-colon separated list of job names 
-    - job_codes (str): Semi-colon separated list of exit job codes
     '''
     
     
     # check if jobs are still running
-    jobs = list(map(lambda x: x.strip(), args.job_codes.split(';')))
+    jobs = list(map(lambda x: x.strip(), args.job_names.split(';')))
     # list of completed jobs to check for success
     completed = check_running_jobs(jobs)
     
@@ -1496,7 +1491,9 @@ def migrate(args):
     # merge all projects databases that were successfully updated
     merge_databases(args.merged_database, updated)
 
+    # copy merged database to server
     
+    #scp -i ~/.ssh/provenance_reporter.pem /scratch2/groups/gsi/bis/rjovelin/provenance_reporter/test_prov_report/prov.reporter.data.db  ubuntu@provenance-reporter.gsi.oicr.on.ca:~/provenance-reporter/
 
 
 
@@ -1525,20 +1522,21 @@ if __name__ == '__main__':
     fill_parser = subparsers.add_parser('fill_db', help="Run jobs to fill database with information about all active projects.", parents = [parent_parser])
     fill_parser.add_argument('-wd', '--workingdir', dest='workingdir', help='Name of the directory where qsubs scripts are written', required = True)
     fill_parser.add_argument('-m', '--memory', dest='mem', default=20, help='Memory allocated to jobs')
-    #fill_parser.add_argument('-d', '--database', dest='database', help='Path to the database file', required=True)
+    fill_parser.add_argument('-md', '--merged_database', dest='merged_database', help='Path to the merged database', required = True)
+    fill_parser.add_argument('-rt', '--run_time', dest='run_time', default=5, help='Run time in hours')
+    fill_parser.add_argument('-s', '--server', dest='server', default='ubuntu@provenance-reporter.gsi.oicr.on.ca', help='Server running the application')
     fill_parser.set_defaults(func=launch_jobs)
 
     
     # launch jobs to fill db with all projects info
     migrate_parser = subparsers.add_parser('migrate', help="Run job to copy the database to the server", parents=[parent_parser])
     migrate_parser.add_argument('-m', '--memory', dest='mem', default=20, help='Memory allocated to jobs')
-    migrate_parser.add_argument('-s', '--server', dest='server', help='Server running the application')
+    migrate_parser.add_argument('-rt', '--run_time', dest='run_time', default=5, help='Run time in hours')
+    migrate_parser.add_argument('-s', '--server', dest='server', default='ubuntu@provenance-reporter.gsi.oicr.on.ca', help='Server running the application')
     migrate_parser.add_argument('-jn', '--job_names', dest='job_names', help='Names of the jobs launched to fill the database')
-    migrate_parser.add_argument('-jc', '--job_codes', dest='job_codes', help='Exit codes of the jobs luanched to fill the database')
     migrate_parser.add_argument('-wd', '--workingdir', dest='workingdir', help='Name of the directory where qsubs scripts are written', required = True)
     migrate_parser.add_argument('-md', '--merged_database', dest='merged_database', help='Path to the merged database', required = True)
     migrate_parser.set_defaults(func=migrate)
-
     # get arguments from the command line
     args = main_parser.parse_args()
  
