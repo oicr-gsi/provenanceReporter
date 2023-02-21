@@ -1169,6 +1169,9 @@ def add_info(args):
     - project (str): Name of the project
     '''
     
+    start = time.time()
+    
+    
     # create database if file doesn't exist
     if os.path.isfile(args.database) == False:
         initiate_db(args.database)
@@ -1183,17 +1186,19 @@ def add_info(args):
     # add project information    
     add_project_info_to_db(args.database, args.project_provenance, args.project, 'Projects')
     # add workflow information
-    #add_workflows_info_to_db(args.fpr, args.database, args.project, 'Workflows', 'Parents', 'Children')
+    add_workflows_info_to_db(args.fpr, args.database, args.project, 'Workflows', 'Parents', 'Children')
     # # add file QC info
-    # add_fileQC_info_to_db(args.database, args.project, args.fpr, args.nabu, 'FilesQC')
+    add_fileQC_info_to_db(args.database, args.project, args.fpr, args.nabu, 'FilesQC')
     # # add file info
-    # add_file_info_to_db(args.database, args.project, args.fpr, args.nabu, 'Files')
+    add_file_info_to_db(args.database, args.project, args.fpr, args.nabu, 'Files')
     # # add library information
-    # add_library_info_to_db(args.database, args.project, args.sample_provenance, 'Libraries')
+    add_library_info_to_db(args.database, args.project, args.sample_provenance, 'Libraries')
     # # add workflow input
-    # add_workflow_inputs_to_db(args.database, args.fpr, args.project, 'Workflow_Inputs')
+    add_workflow_inputs_to_db(args.database, args.fpr, args.project, 'Workflow_Inputs')
     
-        
+    end = time.time()
+
+    print('{0}: {1}'.format(args.project, end -start))    
 
 
 def launch_jobs(args):
@@ -1250,23 +1255,17 @@ def launch_jobs(args):
         jobName = '{0}.provdb'.format(project)
         qsubCmd = "qsub -b y -P gsi -l h_vmem={0}g -N {1} -e {2} -o {2} \"bash {3}\"".format(args.mem, jobName, logdir, bashScript)
         
-        # bashScript = os.path.join(qsubdir, '{0}_add_project_info.qsub'.format(project))
-        # with open(bashScript, 'w') as newfile:
-        #     newfile.write(qsubCmd)
-        # job_names.append(jobName)
-        
-        
         subprocess.call(qsubCmd, shell=True)
         # store job names
         job_names.append(jobName)
     
-        
+    
     # launch job to copy database to server
-    cmd2 = '/u/rjovelin/SOFT/anaconda3/bin/python3.6 {0} migrate -md {1} -jn "{2}" -s {3} -wd {4}'
+    cmd2 = '/u/rjovelin/SOFT/anaconda3/bin/python3.6 {0} migrate -md {1} -jn "{2}" -wd {3} -pf {4}'
     bashScript = os.path.join(qsubdir, 'migrate_db.sh')
     with open(bashScript, 'w') as newfile:
-        newfile.write(cmd2.format(dbfiller, args.merged_database, ';'.join(job_names), args.server, args.workingdir))
-    qsubCmd = "qsub -b y -P gsi -l h_vmem={0}g,h_rt={1}:0:0 -N {2} -e {3} -o {3} \"bash {4}\"".format(args.mem, args.run_time, 'provdb.migration', logdir, bashScript)
+        newfile.write(cmd2.format(dbfiller, args.merged_database, ','.join(job_names), args.workingdir, args.pemfile))
+    qsubCmd = "qsub -b y -P gsi -l h_vmem={0}g,h_rt={1}:0:0 -N {2}  -hold_jid \"{3}\" -e {4} -o {4} \"bash {5}\"".format(args.mem, args.run_time, 'provdb.migration', ','.join(job_names), logdir, bashScript)
     subprocess.call(qsubCmd, shell=True)
 
 
@@ -1387,27 +1386,27 @@ def merge_databases(merged_database, databases):
 
 
 
-def check_running_jobs(jobs):
-    '''
-    (list) -> list
+# def check_running_jobs(jobs):
+#     '''
+#     (list) -> list
 
-    Returns a list of job names when all jobs have completed
+#     Returns a list of job names when all jobs have completed
 
-    Parameters
-    ----------
-    - jobs (list): List of job names
-    '''
+#     Parameters
+#     ----------
+#     - jobs (list): List of job names
+#     '''
 
-    completed = []    
-    while len(jobs) != 0:
-        to_remove = []
-        for i in range(len(jobs)):
-            exit_code = subprocess.call('qstat -j {0}'.format(jobs[i]), shell=True)
-            if exit_code == 1:
-                # job not running, remove from list 
-                to_remove.append(jobs[i])
-        completed.extend([jobs.pop(jobs.index(i)) for i in to_remove])
-    return completed
+#     completed = []    
+#     while len(jobs) != 0:
+#         to_remove = []
+#         for i in range(len(jobs)):
+#             exit_code = subprocess.call('qstat -j {0}'.format(jobs[i]), shell=True)
+#             if exit_code == 1:
+#                 # job not running, remove from list 
+#                 to_remove.append(jobs[i])
+#         completed.extend([jobs.pop(jobs.index(i)) for i in to_remove])
+#     return completed
 
 
 def get_job_exit_status(job):
@@ -1474,14 +1473,12 @@ def migrate(args):
     
     
     # check if jobs are still running
-    jobs = list(map(lambda x: x.strip(), args.job_names.split(';')))
-    # list of completed jobs to check for success
-    completed = check_running_jobs(jobs)
+    jobs = list(map(lambda x: x.strip(), args.job_names.split(',')))
     
     # make a list of successfully updated project db
     updated = []
     databasedir = os.path.join(args.workingdir, 'databases')
-    for job in completed:
+    for job in jobs:
         # get exit status
         exit_status = get_job_exit_status(job)
         if exit_status == 0:
@@ -1492,8 +1489,7 @@ def migrate(args):
     merge_databases(args.merged_database, updated)
 
     # copy merged database to server
-    
-    #scp -i ~/.ssh/provenance_reporter.pem /scratch2/groups/gsi/bis/rjovelin/provenance_reporter/test_prov_report/prov.reporter.data.db  ubuntu@provenance-reporter.gsi.oicr.on.ca:~/provenance-reporter/
+    subprocess.call('scp -i {0} {1} ubuntu@provenance-reporter.gsi.oicr.on.ca:~/provenance-reporter/'.format(args.pemfile, args.merged_database), shell=True)
 
 
 
@@ -1524,19 +1520,19 @@ if __name__ == '__main__':
     fill_parser.add_argument('-m', '--memory', dest='mem', default=20, help='Memory allocated to jobs')
     fill_parser.add_argument('-md', '--merged_database', dest='merged_database', help='Path to the merged database', required = True)
     fill_parser.add_argument('-rt', '--run_time', dest='run_time', default=5, help='Run time in hours')
-    fill_parser.add_argument('-s', '--server', dest='server', default='ubuntu@provenance-reporter.gsi.oicr.on.ca', help='Server running the application')
+    fill_parser.add_argument('-pf', '--pem_file', dest='pemfile', default='~/.ssh/provenance_reporter.pem', help='Path to the pem file to access the server')
     fill_parser.set_defaults(func=launch_jobs)
 
-    
     # launch jobs to fill db with all projects info
     migrate_parser = subparsers.add_parser('migrate', help="Run job to copy the database to the server", parents=[parent_parser])
     migrate_parser.add_argument('-m', '--memory', dest='mem', default=20, help='Memory allocated to jobs')
     migrate_parser.add_argument('-rt', '--run_time', dest='run_time', default=5, help='Run time in hours')
-    migrate_parser.add_argument('-s', '--server', dest='server', default='ubuntu@provenance-reporter.gsi.oicr.on.ca', help='Server running the application')
     migrate_parser.add_argument('-jn', '--job_names', dest='job_names', help='Names of the jobs launched to fill the database')
     migrate_parser.add_argument('-wd', '--workingdir', dest='workingdir', help='Name of the directory where qsubs scripts are written', required = True)
     migrate_parser.add_argument('-md', '--merged_database', dest='merged_database', help='Path to the merged database', required = True)
+    migrate_parser.add_argument('-pf', '--pem_file', dest='pemfile', default='~/.ssh/provenance_reporter.pem', help='Path to the pem file to access the server')
     migrate_parser.set_defaults(func=migrate)
+    
     # get arguments from the command line
     args = main_parser.parse_args()
  
