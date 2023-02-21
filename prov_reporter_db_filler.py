@@ -1261,10 +1261,10 @@ def launch_jobs(args):
     
     
     # launch job to copy database to server
-    cmd2 = '/u/rjovelin/SOFT/anaconda3/bin/python3.6 {0} migrate -md {1} -jn "{2}" -wd {3} -pf {4}'
+    cmd2 = '/u/rjovelin/SOFT/anaconda3/bin/python3.6 {0} migrate -md {1} -jn "{2}" -wd {3} -pf {4} -s {5}'
     bashScript = os.path.join(qsubdir, 'migrate_db.sh')
     with open(bashScript, 'w') as newfile:
-        newfile.write(cmd2.format(dbfiller, args.merged_database, ','.join(job_names), args.workingdir, args.pemfile))
+        newfile.write(cmd2.format(dbfiller, args.merged_database, ','.join(job_names), args.workingdir, args.pemfile, args.server))
     qsubCmd = "qsub -b y -P gsi -l h_vmem={0}g,h_rt={1}:0:0 -N {2}  -hold_jid \"{3}\" -e {4} -o {4} \"bash {5}\"".format(args.mem, args.run_time, 'provdb.migration', ','.join(job_names), logdir, bashScript)
     subprocess.call(qsubCmd, shell=True)
 
@@ -1489,7 +1489,7 @@ def migrate(args):
     merge_databases(args.merged_database, updated)
 
     # copy merged database to server
-    subprocess.call('scp -i {0} {1} ubuntu@provenance-reporter.gsi.oicr.on.ca:~/provenance-reporter/'.format(args.pemfile, args.merged_database), shell=True)
+    subprocess.call('scp -i {0} {1} {2}:~/provenance-reporter/'.format(args.pemfile, args.merged_database, args.server), shell=True)
 
 
 
@@ -1503,7 +1503,6 @@ if __name__ == '__main__':
     parent_parser.add_argument('-n', '--nabu', dest='nabu', default='https://nabu-prod.gsi.oicr.on.ca', help='URL of the Nabu API. Default is https://nabu-prod.gsi.oicr.on.ca')
     parent_parser.add_argument('-sp', '--sample_provenance', dest='sample_provenance', default = 'http://pinery.gsi.oicr.on.ca/provenance/v9/sample-provenance', help = 'URL of the Sample Provenance in Pinery. Default is http://pinery.gsi.oicr.on.ca/provenance/v9/sample-provenance')
     parent_parser.add_argument('-pp', '--project_provenance', dest = 'project_provenance', default = 'http://pinery.gsi.oicr.on.ca/sample/projects', help = 'URL of the Project Provenance in Pinery. Default is http://pinery.gsi.oicr.on.ca/sample/projects')
-    #parent_parser.add_argument('-d', '--database', dest='database', help='Path to the database file', required=True)
         
     main_parser = argparse.ArgumentParser(prog = 'prov_reporter_db_filler.py', description = 'Add data to the Provenance Reporter database')
     subparsers = main_parser.add_subparsers(title='sub-commands', description='valid sub-commands', dest= 'subparser_name', help = 'sub-commands help')
@@ -1521,6 +1520,7 @@ if __name__ == '__main__':
     fill_parser.add_argument('-md', '--merged_database', dest='merged_database', help='Path to the merged database', required = True)
     fill_parser.add_argument('-rt', '--run_time', dest='run_time', default=5, help='Run time in hours')
     fill_parser.add_argument('-pf', '--pem_file', dest='pemfile', default='~/.ssh/provenance_reporter.pem', help='Path to the pem file to access the server')
+    fill_parser.add_argument('-s', '--server', dest='server', help='Provenance reporter server.', required=True)
     fill_parser.set_defaults(func=launch_jobs)
 
     # launch jobs to fill db with all projects info
@@ -1531,6 +1531,7 @@ if __name__ == '__main__':
     migrate_parser.add_argument('-wd', '--workingdir', dest='workingdir', help='Name of the directory where qsubs scripts are written', required = True)
     migrate_parser.add_argument('-md', '--merged_database', dest='merged_database', help='Path to the merged database', required = True)
     migrate_parser.add_argument('-pf', '--pem_file', dest='pemfile', default='~/.ssh/provenance_reporter.pem', help='Path to the pem file to access the server')
+    migrate_parser.add_argument('-s', '--server', dest='server', help='Provenance reporter server.', required=True)
     migrate_parser.set_defaults(func=migrate)
     
     # get arguments from the command line
