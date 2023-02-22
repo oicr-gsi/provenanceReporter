@@ -25,8 +25,8 @@ def connect_to_db():
     This database contains information extracted from FPR
     '''
     
-    #conn = sqlite3.connect('prov_report_test.db')
-    conn = sqlite3.connect('prov.reporter.data.db')
+    conn = sqlite3.connect('merged.db')
+    
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -120,7 +120,7 @@ def get_project_info(project_name):
     
     # keep info for project_name
     project = [i for i in projects if i['project_id'] == project_name][0]
-    
+        
     return project
     
     
