@@ -784,47 +784,6 @@ def remove_table(database, table):
     conn.close()
 
 
-def delete_project_records(database, table, project_name):
-    '''
-    (str, str, str) -> None
-    
-    Delete all records for project_name from the database table 
-    
-    Parameters
-    ----------
-    - database (str): Path to the database file
-    - project_name (str): Name of project of interest
-    - table (str): Name of Table in database. Default is Projects
-    '''
-    
-    conn = sqlite3.connect(database, timeout=30)
-    cur= conn.cursor()
-    cur.execute('DELETE from {0} WHERE project_id = "{1}";'.format(table, project_name))
-    conn.commit()
-    conn.close()
-
-
-def count_project_records(database, table, project_name):
-    '''
-    (str, str, str) -> int
-    
-    Returns the number of records of project_name in database table
-
-    Parameters
-    ----------
-    - database (str): Path to the database file
-    - project_name (str): Name of project of interest
-    - table (str): Name of Table in database. Default is Projects
-    '''
-
-    # make a list of all workflows for a given project
-    conn = sqlite3.connect(database, timeout=30)
-    conn.row_factory = sqlite3.Row
-    data = conn.execute('SELECT * FROM {0} WHERE project_id="{1}"'.format(table, project_name)).fetchall()
-    conn.close()
-    return len(data)
-    
-
 def add_project_info_to_db(database, project_provenance, project, table = 'Projects'):
     '''
     (str, str, str, str) -> None
@@ -839,10 +798,6 @@ def add_project_info_to_db(database, project_provenance, project, table = 'Proje
     - table (str): Name of Table in database. Default is Projects
     '''
     
-    # delete all project records 
-    if count_project_records(database, table, project):
-        delete_project_records(database, table, project)
-
     # get project info
     projects = extract_project_info(project_provenance)
     projects = {project: projects[project]}
@@ -884,10 +839,6 @@ def add_workflows(workflows, database, project_name, table = 'Workflows'):
     - workflow_table (str): Name of the table storing workflow information. Default is Workflows
     '''
     
-    # delete records
-    if count_project_records(database, table, project_name):
-        delete_project_records(database, table, project_name)
-    
     # get column names
     column_names = define_column_names()[table]
        
@@ -918,10 +869,6 @@ def add_workflow_relationships(parent_workflows, database, project, table = 'Par
     - project (str): name of project of interest
     - table (str): Name of the table storing parents-children workflow relationships
     '''
-    
-    # delete records for project in table
-    if count_project_records(database, table, project):
-        delete_project_records(database, table, project)
     
     # get column names
     column_names = define_column_names()[table]
@@ -986,9 +933,6 @@ def add_fileQC_info_to_db(database, project, fpr, nabu_api, table='FilesQC'):
     - table (str): Table in database storing the QC or file information. Default is FilesQC
     '''
 
-    # delete records
-    delete_project_records(database, table, project)
-    
     # collect QC info from nabu
     D = collect_qc_info(project, database, nabu_api)
     
@@ -1029,9 +973,6 @@ def add_file_info_to_db(database, project, fpr, nabu_api, table = 'Files'):
     - table (str): Table in database storing file information. Default is Files
     '''
 
-    # delete records
-    delete_project_records(database, table, project)
-
     # collect file info from FPR
     D = collect_file_info_from_fpr(fpr, project)
     
@@ -1070,9 +1011,6 @@ def add_library_info_to_db(database, project, sample_provenance, table = 'Librar
     - sample_provenance (str): URL of the sample provenance API: 'http://pinery.gsi.oicr.on.ca/provenance/v9/sample-provenance'
     '''
     
-    # delete records
-    delete_project_records(database, table, project)
-
     # collect lims information
     lims = collect_lims_info(sample_provenance)
     
@@ -1113,9 +1051,6 @@ def add_workflow_inputs_to_db(database, fpr, project, table = 'Workflow_Inputs')
     - project (str): Name of project of interest
     - table (str): Table storing library in database. Default is Libraries
     '''
-
-    # delete records
-    delete_project_records(database, table, project)
 
     # collect information about library inputs
     libraries = extract_workflow_info(fpr, project)
@@ -1175,13 +1110,6 @@ def add_info(args):
     # create database if file doesn't exist
     if os.path.isfile(args.database) == False:
         initiate_db(args.database)
-    
-    # # delete projects from tables
-    # tables = ['Projects', 'Workflows', 'Parents', 'FilesQC', 'Files', 'Libraries', 'Workflow_Inputs']
-    # record_numbers = [count_project_records(args.database, i, args.project) for i in tables]
-    # for i in range(len(tables)):
-    #     if record_numbers[i]:
-    #         delete_project_records(args.database, tables[i], args.project)
     
     # add project information    
     add_project_info_to_db(args.database, args.project_provenance, args.project, 'Projects')
@@ -1385,30 +1313,6 @@ def merge_databases(merged_database, databases):
     print('merged databases', end - start)
 
 
-
-# def check_running_jobs(jobs):
-#     '''
-#     (list) -> list
-
-#     Returns a list of job names when all jobs have completed
-
-#     Parameters
-#     ----------
-#     - jobs (list): List of job names
-#     '''
-
-#     completed = []    
-#     while len(jobs) != 0:
-#         to_remove = []
-#         for i in range(len(jobs)):
-#             exit_code = subprocess.call('qstat -j {0}'.format(jobs[i]), shell=True)
-#             if exit_code == 1:
-#                 # job not running, remove from list 
-#                 to_remove.append(jobs[i])
-#         completed.extend([jobs.pop(jobs.index(i)) for i in to_remove])
-#     return completed
-
-
 def get_job_exit_status(job):
     '''
     (str) -> int
@@ -1491,6 +1395,13 @@ def migrate(args):
     # copy merged database to server
     subprocess.call('scp -i {0} {1} {2}:~/provenance-reporter/'.format(args.pemfile, args.merged_database, args.server), shell=True)
 
+    # remove project databases
+    project_databases = [os.path.join(databasedir, i) for i in os.listdir(databasedir) if '.db' in i]
+    for i in project_databases:
+        assert '/scratch2/groups/gsi/bis/rjovelin/provenance_reporter/databases' in i and '.db' in i
+        print(i)
+        #os.remove(i)
+        
 
 
 
