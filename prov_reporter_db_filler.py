@@ -1399,8 +1399,7 @@ def migrate(args):
     project_databases = [os.path.join(databasedir, i) for i in os.listdir(databasedir) if '.db' in i]
     for i in project_databases:
         assert '/scratch2/groups/gsi/bis/rjovelin/provenance_reporter/databases' in i and '.db' in i
-        print(i)
-        #os.remove(i)
+        os.remove(i)
         
 
 
