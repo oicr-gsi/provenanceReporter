@@ -40,7 +40,7 @@
    <tr>
      <td rowspan="{{bmpp_info|length}}">{{bmpp_id}}</td>
      <td rowspan="{{bmpp_info|length}}"> {{bmpp_files}} </td>     
-     {% if fastq_release_status %}
+     {% if fastq_status %}
        <td rowspan="{{bmpp_info|length}}", style="width: 40%; padding: 3px; text-align: left"><img src="{{ url_for('static', filename='images/yes.png') }}" alt="released" title="release_status" style="padding-right: 8px; padding-left:0px; width:10; height:10"></td>     
      {% else %}
        <td rowspan="{{bmpp_info|length}}", style="width: 40%; padding: 3px; text-align: left"><img src="{{ url_for('static', filename='images/no.png') }}" alt="not_released" title="release_status" style="padding-right: 8px; padding-left:0px; width:10; height:10"></td>     
