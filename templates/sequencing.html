@@ -2,7 +2,7 @@
 
 
 {% block link %}
- <a href="{{ url_for('project', project_name=project['project_id']) }}">{{ project['project_id'] }}</a>
+ <a href="{{ url_for('project_page', project_name=project['project_id']) }}">{{ project['project_id'] }}</a>
  {% for i in pipelines %}
    {% if i in routes %}
      <a href="{{ url_for(routes[i], project_name=project['project_id']) }}">{{i}}</a>
