@@ -27,6 +27,9 @@ def connect_to_db():
     
     conn = sqlite3.connect('merged.db')
     
+    #conn = sqlite3.connect('HCCCFD.db')
+    
+    
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -569,13 +572,43 @@ def get_bmpp_downstream_workflows(project_name, bmpp_id):
     return D
 
 
-
-
+def get_library_types(project_name):
+    '''
+    (str) -> str
     
+    Returns a comma-separated list of library types for this project
     
+    Paramaters
+    ----------
+    - project_name (str): Name of the project of interest
+    '''   
+    
+    conn = connect_to_db()
+    data = conn.execute("SELECT library_type FROM Libraries WHERE project_id = '{0}';".format(project_name)).fetchall()
+    conn.close()
+    libraries = sorted(list(set([i['library_type'] for i in data])))
+    
+    return ','.join(libraries)
     
 
+def get_cases_count(project_name):
+    
+    '''
+    (str) -> str
 
+    Returns a comma-separated list of library types for this project
+
+    Paramaters
+    ----------
+    - project_name (str): Name of the project of interest
+    '''   
+
+    conn = connect_to_db()
+    data = conn.execute("SELECT sample FROM Libraries WHERE project_id = '{0}';".format(project_name)).fetchall()
+    conn.close()
+    cases = (list(set([i['sample'] for i in data])))
+
+    return len(cases)
 
 
 # map pipelines to views
@@ -627,10 +660,21 @@ def index():
     projects = conn.execute('SELECT * FROM Projects').fetchall()
     conn.close()
     
+    
+    # # get the library types for project
+    # library_types = get_library_types(project_name)
+    # # get the number of cases for project
+    # cases = get_cases_count(project_name)
+    
+    projects = [dict(i) for i in projects]
+    for i in projects:
+        i['cases'] = get_cases_count(i['project_id'])
+        i['library_types'] = get_library_types(i['project_id'])
+    
     return render_template('index.html', projects=projects)
 
 @app.route('/<project_name>')
-def project(project_name):
+def project_page(project_name):
     
     # get the project info for project_name from db
     project = get_project_info(project_name)
