@@ -21,7 +21,7 @@
   <table class="project_info_table">
   <tr>
     <th>Project name:</th>
-    <td>{{ project['project_id'] }}</td>
+    <td><a href="{{ project['miso'] }}">{{ project['project_id'] }}</a></td>
   </tr>
   <tr>
     <th>Project description:</th>
@@ -53,6 +53,14 @@
     {% else %}
       <td>Not provided</td>   
     {% endif %}
+  </tr>
+  <tr>
+    <th>Case count:</th>
+    <td>{{ project['cases'] }}</td>
+  </tr>
+  <tr>
+    <th>Library types:</th>
+    <td>{{ project['library_types'] }}</td>
   </tr>
 </table>
 

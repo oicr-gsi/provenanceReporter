@@ -660,12 +660,6 @@ def index():
     projects = conn.execute('SELECT * FROM Projects').fetchall()
     conn.close()
     
-    
-    # # get the library types for project
-    # library_types = get_library_types(project_name)
-    # # get the number of cases for project
-    # cases = get_cases_count(project_name)
-    
     projects = [dict(i) for i in projects]
     for i in projects:
         i['cases'] = get_cases_count(i['project_id'])
@@ -681,6 +675,14 @@ def project_page(project_name):
     # get the pipelines from the library definitions in db
     pipelines = get_pipelines(project_name)
     
+    project = dict(project)
+    
+    # add case counts and library types
+    project['cases'] = get_cases_count(project_name)
+    project['library_types'] = get_library_types(project_name)
+    # add miso URL
+    project['miso'] = 'https://miso.oicr.on.ca/miso/project/shortname/{0}'.format(project['project_id'])
+        
     return render_template('project.html', routes=routes, project=project, pipelines=pipelines)
 
 @app.route('/<project_name>/sequencing')
