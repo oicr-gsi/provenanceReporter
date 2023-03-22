@@ -122,12 +122,17 @@ img {
   font-size: 18px;
 }
 .topnav a:hover {
-  background-color: #ddd;
-  color: black;
+  background-color: #4d4d4d;
+  color: #f2f2f2;
 }
 .topnav a.active {
   background-color: LimeGreen;
   color: white;
+}
+.topnav a.selected {
+  background-color: #ddd;
+  color: black;
+  
 }
 
 
