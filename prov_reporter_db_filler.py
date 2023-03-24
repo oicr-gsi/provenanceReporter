@@ -17,17 +17,20 @@ import os
 import subprocess
 
 
-def extract_project_info(project_provenance):
+def extract_project_info(pinery):
     '''
     (str) -> dict
     
-    Returns a dictionary with project information pulled down from the
-    project_provenance Pinary API
+    Returns a dictionary with project information pulled down from Pinary API
 
     Parameters
     ----------
-    - project_provenance (str): Pinery API, http://pinery.gsi.oicr.on.ca/sample/projects
+    - pinery (str): Pinery API, http://pinery.gsi.oicr.on.ca
     '''
+    
+    if pinery[-1] == '/':
+        pinery = pinery[:-1]
+    project_provenance = pinery + '/sample/projects'
     
     response = requests.get(project_provenance)
     if response.ok:
@@ -522,7 +525,7 @@ def get_provenance_data(provenance):
 
 
 
-def collect_lims_info(sample_provenance):
+def collect_lims_info(pinery):
     '''
     (str) -> dict
     
@@ -530,10 +533,10 @@ def collect_lims_info(sample_provenance):
 
     Parameters
     ----------
-    - sample_provenance (str): URL of the pinery sample_provenance API
-    'http://pinery.gsi.oicr.on.ca/provenance/v9/sample-provenance'
+    - pinery (str): Pinery API
     ''' 
 
+    sample_provenance = pinery + '/provenance/v9/sample-provenance'
     # get sample info from pinery
     L = get_provenance_data(sample_provenance)
     
@@ -784,7 +787,7 @@ def remove_table(database, table):
     conn.close()
 
 
-def add_project_info_to_db(database, project_provenance, project, table = 'Projects'):
+def add_project_info_to_db(database, pinery, project, table = 'Projects'):
     '''
     (str, str, str, str) -> None
     
@@ -793,10 +796,12 @@ def add_project_info_to_db(database, project_provenance, project, table = 'Proje
     Parameters
     ----------
     - database (str): Path to the database file
-    - project_provenance (str): Pinery API, http://pinery.gsi.oicr.on.ca/sample/projects
+    - pinery (str): Pinery API, http://pinery.gsi.oicr.on.ca
     - project (str): Name of project of interest
     - table (str): Name of Table in database. Default is Projects
     '''
+    
+    project_provenance = pinery + '/sample/projects'
     
     # get project info
     projects = extract_project_info(project_provenance)
@@ -997,7 +1002,7 @@ def add_file_info_to_db(database, project, fpr, nabu_api, table = 'Files'):
 
 
 
-def add_library_info_to_db(database, project, sample_provenance, table = 'Libraries'):
+def add_library_info_to_db(database, project, pinery, table = 'Libraries'):
     '''
     (str, str, str, str) -> None
     
@@ -1008,9 +1013,11 @@ def add_library_info_to_db(database, project, sample_provenance, table = 'Librar
     - database (str): Path to the databae file
     - project (str): Name of project of interest
     - table (str): Table storing library in database. Default is Libraries
-    - sample_provenance (str): URL of the sample provenance API: 'http://pinery.gsi.oicr.on.ca/provenance/v9/sample-provenance'
+    - pinery (str): URL of the sample provenance API: 
     '''
     
+    sample_provenance = pinery + '/provenance/v9/sample-provenance'
+       
     # collect lims information
     lims = collect_lims_info(sample_provenance)
     
@@ -1098,8 +1105,7 @@ def add_info(args):
     ----------
     - fpr (str): Path to Path to the File Provenance Report
     - nabu (str): URL of the Nabu API
-    - sample_provenance (str): URL of the Sample Provenance in Pinery
-    - project_provenance (str): URL of the Project Provenance in Pinery
+    - pinery (str): Pinery api
     - database (str): Path to the database file
     - project (str): Name of the project
     '''
@@ -1112,17 +1118,17 @@ def add_info(args):
         initiate_db(args.database)
     
     # add project information    
-    add_project_info_to_db(args.database, args.project_provenance, args.project, 'Projects')
+    #add_project_info_to_db(args.database, args.pinery, args.project, 'Projects')
     # add workflow information
-    add_workflows_info_to_db(args.fpr, args.database, args.project, 'Workflows', 'Parents', 'Children')
+    #add_workflows_info_to_db(args.fpr, args.database, args.project, 'Workflows', 'Parents', 'Children')
     # # add file QC info
-    add_fileQC_info_to_db(args.database, args.project, args.fpr, args.nabu, 'FilesQC')
+    #add_fileQC_info_to_db(args.database, args.project, args.fpr, args.nabu, 'FilesQC')
     # # add file info
     add_file_info_to_db(args.database, args.project, args.fpr, args.nabu, 'Files')
     # # add library information
-    add_library_info_to_db(args.database, args.project, args.sample_provenance, 'Libraries')
+    #add_library_info_to_db(args.database, args.project, args.pinery, 'Libraries')
     # # add workflow input
-    add_workflow_inputs_to_db(args.database, args.fpr, args.project, 'Workflow_Inputs')
+    #add_workflow_inputs_to_db(args.database, args.fpr, args.project, 'Workflow_Inputs')
     
     end = time.time()
 
@@ -1139,8 +1145,7 @@ def launch_jobs(args):
     ----------
     - fpr (str): Path to Path to the File Provenance Report
     - nabu (str): URL of the Nabu API
-    - sample_provenance (str): URL of the Sample Provenance in Pinery
-    - project_provenance (str): URL of the Project Provenance in Pinery
+    - pinery (str): Pinery API
     - database (str): Path to the database file
     - workingdir (str): Name of the directory where qsubs scripts are written
     - mem (int): Memory allocated to jobs
@@ -1148,7 +1153,7 @@ def launch_jobs(args):
     
     # populate database with project information
     # extract project information from project provenance
-    projects = extract_project_info(args.project_provenance)
+    projects = extract_project_info(args.pinery)
     # filter out completed projects
     projects = filter_completed_projects(projects)
     # make a list of projects with data in Prinery and FPR
@@ -1167,7 +1172,7 @@ def launch_jobs(args):
     
     dbfiller = os.path.join(args.workingdir, 'prov_reporter_db_filler.py')
 
-    cmd1 = '/u/rjovelin/SOFT/anaconda3/bin/python3.6 {0} add_project -f {1} -n {2} -sp {3} -pp {4} -d {5} -pr {6}'
+    cmd1 = '/u/rjovelin/SOFT/anaconda3/bin/python3.6 {0} add_project -f {1} -n {2} -p {3} -d {4} -pr {5}'
     
     # record job names and job exit codes    
     job_names = []
@@ -1177,7 +1182,7 @@ def launch_jobs(args):
         # get name of output file
         bashScript = os.path.join(qsubdir, '{0}_add_project_info.sh'.format(project))
         with open(bashScript, 'w') as newfile:
-            newfile.write(cmd1.format(dbfiller, args.fpr, args.nabu, args.sample_provenance, args.project_provenance, database, project))
+            newfile.write(cmd1.format(dbfiller, args.fpr, args.nabu, args.pinery, database, project))
                           
         # launch qsub directly, collect job names and exit codes
         jobName = '{0}.provdb'.format(project)
@@ -1411,8 +1416,7 @@ if __name__ == '__main__':
     parent_parser = argparse.ArgumentParser(prog = 'prov_reporter_db_filler.py', description='Script to add data to the Provenance Reporter database', add_help=False)
     parent_parser.add_argument('-f', '--fpr', dest='fpr', default = '/scratch2/groups/gsi/production/vidarr/vidarr_files_report_latest.tsv.gz', help='Path to the File Provenance Report. Default is /scratch2/groups/gsi/production/vidarr/vidarr_files_report_latest.tsv.gz')
     parent_parser.add_argument('-n', '--nabu', dest='nabu', default='https://nabu-prod.gsi.oicr.on.ca', help='URL of the Nabu API. Default is https://nabu-prod.gsi.oicr.on.ca')
-    parent_parser.add_argument('-sp', '--sample_provenance', dest='sample_provenance', default = 'http://pinery.gsi.oicr.on.ca/provenance/v9/sample-provenance', help = 'URL of the Sample Provenance in Pinery. Default is http://pinery.gsi.oicr.on.ca/provenance/v9/sample-provenance')
-    parent_parser.add_argument('-pp', '--project_provenance', dest = 'project_provenance', default = 'http://pinery.gsi.oicr.on.ca/sample/projects', help = 'URL of the Project Provenance in Pinery. Default is http://pinery.gsi.oicr.on.ca/sample/projects')
+    parent_parser.add_argument('-p', '--pinery', dest = 'pinery', default = 'http://pinery.gsi.oicr.on.ca', help = 'Pinery API. Default is http://pinery.gsi.oicr.on.ca')
         
     main_parser = argparse.ArgumentParser(prog = 'prov_reporter_db_filler.py', description = 'Add data to the Provenance Reporter database')
     subparsers = main_parser.add_subparsers(title='sub-commands', description='valid sub-commands', dest= 'subparser_name', help = 'sub-commands help')
