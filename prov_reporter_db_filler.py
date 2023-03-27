@@ -525,6 +525,41 @@ def get_provenance_data(provenance):
 
 
 
+
+
+
+def get_sample_info(pinery, project):
+    '''
+    (str, str) -> dict
+    
+    Return a dictionary with sample information, including samples not sequenced
+    for each project
+    
+    Parameters
+    ----------
+    - pinery (str): Pinery API
+    - project (str): Name of project
+    '''
+    
+    provenance = pinery + '/samples'
+    
+    #L = get_provenance_data(provenance)
+    
+    headers = {'accept': 'application/json',}
+    params = {'project': project,}
+    response = requests.get(provenance, params=params, headers=headers)
+
+    L = []
+       
+    if response.ok:
+        L = response.json()
+        # only keep cases
+        L = [i for i in L if i['name'].count('_') == 1]
+    
+    return L    
+    
+
+
 def collect_lims_info(pinery):
     '''
     (str) -> dict
