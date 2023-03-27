@@ -679,7 +679,8 @@ def define_column_names():
                     'FilesQC': ['file_swid', 'project_id', 'skip', 'user', 'date', 'status', 'reference', 'fresh', 'ticket'],
                     'Libraries': ['library', 'sample', 'tissue_type', 'ext_id', 'tissue_origin',
                                   'library_type', 'prep', 'tissue_prep', 'sample_received_date', 'group_id', 'group_id_description', 'project_id'],
-                    'Workflow_Inputs': ['library', 'run', 'lane', 'wfrun_id', 'limskey', 'barcode', 'platform', 'project_id']}
+                    'Workflow_Inputs': ['library', 'run', 'lane', 'wfrun_id', 'limskey', 'barcode', 'platform', 'project_id'],
+                    'Samples': ['case_id', 'donor_id', 'species', 'sex', 'miso', 'created_date', 'modified_date', 'project_id']}
         
     return column_names
 
@@ -707,7 +708,8 @@ def define_column_types():
                                   'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 
                                   'VARCHAR(256)', 'VARCHAR(128)', 'VARCHAR(256)', 'VARCHAR(128)'],
                     'Workflow_Inputs': ['VARCHAR(128)', 'VARCHAR(256)', 'INTEGER', 'VARCHAR(572)', 
-                                        'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)']}
+                                        'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)'],
+                    'Samples': ['VARCHAR(128) PRIMARY KEY NOT NULL', 'VARCHAR(256)', 'VARCHAR(256)', 'VARCHAR(128)', 'VARCHAR(572)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)']}
     
     return column_types
 
@@ -733,7 +735,7 @@ def create_table(database, table):
     table_format = ', '.join(list(map(lambda x: ' '.join(x), list(zip(column_names, column_types)))))
 
 
-    if table  in ['Workflows', 'Parents', 'Files', 'FilesQC', 'Libraries', 'Workflow_Inputs']:
+    if table  in ['Workflows', 'Parents', 'Files', 'FilesQC', 'Libraries', 'Workflow_Inputs', 'Samples']:
         constraints = '''FOREIGN KEY (project_id)
             REFERENCES Projects (project_id)
             ON DELETE CASCADE ON UPDATE CASCADE'''
@@ -768,7 +770,19 @@ def create_table(database, table):
               REFERENCES Libraries (library)
               ON DELETE CASCADE ON UPDATE CASCADE'''
         table_format = table_format + ', ' + constraints
-            
+    
+    if table == 'Samples':
+        constraints = '''FOREIGN KEY (donor_id)
+            REFERENCES Libraries (ext_id)
+            ON DELETE CASCADE ON UPDATE CASCADE'''
+        table_format = table_format + ', ' + constraints
+
+    if table == 'Libraries':
+        constraints = '''FOREIGN KEY (sample)
+            REFERENCES Samples (case_id)
+            ON DELETE CASCADE ON UPDATE CASCADE'''
+        table_format = table_format + ', ' + constraints
+
     # connect to database
     conn = sqlite3.connect(database)
     cur = conn.cursor()
