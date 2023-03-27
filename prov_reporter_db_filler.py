@@ -1284,7 +1284,7 @@ def launch_jobs(args):
                           
         # launch qsub directly, collect job names and exit codes
         jobName = '{0}.provdb'.format(project)
-        qsubCmd = "qsub -b y -P gsi -l h_vmem={0}g -N {1} -e {2} -o {2} \"bash {3}\"".format(args.mem, jobName, logdir, bashScript)
+        qsubCmd = "qsub -b y -P gsi -l h_vmem={0}g,h_rt={1}:0:0 -N {2} -e {3} -o {3} \"bash {4}\"".format(args.mem, args.run_time, jobName, logdir, bashScript)
         
         subprocess.call(qsubCmd, shell=True)
         # store job names
