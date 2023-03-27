@@ -812,7 +812,7 @@ def initiate_db(database):
     tables = cur.fetchall()
     tables = [i[0] for i in tables]    
     conn.close()
-    for i in ['Projects', 'Workflows', 'Parents', 'Files', 'FilesQC', 'Libraries', 'Workflow_Inputs']:
+    for i in ['Projects', 'Workflows', 'Parents', 'Files', 'FilesQC', 'Libraries', 'Workflow_Inputs', 'Samples']:
         if i not in tables:
             create_table(database, i)
 
@@ -1142,6 +1142,53 @@ def add_workflow_inputs_to_db(database, fpr, project, table = 'Workflow_Inputs')
 
 
 
+def add_samples_info_to_db(database, project, pinery, table):
+    '''
+    (str, str, str) -> None
+    
+    Inserts samples data into Samples table of database    
+    
+    Parameters
+    ----------
+    - database (str): Path to the databae file
+    - project (str): Name of project of interest
+    - pinery (str): Pinery API
+    - table (str): Name of table in database
+    '''
+    
+    # collect information about samples
+    samples = get_sample_info(pinery, project)
+
+    if samples:
+        # connect to db
+        conn = sqlite3.connect(database)
+        cur = conn.cursor()
+   
+        # get column names
+        data = cur.execute("SELECT * FROM {0} WHERE project_id = '{1}';".format(table, project))
+        column_names = [column[0] for column in data.description]
+
+        # add data into table
+        for i in samples:
+            sex, species, donor_id = '', '', ''
+            for j in i['attributes']:
+                if j['name'] == 'Sex':
+                    sex = j['value']
+                if j['name'] == 'Organism':
+                    species= j['value']
+                if j['name'] == 'External Name':
+                    donor_id = j['value']
+            sample_id = i['id']
+            miso = 'https://miso.oicr.on.ca/miso/sample/{0}'.format(sample_id.replace('SAM', ''))    
+            assert project == i['project_name']
+            L = [i['name'], donor_id, species, sex, miso, i['created_date'], i['modified_date'], i['project_name']]          
+            
+            # insert project info
+            cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
+            conn.commit()
+ 
+    conn.close()
+
 
 
 def add_info(args):
@@ -1167,17 +1214,19 @@ def add_info(args):
         initiate_db(args.database)
     
     # add project information    
-    #add_project_info_to_db(args.database, args.pinery, args.project, 'Projects')
+    add_project_info_to_db(args.database, args.pinery, args.project, 'Projects')
+    # add sample information
+    add_samples_info_to_db(args.database, args.project, args.pinery, 'Samples')
     # add workflow information
-    #add_workflows_info_to_db(args.fpr, args.database, args.project, 'Workflows', 'Parents', 'Children')
-    # # add file QC info
-    #add_fileQC_info_to_db(args.database, args.project, args.fpr, args.nabu, 'FilesQC')
-    # # add file info
+    add_workflows_info_to_db(args.fpr, args.database, args.project, 'Workflows', 'Parents', 'Children')
+    # add file QC info
+    add_fileQC_info_to_db(args.database, args.project, args.fpr, args.nabu, 'FilesQC')
+    # add file info
     add_file_info_to_db(args.database, args.project, args.fpr, args.nabu, 'Files')
-    # # add library information
-    #add_library_info_to_db(args.database, args.project, args.pinery, 'Libraries')
-    # # add workflow input
-    #add_workflow_inputs_to_db(args.database, args.fpr, args.project, 'Workflow_Inputs')
+    # add library information
+    add_library_info_to_db(args.database, args.project, args.pinery, 'Libraries')
+    # add workflow input
+    add_workflow_inputs_to_db(args.database, args.fpr, args.project, 'Workflow_Inputs')
     
     end = time.time()
 
