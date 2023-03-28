@@ -25,9 +25,9 @@ def connect_to_db():
     This database contains information extracted from FPR
     '''
     
-    conn = sqlite3.connect('merged.db')
+    #conn = sqlite3.connect('merged.db')
     
-    #conn = sqlite3.connect('HCCCFD.db')
+    conn = sqlite3.connect('HCCCFD.db')
     
     
     conn.row_factory = sqlite3.Row
@@ -611,6 +611,29 @@ def get_cases_count(project_name):
     return len(cases)
 
 
+
+
+
+def get_samples(project_name):
+    '''
+    
+    
+    '''
+    
+    conn = connect_to_db()
+    data = conn.execute("SELECT library, sample, ext_id, group_id, group_id_description, library_type, tissue_origin, tissue_type FROM Libraries WHERE project_id = '{0}'".format(project_name)).fetchall()
+    
+    data = list(set(data))
+    
+    return data
+    
+
+
+
+
+
+
+
 # map pipelines to views
 routes = {'Whole Genome': 'whole_genome_sequencing'}
 
@@ -660,10 +683,11 @@ def index():
     projects = conn.execute('SELECT * FROM Projects').fetchall()
     conn.close()
     
-    projects = [dict(i) for i in projects]
-    for i in projects:
-        i['cases'] = get_cases_count(i['project_id'])
-        i['library_types'] = get_library_types(i['project_id'])
+    
+    # projects = [dict(i) for i in projects]
+    # for i in projects:
+    #     i['cases'] = get_cases_count(i['project_id'])
+    #     i['library_types'] = get_library_types(i['project_id'])
     
     return render_template('index.html', projects=projects)
 
@@ -683,7 +707,10 @@ def project_page(project_name):
     # add miso URL
     project['miso'] = 'https://miso.oicr.on.ca/miso/project/shortname/{0}'.format(project['project_id'])
         
-    return render_template('project.html', routes=routes, project=project, pipelines=pipelines)
+    # get sample information
+    samples = get_samples(project_name)
+        
+    return render_template('project.html', routes=routes, project=project, pipelines=pipelines, samples=samples)
 
 @app.route('/<project_name>/sequencing')
 def sequencing(project_name):

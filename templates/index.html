@@ -23,7 +23,8 @@
      <th>Project</th>
      <th>Description</th>
      <th>Pipeline</th>     
-     <th>Cases</th>
+     <th>Expected Cases</th>
+     <th>Sequenced Cases</th>     
      <th>Libraries</th>
    </tr>     
    {% for i in projects %}
@@ -38,7 +39,10 @@
           <a class="project_links" href="{{ url_for('project_page', project_name=i['project_id']) }}">{{ i['pipeline'] }}</a>
         </td>
         <td>
-          <a class="project_links" href="{{ url_for('project_page', project_name=i['project_id']) }}">{{ i['cases'] }}</a>
+          <a class="project_links" href="{{ url_for('project_page', project_name=i['project_id']) }}">{{ i['expected_samples'] }}</a>
+        </td>
+        <td>
+          <a class="project_links" href="{{ url_for('project_page', project_name=i['project_id']) }}">{{ i['sequenced_samples'] }}</a>
         </td>
         <td>
           <a class="project_links" href="{{ url_for('project_page', project_name=i['project_id']) }}">{{ i['library_types'] }}</a>
