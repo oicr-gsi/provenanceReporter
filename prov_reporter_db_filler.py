@@ -28,8 +28,6 @@ def extract_project_info(pinery):
     - pinery (str): Pinery API, http://pinery.gsi.oicr.on.ca
     '''
     
-    if pinery[-1] == '/':
-        pinery = pinery[:-1]
     project_provenance = pinery + '/sample/projects'
     
     response = requests.get(project_provenance)
@@ -674,7 +672,7 @@ def define_column_names():
     # create dict to store column names for each table {table: [column names]}
     column_names = {'Workflows': ['wfrun_id', 'wf', 'wfv', 'project_id', 'attributes'],
                     'Parents': ['parents_id', 'children_id', 'project_id'],
-                    'Projects': ['project_id', 'pipeline', 'description', 'active', 'contact_name', 'contact_email', 'last_updated'],
+                    'Projects': ['project_id', 'pipeline', 'description', 'active', 'contact_name', 'contact_email', 'last_updated', 'expected_samples', 'sequenced_samples'],
                     'Files': ['file_swid', 'project_id', 'md5sum', 'workflow', 'version', 'wfrun_id', 'file', 'library_type', 'attributes', 'creation_date'],
                     'FilesQC': ['file_swid', 'project_id', 'skip', 'user', 'date', 'status', 'reference', 'fresh', 'ticket'],
                     'Libraries': ['library', 'sample', 'tissue_type', 'ext_id', 'tissue_origin',
@@ -696,7 +694,7 @@ def define_column_types():
     column_types = {'Workflows': ['VARCHAR(572)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'TEXT'],
                     'Parents': ['VARCHAR(572)', 'VARCHAR(572)', 'VARCHAR(128)'],
                     'Projects': ['VARCHAR(128) PRIMARY KEY NOT NULL UNIQUE', 'VARCHAR(128)',
-                                  'TEXT', 'VARCHAR(128)', 'VARCHAR(256)', 'VARCHAR(256)', 'VARCHAR(256)'],
+                                  'TEXT', 'VARCHAR(128)', 'VARCHAR(256)', 'VARCHAR(256)', 'VARCHAR(256)', 'INT', 'INT'],
                     'Files': ['VARCHAR(572) PRIMARY KEY NOT NULL UNIQUE', 'VARCHAR(128)',
                               'VARCHAR(256)', 'VARCHAR(128)', 'VARCHAR(128)',
                               'VARCHAR(572)', 'TEXT', 'VARCHAR(128)', 'TEXT', 'INT'],
@@ -853,7 +851,7 @@ def add_project_info_to_db(database, pinery, project, table = 'Projects'):
     project_provenance = pinery + '/sample/projects'
     
     # get project info
-    projects = extract_project_info(project_provenance)
+    projects = extract_project_info(pinery)
     projects = {project: projects[project]}
                  
     # get column names
@@ -862,8 +860,15 @@ def add_project_info_to_db(database, pinery, project, table = 'Projects'):
     # add time stamp when project data was updated
     projects[project]['last_updated'] = time.strftime('%Y-%m-%d_%H:%M', time.localtime(time.time()))
 
-
-
+    # add number of expected cases for project
+    samples = get_sample_info(pinery, project)
+    samples = [i['name'] for i in samples]
+    projects[project]['expected_samples'] = len(set(samples))
+    
+    # add number of sequenced cases for project
+    lims = collect_lims_info(pinery)
+    projects[project]['expected_samples'] = len(lims[project].keys())
+    
     # connect to db
     conn = sqlite3.connect(database,  timeout=30)
     cur = conn.cursor()
@@ -1065,10 +1070,8 @@ def add_library_info_to_db(database, project, pinery, table = 'Libraries'):
     - pinery (str): URL of the sample provenance API: 
     '''
     
-    sample_provenance = pinery + '/provenance/v9/sample-provenance'
-       
     # collect lims information
-    lims = collect_lims_info(sample_provenance)
+    lims = collect_lims_info(pinery)
     
     # check that data is recorded for that project
     if project in lims and lims[project]:
