@@ -560,51 +560,7 @@ def get_sample_info(pinery, project):
     
 
 
-def collect_lims_info(pinery):
-    '''
-    (str) -> dict
     
-    Returns a dictionary with library information for each sample of each project
-
-    Parameters
-    ----------
-    - pinery (str): Pinery API
-    ''' 
-
-    sample_provenance = pinery + '/provenance/v9/sample-provenance'
-    # get sample info from pinery
-    L = get_provenance_data(sample_provenance)
-    
-    # store lims information for each library of each project
-    # {project: {sample: {library_info}}}    
-    D = {}
-
-    for i in L:
-        project = i['studyTitle']
-        sample = i['rootSampleName']  
-        if project not in D:
-            D[project] = {}
-        if sample not in D[project]:
-            D[project][sample] = {}
-    
-        # collect sample information
-        d = collect_info(i['sampleAttributes'], ['geo_tissue_type', 'geo_external_name', 'geo_tissue_origin',
-                 'geo_library_source_template_type', 'geo_prep_kit',
-                 'geo_tissue_preparation', 'geo_receive_date', 'geo_group_id', 'geo_group_id_description'], ['tissue_type', 'ext_id', 'tissue_origin', 'library_type', 
-                         'prep', 'tissue_prep', 'sample_received_date', 'group_id', 'group_id_description'])
-        # add library name
-        library = i['sampleName']
-                        
-        # store sample information
-        if library not in D[project][sample]:
-            D[project][sample][library] = d
-            
-        #update sample information for each library if some fields are missing
-        for k in d:
-            if D[project][sample][library][k] == '':
-                D[project][sample][library][k] = d[k]    
-    return D    
-
 
 def extract_workflow_info(fpr, project_name):
     '''
@@ -836,7 +792,7 @@ def remove_table(database, table):
     conn.close()
 
 
-def add_project_info_to_db(database, pinery, project, table = 'Projects'):
+def add_project_info_to_db(database, pinery, project, lims_info, table = 'Projects'):
     '''
     (str, str, str, str) -> None
     
@@ -847,6 +803,7 @@ def add_project_info_to_db(database, pinery, project, table = 'Projects'):
     - database (str): Path to the database file
     - pinery (str): Pinery API, http://pinery.gsi.oicr.on.ca
     - project (str): Name of project of interest
+    - lims_info (str): Path to the json file with lims information
     - table (str): Name of Table in database. Default is Projects
     '''
     
@@ -866,7 +823,9 @@ def add_project_info_to_db(database, pinery, project, table = 'Projects'):
     projects[project]['expected_samples'] = len(set(samples))
     
     # add number of sequenced cases for project
-    lims = collect_lims_info(pinery)
+    infile = open(lims_info)
+    lims = json.load(infile)
+    infile.close()
     projects[project]['sequenced_samples'] = len(lims[project].keys())
     
     # add library types
@@ -1064,7 +1023,7 @@ def add_file_info_to_db(database, project, fpr, nabu_api, table = 'Files'):
 
 
 
-def add_library_info_to_db(database, project, pinery, table = 'Libraries'):
+def add_library_info_to_db(database, project, pinery, lims_info, table = 'Libraries'):
     '''
     (str, str, str, str) -> None
     
@@ -1074,13 +1033,16 @@ def add_library_info_to_db(database, project, pinery, table = 'Libraries'):
     ----------
     - database (str): Path to the databae file
     - project (str): Name of project of interest
-    - table (str): Table storing library in database. Default is Libraries
     - pinery (str): URL of the sample provenance API: 
+    - lims_info (str): Path to the json file with lims information
+    - table (str): Table storing library in database. Default is Libraries
     '''
     
     # collect lims information
-    lims = collect_lims_info(pinery)
-    
+    infile = open(lims_info)
+    lims = json.load(infile)
+    infile.close()
+        
     # check that data is recorded for that project
     if project in lims and lims[project]:
         lims = {project: lims[project]}
@@ -1201,6 +1163,57 @@ def add_samples_info_to_db(database, project, pinery, table):
     conn.close()
 
 
+def collect_lims_info(args):
+    '''
+    (str, str) -> str
+    
+    Parse sample-provenance in Pinery and writes information as json
+    
+    Parameters
+    ----------
+    - pinery (str): Pinery API
+    - lims_info (str): Path to the output json file with lims information
+    ''' 
+
+    sample_provenance = args.pinery + '/provenance/v9/sample-provenance'
+    # get sample info from pinery
+    L = get_provenance_data(sample_provenance)
+    
+    # store lims information for each library of each project
+    # {project: {sample: {library_info}}}    
+    D = {}
+
+    for i in L:
+        project = i['studyTitle']
+        sample = i['rootSampleName']  
+        if project not in D:
+            D[project] = {}
+        if sample not in D[project]:
+            D[project][sample] = {}
+    
+        # collect sample information
+        d = collect_info(i['sampleAttributes'], ['geo_tissue_type', 'geo_external_name', 'geo_tissue_origin',
+                 'geo_library_source_template_type', 'geo_prep_kit',
+                 'geo_tissue_preparation', 'geo_receive_date', 'geo_group_id', 'geo_group_id_description'], ['tissue_type', 'ext_id', 'tissue_origin', 'library_type', 
+                         'prep', 'tissue_prep', 'sample_received_date', 'group_id', 'group_id_description'])
+        # add library name
+        library = i['sampleName']
+                        
+        # store sample information
+        if library not in D[project][sample]:
+            D[project][sample][library] = d
+            
+        #update sample information for each library if some fields are missing
+        for k in d:
+            if D[project][sample][library][k] == '':
+                D[project][sample][library][k] = d[k]    
+    
+    newfile = open(args.lims_info, 'w')
+    json.dump(D, newfile)
+    newfile.close()    
+
+
+
 
 def add_info(args):
     '''
@@ -1214,6 +1227,7 @@ def add_info(args):
     - nabu (str): URL of the Nabu API
     - pinery (str): Pinery api
     - database (str): Path to the database file
+    - lims_info (str): Path to the json file with lims information
     - project (str): Name of the project
     '''
     
@@ -1225,7 +1239,7 @@ def add_info(args):
         initiate_db(args.database)
     
     # add project information    
-    add_project_info_to_db(args.database, args.pinery, args.project, 'Projects')
+    add_project_info_to_db(args.database, args.pinery, args.project, args.lims_info, 'Projects')
     # add sample information
     add_samples_info_to_db(args.database, args.project, args.pinery, 'Samples')
     # add workflow information
@@ -1235,7 +1249,7 @@ def add_info(args):
     # add file info
     add_file_info_to_db(args.database, args.project, args.fpr, args.nabu, 'Files')
     # add library information
-    add_library_info_to_db(args.database, args.project, args.pinery, 'Libraries')
+    add_library_info_to_db(args.database, args.project, args.pinery, args.lims_info, 'Libraries')
     # add workflow input
     add_workflow_inputs_to_db(args.database, args.fpr, args.project, 'Workflow_Inputs')
     
@@ -1281,7 +1295,15 @@ def launch_jobs(args):
     
     dbfiller = os.path.join(args.workingdir, 'prov_reporter_db_filler.py')
 
-    cmd1 = '/u/rjovelin/SOFT/anaconda3/bin/python3.6 {0} add_project -f {1} -n {2} -p {3} -d {4} -pr {5}'
+    cmd1 = '/u/rjovelin/SOFT/anaconda3/bin/python3.6 {0} collect_lims -p {1} -l {2}'
+    bashScript = os.path.join(qsubdir, 'collect_lims.sh')
+    lims_info_file = os.path.join(args.workingdir, 'lims_info.json')
+    with open(bashScript, 'w') as newfile:
+        newfile.write(cmd1.format(dbfiller, args.pinery, lims_info_file))
+    qsubCmd = "qsub -b y -P gsi -l h_vmem={0}g -N {1}  -e {2} -o {2} \"bash {3}\"".format(args.mem, 'provdb.lims', logdir, bashScript)
+    subprocess.call(qsubCmd, shell=True)
+
+    cmd2 = '/u/rjovelin/SOFT/anaconda3/bin/python3.6 {0} add_project -f {1} -n {2} -p {3} -d {4} -pr {5} -l {6}'
     
     # record job names and job exit codes    
     job_names = []
@@ -1291,22 +1313,19 @@ def launch_jobs(args):
         # get name of output file
         bashScript = os.path.join(qsubdir, '{0}_add_project_info.sh'.format(project))
         with open(bashScript, 'w') as newfile:
-            newfile.write(cmd1.format(dbfiller, args.fpr, args.nabu, args.pinery, database, project))
-                          
+            newfile.write(cmd2.format(dbfiller, args.fpr, args.nabu, args.pinery, database, project, lims_info_file))
         # launch qsub directly, collect job names and exit codes
         jobName = '{0}.provdb'.format(project)
-        qsubCmd = "qsub -b y -P gsi -l h_vmem={0}g,h_rt={1}:0:0 -N {2} -e {3} -o {3} \"bash {4}\"".format(args.mem, args.run_time, jobName, logdir, bashScript)
-        
+        qsubCmd = 'qsub -b y -P gsi -l h_vmem={0}g,h_rt={1}:0:0 -N {2} -hold_jid "{3}" -e {4} -o {4} "bash {5}"'.format(args.mem, args.run_time, jobName, 'provdb.lims', logdir, bashScript)
         subprocess.call(qsubCmd, shell=True)
         # store job names
         job_names.append(jobName)
     
-    
     # launch job to copy database to server
-    cmd2 = '/u/rjovelin/SOFT/anaconda3/bin/python3.6 {0} migrate -md {1} -jn "{2}" -wd {3} -pf {4} -s {5}'
+    cmd3 = '/u/rjovelin/SOFT/anaconda3/bin/python3.6 {0} migrate -md {1} -jn "{2}" -wd {3} -pf {4} -s {5}'
     bashScript = os.path.join(qsubdir, 'migrate_db.sh')
     with open(bashScript, 'w') as newfile:
-        newfile.write(cmd2.format(dbfiller, args.merged_database, ','.join(job_names), args.workingdir, args.pemfile, args.server))
+        newfile.write(cmd3.format(dbfiller, args.merged_database, ','.join(job_names), args.workingdir, args.pemfile, args.server))
     qsubCmd = "qsub -b y -P gsi -l h_vmem={0}g,h_rt={1}:0:0 -N {2}  -hold_jid \"{3}\" -e {4} -o {4} \"bash {5}\"".format(args.mem, args.run_time, 'provdb.migration', ','.join(job_names), logdir, bashScript)
     subprocess.call(qsubCmd, shell=True)
 
@@ -1534,6 +1553,7 @@ if __name__ == '__main__':
     project_parser = subparsers.add_parser('add_project', help="Add project information to the Provenance Reporter database", parents = [parent_parser])
     project_parser.add_argument('-pr', '--project', dest='project', help='Name of the project of interest', required = True)
     project_parser.add_argument('-d', '--database', dest='database', help='Path to the database file', required=True)
+    project_parser.add_argument('-l', '--lims', dest='lims_info', help='Path to json file with lims info', required=True)
     project_parser.set_defaults(func=add_info)
  
     # launch jobs to fill db with all projects info
@@ -1545,6 +1565,12 @@ if __name__ == '__main__':
     fill_parser.add_argument('-pf', '--pem_file', dest='pemfile', default='~/.ssh/provenance_reporter.pem', help='Path to the pem file to access the server')
     fill_parser.add_argument('-s', '--server', dest='server', help='Provenance reporter server.', required=True)
     fill_parser.set_defaults(func=launch_jobs)
+
+
+    # collect lims information from pinery
+    fill_parser = subparsers.add_parser('collect_lims', help="Collect lims information from Pinery.", parents = [parent_parser])
+    fill_parser.add_argument('-l', '--lims', dest='lims_info', help='Path to json file with lims info', required = True)
+    fill_parser.set_defaults(func=collect_lims_info)
 
     # launch jobs to fill db with all projects info
     migrate_parser = subparsers.add_parser('migrate', help="Run job to copy the database to the server", parents=[parent_parser])
