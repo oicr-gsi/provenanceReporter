@@ -679,9 +679,8 @@ def sequencing(project_name):
     # get the pipelines from the library definitions in db
     pipelines = get_pipelines(project_name)
     
-    
+    # get sequences    
     conn = connect_to_db()
-
     files = conn.execute("SELECT Files.file, Files.workflow, Files.version, Files.wfrun_id, Files.attributes, \
                          FilesQC.status, Workflow_Inputs.run, Workflow_Inputs.lane, Workflow_Inputs.platform, \
                          Libraries.library, Libraries.sample, Libraries.ext_id, Libraries.group_id \
@@ -691,8 +690,6 @@ def sequencing(project_name):
                          AND Files.wfrun_id = Workflow_Inputs.wfrun_id AND Workflow_Inputs.library = Libraries.library \
                          AND LOWER(Files.workflow) in ('casava', 'bcl2fastq', 'fileimportforanalysis', 'fileimport', 'import_fastq');".format(project_name)).fetchall()
     conn.close()
-
-
     # find and group pairs of fastqs
     sequences = group_sequences(files)
 
@@ -726,7 +723,8 @@ def whole_genome_sequencing(project_name):
     cases = get_call_ready_cases(data)
     
     samples = sorted(list(cases.keys()))
-    
+
+   
     return render_template('Whole_Genome_Sequencing.html', routes = routes, project=project, samples=samples, cases=cases, pipelines=pipelines)
 
 
@@ -837,9 +835,36 @@ def download_cases_table(project_name):
     data = pd.DataFrame(D.values())
     data.to_excel('{0}_cases.xlsx'.format(project_name), index=False)
    
-    # send the json to outoutfile                    
     return send_file("{0}_cases.xlsx".format(project_name), as_attachment=True)
 
 
 
+@app.route('/download_identifiers/<project_name>')
+def download_identifiers_table(project_name):
+    '''
+    
+    
+    '''
+    
+    conn = connect_to_db()
+    identifiers = conn.execute("SELECT library, sample, ext_id, group_id, group_id_description, \
+                               library_type, tissue_origin, tissue_type FROM Libraries \
+                               WHERE Libraries.project_id = '{0}';".format(project_name)).fetchall()
+    conn.close()
+    
+    identifiers = list(set(identifiers))
+    
+    D ={}
+    for i in range(len(identifiers)):
+        D[i] = dict(identifiers[i])
+    data = pd.DataFrame(D.values())
+    
+    outputfile = '{0}_libraries.xlsx'.format(project_name)
+    data.to_excel(outputfile, index=False)
+   
+    return send_file(outputfile, as_attachment=True)
 
+
+if __name__ == "__main__":
+    app.run(host='0.0.0.0')
+    
