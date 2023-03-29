@@ -71,29 +71,24 @@
 
 <table id="project_table">
    <tr>
-     <th>Library Id</th>
      <th>Case Id</th>
-     <th>Donor Id</th>     
-     <th>Sample Id</th>
-     <th>Sample Description</th>
-     <th>Library Type</th>
-     <th>Tissue Origin</th>
-     <th>Tissue Type</th>
+     <th>Donor Id</th>
+     <th>Species</th>     
+     <th>Sex</th>
+     <th>Created</th>
+     <th>Modified</th>
    </tr>     
-   {% for i in samples %}
+   {% for i in cases %}
      <tr>
-        <td>{{ i['library'] }}</td>
-        <td>{{ i['sample'] }}</td>        
-        <td>{{ i['ext_id'] }}</td>
-        <td>{{ i['group_id'] }}</td>
-        <td>{{ i['group_id_description'] }}</td>
-        <td>{{ i['library_type'] }}</td>
-        <td>{{ i['tissue_origin'] }}</td>
-        <td>{{ i['tissue_type'] }}</td>
+        <td><a class="miso_link" href="{{ i['miso'] }}" target="_blank">{{ i['case_id'] }}</a></td>
+        <td>{{ i['donor_id'] }}</td>        
+        <td>{{ i['species'] }}</td>
+        <td>{{ i['sex'] }}</td>
+        <td>{{ i['created_date'] }}</td>
+        <td>{{ i['modified_date'] }}</td>
      </tr>
    {% endfor %}
 </table>
-
 
 <footer>
 <p style="margin-left:auto;margin-right:auto; margin-top:150px; padding-bottom:0px;max-width:300px;position:relative;font-size:16px; font-style:normal; font-family: Arial, Helvetica, sans-serif; color: #A8A8A8;"> Data last updated {{project['last_updated'].split('_')[0]}} </p>

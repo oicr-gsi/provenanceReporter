@@ -624,6 +624,20 @@ def get_samples(project_name):
     return data
     
 
+def get_cases(project_name):
+    '''
+    
+    
+    '''
+    
+    conn = connect_to_db()
+    data = conn.execute("SELECT case_id, donor_id, species, sex, created_date, modified_date, miso FROM Samples WHERE project_id = '{0}'".format(project_name)).fetchall()
+    
+    # data = sorted([(i['case_id'], i) for i in data])
+    # data = [i[1] for i in data]
+       
+    
+    return data
 
 
 
@@ -692,18 +706,25 @@ def project_page(project_name):
     # get the pipelines from the library definitions in db
     pipelines = get_pipelines(project_name)
     
-    project = dict(project)
     
-    # add case counts and library types
-    project['cases'] = get_cases_count(project_name)
-    project['library_types'] = get_library_types(project_name)
-    # add miso URL
-    project['miso'] = 'https://miso.oicr.on.ca/miso/project/shortname/{0}'.format(project['project_id'])
+    # project = dict(project)
+    
+    # # add case counts and library types
+    # project['cases'] = get_cases_count(project_name)
+    # project['library_types'] = get_library_types(project_name)
+    # # add miso URL
+    # project['miso'] = 'https://miso.oicr.on.ca/miso/project/shortname/{0}'.format(project['project_id'])
         
-    # get sample information
-    samples = get_samples(project_name)
+    # get case information
+    
+    cases = get_cases(project_name)
+    
+    
+    
+    
+    #samples = get_samples(project_name)
         
-    return render_template('project.html', routes=routes, project=project, pipelines=pipelines, samples=samples)
+    return render_template('project.html', routes=routes, project=project, pipelines=pipelines, cases=cases)
 
 @app.route('/<project_name>/sequencing')
 def sequencing(project_name):
