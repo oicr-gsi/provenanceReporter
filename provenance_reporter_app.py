@@ -7,12 +7,13 @@ Created on Tue May  3 14:32:40 2022
 
 import sqlite3
 import json
-from flask import Flask, render_template, request, url_for, flash, redirect, Response
+from flask import Flask, render_template, request, url_for, flash, redirect, Response, send_file
 from werkzeug.exceptions import abort
 import requests
 import gzip
 import os
 import time
+import pandas as pd
 
 
 
@@ -833,12 +834,11 @@ def download_cases_table(project_name):
         assert i['case_id'] not in D
         D[i['case_id']] = i
     
+    data = pd.DataFrame(D.values())
+    data.to_excel('{0}_cases.xlsx'.format(project_name), index=False)
+   
     # send the json to outoutfile                    
-    return Response(
-        response=json.dumps(D),
-        mimetype="application/json",
-        status=200,
-        headers={"Content-disposition": "attachment; filename={0}_cases.json".format(project_name)})
+    return send_file("{0}_cases.xlsx".format(project_name), as_attachment=True)
 
 
 
