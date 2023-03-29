@@ -16,9 +16,8 @@
 {% block content %}
   <div class="project_title">
     <p>{% block title %}{{ project['name'] }} {% endblock %}</p>
-    <button id="download_button"><a href="{{url_for('download_cases_table', project_name=project['project_id'])}}">Download Case table</a></button>
-    </div>    
-    
+  </div>    
+
   <table class="project_info_table">
   <tr>
     <th>Project name:</th>
@@ -69,8 +68,9 @@
   </tr>
 </table>
 
+ <button id="download_button" style="margin-top:20px;margin-left:100px"><a href="{{url_for('download_cases_table', project_name=project['project_id'])}}">Download Case table</a></button>
 
-<table id="project_table">
+<table id="project_table" style="margin-top:35px;">
    <tr>
      <th>Case Id</th>
      <th>Donor Id</th>
