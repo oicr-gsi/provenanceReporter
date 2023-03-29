@@ -25,11 +25,7 @@ def connect_to_db():
     This database contains information extracted from FPR
     '''
     
-    #conn = sqlite3.connect('merged.db')
-    
-    conn = sqlite3.connect('HCCCFD.db')
-    
-    
+    conn = sqlite3.connect('merged.db')
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -683,11 +679,8 @@ def index():
     projects = conn.execute('SELECT * FROM Projects').fetchall()
     conn.close()
     
-    
-    # projects = [dict(i) for i in projects]
-    # for i in projects:
-    #     i['cases'] = get_cases_count(i['project_id'])
-    #     i['library_types'] = get_library_types(i['project_id'])
+    projects = sorted([(i['project_id'], i) for i in projects])
+    projects = [i[1] for i in projects]
     
     return render_template('index.html', projects=projects)
 
