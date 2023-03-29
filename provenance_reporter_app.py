@@ -568,47 +568,6 @@ def get_bmpp_downstream_workflows(project_name, bmpp_id):
     return D
 
 
-def get_library_types(project_name):
-    '''
-    (str) -> str
-    
-    Returns a comma-separated list of library types for this project
-    
-    Paramaters
-    ----------
-    - project_name (str): Name of the project of interest
-    '''   
-    
-    conn = connect_to_db()
-    data = conn.execute("SELECT library_type FROM Libraries WHERE project_id = '{0}';".format(project_name)).fetchall()
-    conn.close()
-    libraries = sorted(list(set([i['library_type'] for i in data])))
-    
-    return ','.join(libraries)
-    
-
-def get_cases_count(project_name):
-    
-    '''
-    (str) -> str
-
-    Returns a comma-separated list of library types for this project
-
-    Paramaters
-    ----------
-    - project_name (str): Name of the project of interest
-    '''   
-
-    conn = connect_to_db()
-    data = conn.execute("SELECT sample FROM Libraries WHERE project_id = '{0}';".format(project_name)).fetchall()
-    conn.close()
-    cases = (list(set([i['sample'] for i in data])))
-
-    return len(cases)
-
-
-
-
 
 def get_samples(project_name):
     '''
@@ -705,25 +664,9 @@ def project_page(project_name):
     project = get_project_info(project_name)
     # get the pipelines from the library definitions in db
     pipelines = get_pipelines(project_name)
-    
-    
-    # project = dict(project)
-    
-    # # add case counts and library types
-    # project['cases'] = get_cases_count(project_name)
-    # project['library_types'] = get_library_types(project_name)
-    # # add miso URL
-    # project['miso'] = 'https://miso.oicr.on.ca/miso/project/shortname/{0}'.format(project['project_id'])
-        
     # get case information
-    
     cases = get_cases(project_name)
     
-    
-    
-    
-    #samples = get_samples(project_name)
-        
     return render_template('project.html', routes=routes, project=project, pipelines=pipelines, cases=cases)
 
 @app.route('/<project_name>/sequencing')
