@@ -814,3 +814,32 @@ def get_bmpp_data(project_name, case, bmpp_id):
         headers={"Content-disposition": "attachment; filename={0}_WGS_{1}_{2}.json".format(project_name, case, bmpp_id)})
 
 
+
+
+
+@app.route('/download_cases/<project_name>')
+def download_cases_table(project_name):
+    '''
+    
+    
+    '''
+    
+    # get case information
+    cases = get_cases(project_name)
+    
+    D = {}
+    for i in cases:
+        i = dict(i)
+        assert i['case_id'] not in D
+        D[i['case_id']] = i
+    
+    # send the json to outoutfile                    
+    return Response(
+        response=json.dumps(D),
+        mimetype="application/json",
+        status=200,
+        headers={"Content-disposition": "attachment; filename={0}_cases.json".format(project_name)})
+
+
+
+
