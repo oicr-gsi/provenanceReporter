@@ -602,6 +602,27 @@ def get_cases(project_name):
 
 
 
+def get_last_sequencing(project_name):
+    '''
+    
+    
+    '''
+    
+    conn = connect_to_db()
+    sequencing = conn.execute("SELECT Files.creation_date FROM Files WHERE Files.project_id = '{0}' \
+                         AND LOWER(Files.workflow) in ('casava', 'bcl2fastq', 'fileimportforanalysis', 'fileimport', 'import_fastq');".format(project_name)).fetchall()
+    conn.close()
+    # get the most recent creation date of fastq generating workflows
+    if sequencing:
+        seq_date = sorted(list(set([i['creation_date'] for i in sequencing])))[-1]
+        # convert to readable time
+        seq_date = time.strftime('%Y-%m-%d', time.localtime(seq_date))
+    else:
+        seq_date = 'NA'
+    return seq_date
+
+
+
 
 
 # map pipelines to views
@@ -668,7 +689,10 @@ def project_page(project_name):
     # get case information
     cases = get_cases(project_name)
     
-    return render_template('project.html', routes=routes, project=project, pipelines=pipelines, cases=cases)
+    # get the date of the last sequencing data
+    seq_date = get_last_sequencing(project['project_id'])
+        
+    return render_template('project.html', routes=routes, project=project, pipelines=pipelines, cases=cases, seq_date=seq_date)
 
 @app.route('/<project_name>/sequencing')
 def sequencing(project_name):
