@@ -59,7 +59,11 @@
        </td>        
        <td> {{i['read_count']}} </td>
        <td> {{i['workflow']}} </td>
-       <td> {{i['release_status']}} </td>
+       {% if i['ticket'] %}
+         <td><a class="miso_link" href="{{i['ticket']}}" target="_blank">{{ i['release_status'] }}</a></td>
+       {% else %}
+         <td> {{i['release_status']}} </td>
+       {% endif %}
      </tr>
    {% endfor %}               
    </table>
