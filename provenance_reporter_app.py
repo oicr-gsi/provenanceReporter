@@ -74,9 +74,11 @@ def group_sequences(L):
             else:
                 ticket1 = ''
             readcount = '{:,}'.format(int(read_count1)) if read_count1 != 'NA' else 'NA'
+            fileprefix = os.path.basename(file1)
+            fileprefix = '_'.join(fileprefix.split('_')[:-1])
             d = {'case': case1, 'sample': sample1, 'library': library1, 'run': run1,
                  'files': [file1, file2], 'read_count': readcount, 'workflow': workflow1,
-                 'release_status': status1, 'ticket': ticket1}
+                 'release_status': status1, 'ticket': ticket1, 'prefix':fileprefix}
             F.append(d)
        
     F.sort(key = lambda x: x['case'])
