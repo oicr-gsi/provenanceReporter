@@ -882,6 +882,8 @@ def download_cases_table(project_name):
     for i in cases:
         i = dict(i)
         assert i['case_id'] not in D
+        normals, tumors, libraries = get_sample_counts(project_name, i['case_id'])
+        i['normals'], i['tumors'], i['libraries'] = normals, tumors, libraries        
         D[i['case_id']] = i
     
     data = pd.DataFrame(D.values())
