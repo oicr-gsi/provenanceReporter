@@ -110,6 +110,9 @@ def get_sequences(L):
             case = L[i]['sample']
             sample = L[i]['ext_id']
             library =  L[i]['library']
+            library_type =  L[i]['library_type']
+            tissue_origin =  L[i]['tissue_origin']
+            tissue_type =  L[i]['tissue_type']
             group_id = L[i]['group_id']
             workflow = L[i]['workflow'] + '_' + L[i]['version']
             wfrun = L[i]['wfrun_id']
@@ -129,7 +132,9 @@ def get_sequences(L):
             fileprefix = '_'.join(fileprefix.split('_')[:-1])
             d = {'case': case, 'sample': sample, 'library': library, 'run': run,
                  'read_count': readcount, 'workflow': workflow, 'release_status': status,
-                 'ticket': ticket, 'prefix':fileprefix, 'platform': platform, 'group_id': group_id}
+                 'ticket': ticket, 'prefix':fileprefix, 'platform': platform,
+                 'group_id': group_id, 'tissue_type': tissue_type, 'library_type': library_type,
+                 'tissue_origin': tissue_origin}
             F.append(d)
        
     F.sort(key = lambda x: x['case'])
@@ -794,7 +799,8 @@ def sequencing(project_name):
     conn = connect_to_db()
     files = conn.execute("SELECT Files.file, Files.workflow, Files.version, Files.wfrun_id, Files.attributes, \
                          FilesQC.status, FilesQC.ticket, Workflow_Inputs.run, Workflow_Inputs.lane, Workflow_Inputs.platform, \
-                         Libraries.library, Libraries.sample, Libraries.ext_id, Libraries.group_id \
+                         Libraries.library, Libraries.sample, Libraries.ext_id, Libraries.group_id, \
+                         Libraries.library_type, Libraries.tissue_origin, Libraries.tissue_type \
                          from Files JOIN FilesQC JOIN Workflow_Inputs JOIN Libraries WHERE Files.project_id = '{0}' \
                          AND FilesQC.project_id = '{0}' AND FilesQC.file_swid = Files.file_swid \
                          AND Workflow_Inputs.project_id = '{0}' AND Libraries.project_id = '{0}' \
