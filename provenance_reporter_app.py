@@ -598,8 +598,10 @@ def get_cases(project_name):
     data = conn.execute("SELECT case_id, donor_id, species, sex, created_date, modified_date, miso FROM Samples WHERE project_id = '{0}'".format(project_name)).fetchall()
     
     # data = sorted([(i['case_id'], i) for i in data])
-    # data = [i[1] for i in data]
-       
+    #data = [i[1] for i in data]
+    
+    data = [dict(i) for i in data]
+    
     
     return data
 
@@ -626,6 +628,24 @@ def get_last_sequencing(project_name):
     return seq_date
 
 
+def get_sample_counts(project_name, case):
+    '''
+    
+    
+    '''
+    
+    conn = connect_to_db()
+    
+    data = conn.execute("SELECT library, sample, tissue_type, group_id FROM Libraries WHERE project_id = '{0}' and sample = '{1}';".format(project_name, case)).fetchall()
+    conn.close()
+
+    libraries = len(set([dict(i)['library'] for i in data]))
+    samples = [(dict(i)['sample'] + '_' + dict(i)['group_id'], dict(i)['tissue_type']) for i in data]
+    normals = len(set([i[0] + '_' + i[1] for i in samples if i[1] == 'R']))    
+    tumors = len(set([i[0] + '_' + i[1] for i in samples if i[1] != 'R']))
+        
+    return normals, tumors, libraries
+    
 
 
 
@@ -693,9 +713,13 @@ def project_page(project_name):
     # get case information
     cases = get_cases(project_name)
     
+    for i in range(len(cases)):
+        normals, tumors, libraries = get_sample_counts(project_name, cases[i]['case_id'])
+        cases[i]['normals'], cases[i]['tumors'], cases[i]['libraries'] = normals, tumors, libraries        
+        
     # get the date of the last sequencing data
     seq_date = get_last_sequencing(project['project_id'])
-        
+    
     return render_template('project.html', routes=routes, project=project, pipelines=pipelines, cases=cases, seq_date=seq_date)
 
 @app.route('/<project_name>/sequencing')

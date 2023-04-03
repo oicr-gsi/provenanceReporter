@@ -86,6 +86,9 @@
      <th>Sex</th>
      <th>Created</th>
      <th>Modified</th>
+     <th>Normals</th>
+     <th>Tumours</th>
+     <th>Libraries</th>
    </tr>     
    {% for i in cases %}
      <tr>
@@ -95,6 +98,13 @@
         <td>{{ i['sex'] }}</td>
         <td>{{ i['created_date'] }}</td>
         <td>{{ i['modified_date'] }}</td>
+
+        <td>{{ i['normals'] }}</td>
+        <td>{{ i['tumors'] }}</td>
+        <td>{{ i['libraries'] }}</td>
+
+
+
      </tr>
    {% endfor %}
 </table>
