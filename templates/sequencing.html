@@ -36,9 +36,11 @@
   <table id="project_table">
    <thead>
      <th>Case</th>
+     <th>Donor</th>
      <th>Sample</th>
      <th>Library</th>     
      <th>Run</th>
+     <th>Platform</th>
      <th>File Prefix</th>
      <th>Read Counts</th>
      <th>Workflow</th> 
@@ -49,8 +51,10 @@
      <tr>
        <td> {{i['case']}} </td>
        <td> {{i['sample']}} </td>
+       <td> {{i['group_id']}} </td>
        <td> {{i['library']}} </td>
        <td> {{i['run']}} </td>
+       <td> {{i['platform']}} </td>
        <td> {{i['prefix']}} </td>        
        <td> {{i['read_count']}} </td>
        <td> {{i['workflow']}} </td>
