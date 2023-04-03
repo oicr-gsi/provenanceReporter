@@ -73,8 +73,9 @@ def group_sequences(L):
                 ticket1 = os.path.join('https://jira.oicr.on.ca/browse/', os.path.basename(ticket1))    
             else:
                 ticket1 = ''
+            readcount = '{:,}'.format(int(read_count1)) if read_count1 != 'NA' else 'NA'
             d = {'case': case1, 'sample': sample1, 'library': library1, 'run': run1,
-                 'files': [file1, file2], 'read_count': read_count1, 'workflow': workflow1,
+                 'files': [file1, file2], 'read_count': readcount, 'workflow': workflow1,
                  'release_status': status1, 'ticket': ticket1}
             F.append(d)
        
