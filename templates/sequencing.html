@@ -1,0 +1,103 @@
+{% extends 'project_base.html' %}
+
+
+{% block link %}
+<a href="{{ url_for('project_page', project_name=project['project_id']) }}">{{ project['project_id'] }}</a>
+<a class="selected" href="{{ url_for('sequencing', project_name=project['project_id']) }}">Sequencing</a>
+ {% for i in pipelines %}
+   {% if i in routes %}
+     <a href="{{ url_for(routes[i], project_name=project['project_id']) }}">{{i}}</a>
+   {% else %}
+     <a href="#{{i}}">{{i}}</a>
+   {% endif %}  
+  {% endfor %}   
+{% endblock %}
+
+
+{% block content %}
+  <div class="project_title">
+    <p>{% block title %}{{ project['project_id'] }} {% endblock %}
+      {% if sequences %}
+        <span style="font-size:30px; font-style:normal;"> Displaying sequence information for <span id ="count"> {{ sequences|length }} </span> records</span>
+        <button id="download_button" style="margin-top:20px;margin-left:100px"><a href="{{url_for('download_identifiers_table', project_name=project['project_id'])}}">Download identifiers</a></button>
+      {% else %}
+        <span style="font-size:30px; font-style:normal;"> No sequence information to display</span>
+      {% endif %}  
+    </p>   
+    
+</div> 
+
+  {% if sequences %}
+  
+   <div style="margin-left:auto;margin-right:auto;margin-top:80px;padding-bottom:7px;max-width:300px;position:relative">
+     <input type="text" id="search_table"  onkeyup="searchFunction()" placeholder="Search.." title="Type in a keyword">
+   </div>
+
+  <table id="project_table">
+   <thead>
+     <th>Case</th>
+     <th>Donor</th>
+     <th>Sample</th>
+     <th>Library</th>     
+     <th>Library Type</th>     
+     <th>Tissue Origin</th>     
+     <th>Tissue Type</th>     
+     <th>Platform</th>
+     <th>File Prefix</th>
+     <th>Read Counts</th>
+     <th>Workflow</th> 
+     <th>Release status</th>
+   </thead>     
+
+   {% for i in sequences %}
+     <tr>
+       <td> {{i['case']}} </td>
+       <td> {{i['sample']}} </td>
+       <td> {{i['group_id']}} </td>
+       <td> {{i['library']}} </td>
+       <td> {{i['library_type']}} </td>
+       <td> {{i['tissue_origin']}} </td>
+       <td> {{i['tissue_type']}} </td>
+       <td> {{i['platform']}} </td>
+       <td> {{i['prefix']}} </td>        
+       <td> {{i['read_count']}} </td>
+       <td> {{i['workflow']}} </td>
+       {% if i['ticket'] %}
+         <td><a class="miso_link" href="{{i['ticket']}}" target="_blank">{{ i['release_status'] }}</a></td>
+       {% else %}
+         <td> {{i['release_status']}} </td>
+       {% endif %}
+     </tr>
+   {% endfor %}               
+   </table>
+
+  
+   <script>
+   function searchFunction() {
+   var input, filter, table, tr, td, i, txtValue;
+   var rowCount = 0    
+   input = document.getElementById("search_table");
+   filter = input.value.toUpperCase();
+   table = document.getElementById("project_table");
+   tr = table.getElementsByTagName("tr");
+   for (i = 1; i < tr.length; i++) {
+   td= tr[i];
+     if (td) {
+       txtValue = td.textContent || td.innerText;
+       if (txtValue.toUpperCase().indexOf(filter) > -1) {
+         tr[i].style.display = "";
+         rowCount++;
+       } else {
+         tr[i].style.display = "none";
+         }
+     }       
+    }
+   document.getElementById("count").innerHTML = rowCount
+   }
+  </script>
+
+  {% endif %}
+
+
+   
+{% endblock %}

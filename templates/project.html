@@ -1,0 +1,119 @@
+{% extends 'project_base.html' %}
+
+{% block link %}
+ <a class="selected" href="{{ url_for('project_page', project_name=project['project_id']) }}">{{ project['project_id'] }}</a>
+ <a href="{{ url_for('sequencing', project_name=project['project_id']) }}">Sequencing</a>  
+ {% for i in pipelines %}
+   {% if i in routes %}
+       <a href="{{ url_for(routes[i], project_name=project['project_id']) }}">{{i}}</a>
+   {% else %}
+       <a href="#{{i}}">{{i}}</a>
+   {% endif %}  
+ {% endfor %}  
+{% endblock %}
+
+
+{% block content %}
+  <div class="project_title">
+    <p>{% block title %}{{ project['name'] }} {% endblock %}</p>
+  </div>    
+
+  <table class="project_info_table">
+  <tr>
+    <th>Project name:</th>
+    <td>{{ project['project_id'] }}</td>
+  </tr>
+  <tr>   
+    <th>Last sequencing:</th>
+    <td>{{ seq_date }}</td>
+  </tr>
+  <tr>
+    <th>MISO:</th>
+    <td><a class="miso_link" href="https://miso.oicr.on.ca/miso/project/shortname/{{project['project_id']}}" target="_blank">{{ project['project_id'] }}</a></td>
+  </tr>
+  <tr>
+    <th>Project description:</th>
+    {% if project['description'] %}
+      <td>{{ project['description'] }}</td>
+    {% else %}
+      <td>Not provided</>
+    {% endif %}
+  </tr>
+  <tr>
+    <th>Pipeline:</th>
+    <td>{{ project['pipeline'] }}</td>
+  </tr>
+  <tr>
+    <th>Status:</th>
+    <td>{{ project['active'] }}</td>  
+  </tr>
+  <tr>
+    <th>Contact name:</th>
+    {% if project['contact_name'] %}
+      <td>{{ project['contact_name'] }}</td>
+    {% else %}
+      <td>Not provided</td>
+    {% endif %}     
+  <tr>
+    <th>Contact email:</th>
+    {% if project['contact_email'] %}     
+      <td>{{ project['contact_email'] }}</td>
+    {% else %}
+      <td>Not provided</td>   
+    {% endif %}
+  </tr>
+  <tr>
+    <th>Expected Cases:</th>
+    <td>{{ project['expected_samples'] }}</td>
+  </tr>
+  <tr>
+    <th>Sequenced Cases:</th>
+    <td>{{ project['sequenced_samples'] }}</td>
+  </tr>
+  <tr>
+    <th>Library types:</th>
+    <td>{{ project['library_types'] }}</td>
+  </tr>
+</table>
+
+ <button id="download_button" style="margin-top:20px;margin-left:100px"><a href="{{url_for('download_cases_table', project_name=project['project_id'])}}">Download Case table</a></button>
+
+<table id="project_table" style="margin-top:35px;">
+   <tr>
+     <th>Case Id</th>
+     <th>Donor Id</th>
+     <th>Species</th>     
+     <th>Sex</th>
+     <th>Created</th>
+     <th>Modified</th>
+     <th>Normals</th>
+     <th>Tumours</th>
+     <th>Libraries</th>
+   </tr>     
+   {% for i in cases %}
+     <tr>
+        <td><a class="miso_link" href="{{ i['miso'] }}" target="_blank">{{ i['case_id'] }}</a></td>
+        <td>{{ i['donor_id'] }}</td>        
+        <td>{{ i['species'] }}</td>
+        <td>{{ i['sex'] }}</td>
+        <td>{{ i['created_date'] }}</td>
+        <td>{{ i['modified_date'] }}</td>
+
+        <td>{{ i['normals'] }}</td>
+        <td>{{ i['tumors'] }}</td>
+        <td>{{ i['libraries'] }}</td>
+
+
+
+     </tr>
+   {% endfor %}
+</table>
+
+<footer>
+<p style="margin-left:auto;margin-right:auto; margin-top:150px; padding-bottom:0px;max-width:300px;position:relative;font-size:16px; font-style:normal; font-family: Arial, Helvetica, sans-serif; color: #A8A8A8;"> Data last updated {{project['last_updated'].split('_')[0]}} </p>
+</footer>
+
+{% endblock %}
+
+
+

@@ -1,0 +1,208 @@
+h1 {
+    border: 2px #eee solid;
+    color: black;
+    text-align: center;
+    padding: 10px;
+}
+
+img {
+  width: 80%;
+}
+
+
+#project_table {
+  margin-left: auto;
+  margin-right: auto;
+  margin-top: 60px;
+  font-family: Arial, Helvetica, sans-serif;
+  border-collapse: collapse;
+  width: 80%;
+}
+#project_table td, #project_table th {
+  border: 1px solid #ddd;
+  padding: 8px;
+}
+#project_table tr:nth-child(even){background-color: #f2f2f2;}
+#project_table tr:hover {background-color: #cc99ff;color: white}
+#project_table tr:hover a {background-color: #cc99ff;color: white}
+#project_table th {
+  padding-top: 12px;
+  padding-bottom: 12px;
+  text-align: left;
+  background-color: #00b300;
+  color: white;
+}
+
+
+
+#simple_table {
+  margin-left: auto;
+  margin-right: auto;
+  margin-top: 60px;
+  font-family: Arial, Helvetica, sans-serif;
+  border-collapse: collapse;
+  width: 80%;
+}
+#simple_table td, #simple_table th {
+  border: 1px solid #ddd;
+  padding: 8px;
+}
+#simple_table th {
+  padding-top: 12px;
+  padding-bottom: 12px;
+  text-align: left;
+  background-color: #00b300;
+  color: white;
+}
+
+
+
+
+
+
+.search_bar input[type=text] {
+  float: left;  
+  padding: 6px;
+  font-size: 17px;
+  border: 1px solid grey;
+  width: 70%;
+  background: #f1f1f1;
+  box-sizing: border-box
+}
+.search_bar button {
+  width: 30%;
+  padding: 6px;
+  background: #C0C0C0;
+  color: white;
+  font-size: 17px;
+  border: 1px solid grey;
+  border-left: none;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+.search_bar button:hover {
+  background: #A0A0A0;
+}
+
+
+#search_table {
+    
+  padding: 6px;
+  font-size: 17px;
+  border: 1px solid grey;
+  width: 70%;
+  background: #f1f1f1;
+  box-sizing: border-box;
+  position:absolute
+}
+
+
+
+.project_links {
+  color: black;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size:16px;
+  text-align: left;
+  text-decoration:none;
+}
+
+
+.topnav {
+  overflow: hidden;
+  background-color: #333;
+  margin: 0;
+  font-family: Arial, Helvetica, sans-serif;
+}
+.topnav a {
+  float: left;
+  color: #f2f2f2;
+  text-align: center;
+  padding: 14px 16px;
+  text-decoration: none;
+  font-size: 18px;
+}
+.topnav a:hover {
+  background-color: #4d4d4d;
+  color: #f2f2f2;
+}
+.topnav a.active {
+  background-color: LimeGreen;
+  color: white;
+}
+.topnav a.selected {
+  background-color: #ddd;
+  color: black;
+  
+}
+
+
+.project_title {
+  font-family: Arial, Helvetica, sans-serif;
+  padding-left: 30px;   
+  font-size: 50px;
+  margin-top: 30px; 
+  font-style: bold;
+  color: black;
+  text-align: left; 
+}
+
+
+
+
+.project_info_table {
+  font-family: Arial, Helvetica, sans-serif;
+  color: black;
+  text-align: left;
+  padding-left: 16px;
+  padding-right: 16px;
+  font-size: 20px;
+  margin-left: 100px;
+  margin-right: 100px;
+  background-color: #ffffe6;
+  border: 1.5px #D8D8D8 solid;
+}
+.project_info_table th {
+  color:#A8A8A8;
+  font-weight:normal;
+  padding-right: 20px;
+}
+.project_info_table th, td {
+  padding-bottom:16px;
+}
+
+
+
+#download_button {
+  background-color: gray;
+  border: none;
+  color: white;
+  padding: 10px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  font-size: 16px;
+  margin: 4px 2px;
+  cursor: pointer;
+  border-radius: 8px;
+  margin-left:25px; 
+}
+
+#download_button a {
+    color: white;
+    text-decoration: none;
+}
+
+
+.miso_link {
+  color: #b35900;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 20px; 
+  text-align: left;
+  text-decoration:none;
+}
+
+.miso_link:hover {
+  color: #ff9933;
+}
+
+
