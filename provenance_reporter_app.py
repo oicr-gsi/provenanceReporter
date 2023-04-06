@@ -679,18 +679,34 @@ def get_last_sequencing(project_name):
     '''
     
     conn = connect_to_db()
-    sequencing = conn.execute("SELECT Files.creation_date FROM Files WHERE Files.project_id = '{0}' \
-                         AND LOWER(Files.workflow) in ('casava', 'bcl2fastq', 'fileimportforanalysis', 'fileimport', 'import_fastq');".format(project_name)).fetchall()
+    sequencing = conn.execute("SELECT Workflow_Inputs.run, Files.creation_date FROM Workflow_Inputs JOIN Files \
+                              WHERE Workflow_Inputs.project_id = '{0}' AND Files.project_id = '{0}' \
+                              AND Files.wfrun_id = Workflow_Inputs.wfrun_id \
+                              AND LOWER(Files.workflow) in ('casava', 'bcl2fastq', 'fileimportforanalysis', 'fileimport', 'import_fastq');".format(project_name)).fetchall()
     conn.close()
     # get the most recent creation date of fastq generating workflows
+    
     if sequencing:
-        seq_date = sorted(list(set([i['creation_date'] for i in sequencing])))[-1]
-        # convert to readable time
-        seq_date = time.strftime('%Y-%m-%d', time.localtime(seq_date))
+        sequencing = list(set(sequencing))
+        seq_dates = [i['run'] for i in sequencing]
+        for i in range(len(seq_dates)):
+            seq_dates[i] = seq_dates[i].split('_')
+            if any(list(map(lambda x: x.isdigit(), seq_dates[i]))):
+                j = list(map(lambda x: x.isdigit(), seq_dates[i])).index(True)
+                seq_dates[i] = seq_dates[i][j]
+            else:
+                seq_dates[i] = ''
+            
+        seq_dates = list(set(seq_dates))
+        seq_dates.remove('')
+        seq_dates.sort()
+        seq_date = seq_dates[-1]
+        seq_date = '20' + str(seq_date)[:2] + '-' + str(seq_date)[2:4] + '-' + str(seq_date)[4:]
+        
     else:
         seq_date = 'NA'
     return seq_date
-
+    
 
 def get_sample_counts(project_name, case):
     '''
