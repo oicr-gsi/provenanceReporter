@@ -20,7 +20,7 @@
   <div class="project_title">
     <p>{% block title %}{{ project['project_id'] }} {% endblock %}
       {% if cases %}
-        <span style="font-size:30px; font-style:normal;"> Details of the most recent call ready workflow for <span id ="count"> {{ cases|length }} </span> cases</span>
+        <span style="font-size:30px; font-style:normal;"> WGS workflow data for <span id ="count"> {{ cases|length }} </span> cases</span>
       {% else %}
         <span style="font-size:30px; font-style:normal;"> No cases to display</span>
       {% endif %}  
@@ -39,7 +39,8 @@
      <th>Cases</th>
      <th>Samples</th>
      <th>Libraries</th>     
-     <th>Worfklow id</th>
+     <th>Count of call-ready workflows</th>
+     <th>Count of downstream workflows</th>
    </thead>     
 
    {% for i in samples %}
@@ -60,7 +61,10 @@
          {% endfor %}
        </td>
        <td>
-         <a class="project_links" href="{{ url_for('wgs_case', project_name=project['project_id'], case=i)}}">{{cases[i]['wfrun_id']}}</a>
+         <a class="project_links" href="{{ url_for('wgs_case', project_name=project['project_id'], case=i)}}">{{cases[i]['bmpp'] | length}}</a>
+       </td>
+       <td>
+         <a class="project_links" href="{{ url_for('wgs_case', project_name=project['project_id'], case=i)}}">{{cases[i]['downstream'] | length}}</a>
        </td>
      </tr>
    {% endfor %}               

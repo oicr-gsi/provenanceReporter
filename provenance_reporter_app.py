@@ -217,6 +217,64 @@ def get_pipelines(project_name):
     
 
 
+# def get_call_ready_cases(data):
+#     '''
+#     (list) -> dict
+
+#     Returns a dictionary with samples and libraries and bamMergePreprocessing
+#     workflow id for each case in a project
+
+#     Parameters
+#     ----------
+#     - data (list): List of sqlite3.Row extracted from the database and sample information for bamMergePreprocessing workflow iterations
+#     '''
+    
+#     L = []
+#     for i in data:
+#         if dict(i) not in L:
+#             L.append(dict(i))
+    
+#     # group info for each case
+#     D = {}
+#     for i in L:
+#         case = i['sample']
+#         creation_date = i['creation_date']
+#         wfrun_id = i['wfrun_id']
+#         sample = '_'.join([case, i['tissue_origin'], i['tissue_type'], i['group_id']])
+#         if i['group_id']:
+#             sample = '_'.join([case, i['tissue_origin'], i['tissue_type'], i['group_id']])
+#         else:
+#             sample = '_'.join([case, i['tissue_origin'], i['tissue_type']])
+                
+#         library = i['library'] 
+#         # keep only bmpp workflows processing sequences from Novaseq instruments
+#         platform = i['platform']
+#         if 'novaseq' in platform.lower():
+#             if case in D:
+#                 # get the sample name and library name
+#                 # compare creation time and workflow run_id
+#                 if D[case]['creation_date'] < creation_date:
+#                     # update with most recent information
+#                     D[case]['samples'] = [sample]
+#                     D[case]['libraries'] = [library]
+#                     D[case]['wfrun_id'] = wfrun_id
+#                     D[case]['creation_sate'] = creation_date
+#                 elif D[case]['creation_date'] == creation_date:
+#                     if D[case]['wfrun_id'] == wfrun_id:
+#                         D[case]['samples'].append(sample)
+#                         D[case]['libraries'].append(library)
+#             else:
+#                 D[case] = {'libraries': [library],
+#                            'samples': [sample],
+#                            'wfrun_id': wfrun_id,
+#                            'creation_date': creation_date}
+#     for i in D:
+#         D[i]['libraries'] = list(set(D[i]['libraries']))
+#         D[i]['samples'] = list(set(D[i]['samples']))
+        
+#     return D
+
+
 def get_call_ready_cases(data):
     '''
     (list) -> dict
@@ -227,52 +285,44 @@ def get_call_ready_cases(data):
     Parameters
     ----------
     - data (list): List of sqlite3.Row extracted from the database and sample information for bamMergePreprocessing workflow iterations
+    - 
     '''
-    
-    L = []
+
+    cases = {}
     for i in data:
-        if dict(i) not in L:
-            L.append(dict(i))
-    
-    # group info for each case
-    D = {}
-    for i in L:
-        case = i['sample']
-        creation_date = i['creation_date']
-        wfrun_id = i['wfrun_id']
-        sample = '_'.join([case, i['tissue_origin'], i['tissue_type'], i['group_id']])
-        if i['group_id']:
-            sample = '_'.join([case, i['tissue_origin'], i['tissue_type'], i['group_id']])
-        else:
-            sample = '_'.join([case, i['tissue_origin'], i['tissue_type']])
-                
-        library = i['library'] 
-        # keep only bmpp workflows processing sequences from Novaseq instruments
-        platform = i['platform']
-        if 'novaseq' in platform.lower():
-            if case in D:
-                # get the sample name and library name
-                # compare creation time and workflow run_id
-                if D[case]['creation_date'] < creation_date:
-                    # update with most recent information
-                    D[case]['samples'] = [sample]
-                    D[case]['libraries'] = [library]
-                    D[case]['wfrun_id'] = wfrun_id
-                    D[case]['creation_sate'] = creation_date
-                elif D[case]['creation_date'] == creation_date:
-                    if D[case]['wfrun_id'] == wfrun_id:
-                        D[case]['samples'].append(sample)
-                        D[case]['libraries'].append(library)
+        # select bmpp data sequenced on novaseq
+        if 'novaseq' in i['platform'].lower():
+            if i['sample'] not in cases:
+                cases[i['sample']] = {'project': i['project_id'], 'samples': [i['ext_id'] + '_' + i['group_id']], 'libraries': [i['library']], 'bmpp': [i['wfrun_id']]}
             else:
-                D[case] = {'libraries': [library],
-                           'samples': [sample],
-                           'wfrun_id': wfrun_id,
-                           'creation_date': creation_date}
-    for i in D:
-        D[i]['libraries'] = list(set(D[i]['libraries']))
-        D[i]['samples'] = list(set(D[i]['samples']))
-        
-    return D
+                cases[i['sample']]['samples'].append(i['ext_id'] + '_' + i['group_id'])
+                cases[i['sample']]['libraries'].append(i['library'])
+                cases[i['sample']]['bmpp'].append(i['wfrun_id'])
+    for i in cases:
+        cases[i]['samples'] = list(set(cases[i]['samples']))
+        cases[i]['libraries'] = list(set(cases[i]['libraries']))
+        cases[i]['bmpp'] = list(set(cases[i]['bmpp']))
+
+    # find the bmpp downstream workflows
+    for i in cases:
+        downstream = []
+        for j in cases[i]['bmpp']:
+            d = get_children_workflows(cases[i]['project'], j)
+            # filter out QC workflows
+            d = filter_out_QC_workflows(cases[i]['project'], d)
+            # list all downstream workflows
+            downstream_wf = [k for m in d.values() for k in m]
+            downstream.extend(downstream_wf)
+            # get downstream workflows of dowmstream workflows
+            for k in downstream_wf:
+                d = get_children_workflows(cases[i]['project'], k)
+                df = [n for m in d.values() for n in m]
+                downstream.extend(df)
+        cases[i]['downstream'] = list(set(downstream)) 
+    
+    
+    return cases
+
 
 
 def get_bmpp_files(data):
@@ -698,7 +748,8 @@ def get_last_sequencing(project_name):
                 seq_dates[i] = ''
             
         seq_dates = list(set(seq_dates))
-        seq_dates.remove('')
+        if '' in seq_dates:
+            seq_dates.remove('')
         seq_dates.sort()
         seq_date = seq_dates[-1]
         seq_date = '20' + str(seq_date)[:2] + '-' + str(seq_date)[2:4] + '-' + str(seq_date)[4:]
@@ -832,6 +883,38 @@ def sequencing(project_name):
 
 
 
+# @app.route('/<project_name>/whole_genome_sequencing')
+# def whole_genome_sequencing(project_name):
+    
+#     # get the project info for project_name from db
+#     project = get_project_info(project_name)
+    
+#     # get the pipelines from the library definitions in db
+#     pipelines = get_pipelines(project_name)
+        
+#     conn = connect_to_db()
+#     #extract sample, library and workflow information for call ready workflow bamMergePreprocessing
+#     data = conn.execute("SELECT Files.creation_date, Libraries.library, Libraries.sample, \
+#                           Libraries.ext_id, Libraries.group_id, Libraries.tissue_type, \
+#                           Libraries.tissue_origin, Workflow_Inputs.run, Workflow_Inputs.lane, \
+#                           Workflow_Inputs.platform, Workflows.wf, Workflows.wfv, Workflows.wfrun_id \
+#                           from Files JOIN Libraries JOIN Workflow_Inputs JOIN Workflows \
+#                           WHERE Files.project_id = '{0}' AND Libraries.project_id = '{0}' \
+#                           AND Workflow_Inputs.project_id = '{0}' AND Workflows.project_id = '{0}' \
+#                           AND Files.wfrun_id = Workflow_Inputs.wfrun_id  AND Workflow_Inputs.wfrun_id = Workflows.wfrun_id AND Workflow_Inputs.library = Libraries.library \
+#                           AND LOWER(SUBSTR(Workflows.wf, 1, 21)) = 'bammergepreprocessing';".format(project_name)).fetchall()
+#     conn.close()
+
+#     # get samples and libraries for the most recent bmpp run for each case in project
+#     cases = get_call_ready_cases(data)
+    
+#     samples = sorted(list(cases.keys()))
+
+   
+#     return render_template('Whole_Genome_Sequencing.html', routes = routes, project=project, samples=samples, cases=cases, pipelines=pipelines)
+
+
+
 @app.route('/<project_name>/whole_genome_sequencing')
 def whole_genome_sequencing(project_name):
     
@@ -843,16 +926,46 @@ def whole_genome_sequencing(project_name):
         
     conn = connect_to_db()
     #extract sample, library and workflow information for call ready workflow bamMergePreprocessing
-    data = conn.execute("SELECT Files.creation_date, Libraries.library, Libraries.sample, \
-                          Libraries.ext_id, Libraries.group_id, Libraries.tissue_type, \
-                          Libraries.tissue_origin, Workflow_Inputs.run, Workflow_Inputs.lane, \
-                          Workflow_Inputs.platform, Workflows.wf, Workflows.wfv, Workflows.wfrun_id \
-                          from Files JOIN Libraries JOIN Workflow_Inputs JOIN Workflows \
-                          WHERE Files.project_id = '{0}' AND Libraries.project_id = '{0}' \
-                          AND Workflow_Inputs.project_id = '{0}' AND Workflows.project_id = '{0}' \
-                          AND Files.wfrun_id = Workflow_Inputs.wfrun_id  AND Workflow_Inputs.wfrun_id = Workflows.wfrun_id AND Workflow_Inputs.library = Libraries.library \
+    # data = conn.execute("SELECT Files.creation_date, Libraries.library, Libraries.sample, \
+    #                       Libraries.ext_id, Libraries.group_id, Libraries.tissue_type, \
+    #                       Libraries.tissue_origin, Workflow_Inputs.run, Workflow_Inputs.lane, \
+    #                       Workflow_Inputs.platform, Workflows.wf, Workflows.wfv, Workflows.wfrun_id \
+    #                       from Files JOIN Libraries JOIN Workflow_Inputs JOIN Workflows \
+    #                       WHERE Files.project_id = '{0}' AND Libraries.project_id = '{0}' \
+    #                       AND Workflow_Inputs.project_id = '{0}' AND Workflows.project_id = '{0}' \
+    #                       AND Files.wfrun_id = Workflow_Inputs.wfrun_id  AND Workflow_Inputs.wfrun_id = Workflows.wfrun_id AND Workflow_Inputs.library = Libraries.library \
+    #                       AND LOWER(SUBSTR(Workflows.wf, 1, 21)) = 'bammergepreprocessing';".format(project_name)).fetchall()
+   
+    
+    data = conn.execute("SELECT Libraries.library, Libraries.sample, Libraries.project_id, \
+                          Libraries.ext_id, Libraries.group_id, \
+                          Workflows.wf, Workflows.wfrun_id, Workflow_Inputs.platform \
+                          from Workflow_Inputs JOIN Libraries JOIN Workflows \
+                          WHERE Libraries.project_id = '{0}' AND Workflow_Inputs.project_id = '{0}' \
+                          AND Workflows.project_id = '{0}' AND Workflow_Inputs.wfrun_id = Workflows.wfrun_id \
+                          AND Workflow_Inputs.library = Libraries.library \
                           AND LOWER(SUBSTR(Workflows.wf, 1, 21)) = 'bammergepreprocessing';".format(project_name)).fetchall()
+ 
+    
     conn.close()
+
+    
+    # cases = {}
+    # for i in data:
+    #     if i['sample'] not in cases:
+    #         cases[i['sample']] = {'samples': [i['ext_id'] + '_' + i['group_id']], 'libraries': [i['library']], 'bmpp': [i['wfrun_id']]}
+    #     else:
+    #         cases[i['sample']]['samples'].append(i['ext_id'] + '_' + i['group_id'])
+    #         cases[i['sample']]['libraries'].append(i['library'])
+    #         cases[i['sample']]['bmpp'].append(i['wfrun_id'])
+    # for i in cases:
+    #     cases[i]['samples'] = list(set(cases[i]['samples']))
+    #     cases[i]['libraries'] = list(set(cases[i]['libraries']))
+    #     cases[i]['bmpp'] = list(set(cases[i]['bmpp']))
+
+
+
+
 
     # get samples and libraries for the most recent bmpp run for each case in project
     cases = get_call_ready_cases(data)
@@ -861,6 +974,10 @@ def whole_genome_sequencing(project_name):
 
    
     return render_template('Whole_Genome_Sequencing.html', routes = routes, project=project, samples=samples, cases=cases, pipelines=pipelines)
+
+
+
+
 
 
 
