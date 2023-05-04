@@ -1,0 +1,127 @@
+{% extends 'project_base.html' %}
+
+
+{% block link %}
+ <a href="{{ url_for('project_page', project_name=project['project_id']) }}">{{ project['project_id'] }}</a>
+ <a href="{{ url_for('sequencing', project_name=project['project_id']) }}">Sequencing</a> 
+ {% for i in pipelines %}
+   {% if i in routes %}
+     {% if i == 'Whole Genome' %}
+       <a class="selected" href="{{ url_for(routes[i], project_name=project['project_id']) }}">{{i}}</a>
+     {% endif %}   
+   {% else %}
+       <a href="#{{i}}">{{i}}</a>
+   {% endif %}  
+ {% endfor %}   
+{% endblock %}
+
+
+{% block content %}
+  <div class="project_title">
+    <p>
+      {% block title %} {{ sample_case }} {% endblock %}
+      <span style="font-size:30px; font-style:normal;"> Whole Genome Sequencing pipeline </span>
+      {% if bmpp_info %}
+        <button id="download_button"><a href="{{url_for('get_bmpp_data', project_name=project['project_id'], case=case, bmpp_id=bmpp_id)}}">Download json</a></button>
+      {% endif %}
+    </p>  
+  </div> 
+
+
+  <table id="simple_table">
+   <thead>
+     <th>BMPP workflow</th>
+     <th>Files</th>     
+     <th>Fastq release status</th>
+     <th>Samples</th>
+     <th>Tissue type</th>     
+     <th>Tissue Origin</th>
+     <th>Libraries</th>
+   </thead>     
+
+   <tr>
+     <td rowspan="{{bmpp_info|length}}">{{bmpp_id}}</td>
+     <td rowspan="{{bmpp_info|length}}"> {{bmpp_files}} </td>     
+     {% if fastq_status %}
+       <td rowspan="{{bmpp_info|length}}", style="width: 40%; padding: 3px; text-align: left"><img src="{{ url_for('static', filename='images/yes.png') }}" alt="released" title="release_status" style="padding-right: 8px; padding-left:0px; width:10; height:10"></td>     
+     {% else %}
+       <td rowspan="{{bmpp_info|length}}", style="width: 40%; padding: 3px; text-align: left"><img src="{{ url_for('static', filename='images/no.png') }}" alt="not_released" title="release_status" style="padding-right: 8px; padding-left:0px; width:10; height:10"></td>     
+     {% endif %}
+     {% for i in bmpp_info %}
+       <td>{{i.0}}</td>
+       <td>{{i.1}}</td>
+       <td>{{i.2}}</td>
+       <td>{{i.3}}</td>
+      </tr> 
+      {% endfor %}
+  </table>
+
+
+  {% if bmpp_children_workflows %}
+ 
+   <table id="simple_table">
+     <thead>
+       <th>Normal sample</th>
+       <th>Tmour sample</th>     
+       <th>mutect2</th>
+       <th>variantEffectPredictor</th>
+       <th>varscan</th>     
+       <th>sequenza</th>
+       <th>delly</th>
+       <th>mavis</th>
+     </thead>     
+
+     {% for i in bmpp_children_workflows %}
+       {% set normal,tumour = i.split(';') %}     
+     <tr>
+       <td>{{normal}}</td>
+       <td>{{tumour}}</td>
+       <td>{{ 'mutect2' | find_workflow_id(bmpp_children_workflows, i) }}</td>     
+       <td>{{ 'variantEffectPredictor' | find_workflow_id(bmpp_children_workflows, i) }}</td>
+       <td>{{ 'varscan' | find_workflow_id(bmpp_children_workflows, i) }}</td>
+       <td>{{ 'sequenza' | find_workflow_id(bmpp_children_workflows, i) }}</td>
+       <td>{{ 'delly' | find_workflow_id(bmpp_children_workflows, i) }}</td>
+       <td>{{ 'mavis' | find_workflow_id(bmpp_children_workflows, i) }}</td>
+     </tr>
+     {% endfor %}  
+   </table>
+  
+
+  <table id="simple_table">
+     <thead>
+       <th>Workflow Run id</th>
+       <th>Workflow</th>     
+       <th>Run date</th>
+       <th>Tags</th>
+       <th>Parent</th>     
+       <th>Files</th>
+     </thead>     
+
+     {% for i in bmpp_children_workflows %}
+       {% for workflow in bmpp_children_workflows[i] %}
+         <tr>
+           <td>{{bmpp_children_workflows[i][workflow]['workflow_id']}}</td>
+           <td>{{workflow}}</td>
+           <td>{{bmpp_children_workflows[i][workflow]['creation_date']}}</td>  
+           <td>{{bmpp_children_workflows[i][workflow]['attributes']}}</td>
+           <td>
+             {% for j in bmpp_children_workflows[i][workflow]['parent'] %}
+               {% for k in j %}
+                 {{k}}: {{j[k].0}}
+                 <br>
+               {% endfor %}
+             {% endfor %}
+           </td>       
+           <td>
+             {% for item in bmpp_children_workflows[i][workflow]['files'] %}
+               {{item}}
+               <br> 
+             {% endfor %}       
+           </td>
+         </tr>
+       {% endfor %}  
+     {% endfor %}  
+  </table>
+  {% endif %}
+
+{% endblock %}
