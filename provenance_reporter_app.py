@@ -241,7 +241,11 @@ def map_libraries_to_samples(project_name, sample):
    
     s = sample.split('_')
     donor = s[0] + '_' + s[1]
-    tissue_type, tissue_origin, library_type, group_id = s[2:]
+    
+    tissue_type = s[2]
+    tissue_origin = s[3]
+    library_type = s[4]
+    group_id = '_'.join(s[5:])
     conn = connect_to_db()
     data = conn.execute("SELECT Libraries.library FROM Libraries WHERE libraries.sample = '{0}' AND \
                         Libraries.group_id = '{1}' AND Libraries.tissue_type = '{2}' AND \
