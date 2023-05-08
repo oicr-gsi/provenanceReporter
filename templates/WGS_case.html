@@ -7,7 +7,7 @@
  {% for i in pipelines %}
    {% if i in routes %}
      {% if i == 'Whole Genome' %}
-       <a class="selected" href="{{ url_for(routes[i], project_name=project['project_id']) }}">{{i}}</a>
+       <a href="{{ url_for(routes[i], project_name=project['project_id']) }}">{{i}}</a>
      {% endif %}   
    {% else %}
        <a href="#{{i}}">{{i}}</a>
@@ -24,6 +24,8 @@
       <span style="font-size:30px; font-style:normal;"> Somatic callers analysis blocks </span>
     </p>  
   </div> 
+
+
 
   {% for block in blocks %}
      <p> {{ block }} </p>
@@ -47,5 +49,6 @@
       </table>
      {% endfor %}
    {% endfor %}
+
 
 {% endblock %}

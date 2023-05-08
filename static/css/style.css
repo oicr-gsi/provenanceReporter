@@ -135,7 +135,7 @@ img {
 }
 .topnav a.split {
   float: right;
-  background-color: #04AA6D;
+  background-color: #196719;
   color: white;
 }
 
@@ -315,3 +315,17 @@ img {
 .dropdown-check-list.visible .items {
   display: block;
 }
+
+.somatic_block {
+  padding: 6px;
+  font-size: 17px;
+  border: 1px solid grey;
+  width: 70%;
+  background: #f1f1f1;
+  box-sizing: border-box;
+  position:absolute
+}
+
+
+
+
