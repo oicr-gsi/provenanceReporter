@@ -13,14 +13,15 @@
        <a href="#{{i}}">{{i}}</a>
    {% endif %}  
  {% endfor %}   
+ <a class="split" href="{{ miso_link }}" target="_blank">{{ sample_case }}</a> 
+
 {% endblock %}
 
 
 {% block content %}
   <div class="project_title">
     <p>
-      {% block title %} {{ sample_case }} {% endblock %}
-      <span style="font-size:30px; font-style:normal;"> Whole Genome Sequencing pipeline </span>
+      <span style="font-size:30px; font-style:normal;"> Somatic callers analysis blocks </span>
     </p>  
   </div> 
 

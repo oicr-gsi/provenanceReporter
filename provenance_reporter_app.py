@@ -1262,79 +1262,15 @@ def wgs_case(project_name, case):
     # find the blocks by mapping the analysis workflows to ttheir parent workflows    
     blocks = find_analysis_blocks(project_name, D)
     
-    
-# WORKFLOW RUN REPORT for Project:HCCCFD
-# Pipeline:WGTS , Whole Genome and Transcriptome Pipeline
-# CallReady Aligned Whole Genome + Somatic Callers (Mutations, CopyNumber, StructuralVariants)
-# Aligned Whole Transcriptome, Gene Expression and Fusions
-
-# Case=HCCCFD_0001
-# #   BLOCK WG.1 ==========================================================================================================================================================================================
-
-# #   SAMPLES : HCCCFD_0001_Lv_M_WG_HCC-B-001-T1-R | HCCCFD_0001_Ly_R_WG_HCC-B-001-T0-R -------------------------------------------------------------------------------------------------------------------
-# #wf_run_id	n_lanes	date	workflow	limskeys	sequencing_release
-# dbb2a186618848b1588a456dd58f5109db66f5b197c98182b5c0a3990ae2ac68	6	2021-02-19	delly                                             	4991_1_LDI51430|5052_1_LDI51430|5052_2_LDI51430|5073_2_LDI57812|5073_3_LDI57812|5073_4_LDI57812	CHECK_RELEASE
-# b1600687318545828dd69374a4023dbea8c2fe10c0398d15995ed7adfa6b91d5	6	2022-06-22	varscan                                           	4991_1_LDI51430|5052_1_LDI51430|5052_2_LDI51430|5073_2_LDI57812|5073_3_LDI57812|5073_4_LDI57812	CHECK_RELEASE
-# 20422a9a77eac7dadc8162ada16754c47af807c7262968806d347a9eff969570	6	2022-06-22	sequenza                                          	4991_1_LDI51430|5052_1_LDI51430|5052_2_LDI51430|5073_2_LDI57812|5073_3_LDI57812|5073_4_LDI57812	CHECK_RELEASE
-# f38a78689191a7b4212aba0c29150e2019d70c427310f0207b34a2b14eb822b7	6	2022-10-25	mutect2_matched                                   	4991_1_LDI51430|5052_1_LDI51430|5052_2_LDI51430|5073_2_LDI57812|5073_3_LDI57812|5073_4_LDI57812	CHECK_RELEASE
-# ec198dac81aa82b2a29aa7eef1f83ea5a2a085bffe3a213a6e99f53c17279fea	6	2022-10-25	variantEffectPredictor_matched                    	4991_1_LDI51430|5052_1_LDI51430|5052_2_LDI51430|5073_2_LDI57812|5073_3_LDI57812|5073_4_LDI57812	CHECK_RELEASE
-
-# CHECK RELEASE : 5052_1_LDI51430	PENDING	HCCCFD_0001_Lv_M_WG_HCC-B-001-T1-R	210129_A00469_0148_AHLTWNDSXY_1
-# 	vidarr:research/file/b434972e8009cae8bdb0fc6a3cc2375ac27bb64958389e7a46361a4066ac8490,vidarr:research/file/5d4b40ec4c87dda4ac17c271c78091fe70c321d5d2c5e11108461a2f3df12ecc
-# CHECK RELEASE : 5052_2_LDI51430	PENDING	HCCCFD_0001_Lv_M_WG_HCC-B-001-T1-R	210129_A00469_0148_AHLTWNDSXY_2
-# 	vidarr:research/file/b809736d1769bd5f73685bd6def1c3219971e5bed09c84ce5cab273c30767880,vidarr:research/file/563969da0351c1309e2ab84d4c46664676fde73acfa3c07af05cd1685d1f0768
-
-# #   SAMPLES : HCCCFD_0001_Lv_P_WG_HCC-B-001-T0-R | HCCCFD_0001_Ly_R_WG_HCC-B-001-T0-R -------------------------------------------------------------------------------------------------------------------
-# #wf_run_id	n_lanes	date	workflow	limskeys	sequencing_release
-# d2e93f7078a267d4a0ea30e8df33f11a20bc0cf5a13b8b4a83312276dac140e9	4	2021-02-19	delly                                             	4991_1_LDI51431|5073_2_LDI57812|5073_3_LDI57812|5073_4_LDI57812	ALL_SEQUENCING_RELEASED
-# 4c133f294dbf24840d971eb5a43d3928cf250034d10c9bf7e8353f0a8015bedf	4	2022-08-27	varscan                                           	4991_1_LDI51431|5073_2_LDI57812|5073_3_LDI57812|5073_4_LDI57812	ALL_SEQUENCING_RELEASED
-# 062a7cdccc148a4b954e280c1ea61fc82a8faa3233640e2f80e203a970f7836f	4	2022-08-27	sequenza                                          	4991_1_LDI51431|5073_2_LDI57812|5073_3_LDI57812|5073_4_LDI57812	ALL_SEQUENCING_RELEASED
-# 84ee3d632a782b6e5413c285c79a99650504f5973b12e963fc0c96824b22d206	4	2022-10-25	mutect2_matched                                   	4991_1_LDI51431|5073_2_LDI57812|5073_3_LDI57812|5073_4_LDI57812	ALL_SEQUENCING_RELEASED
-# c8ba23bfb2f06fdcc86737fad9fa6b8c44adbcb8ed3c77875a02baa5ecb90331	4	2022-10-25	variantEffectPredictor_matched                    	4991_1_LDI51431|5073_2_LDI57812|5073_3_LDI57812|5073_4_LDI57812	ALL_SEQUENCING_RELEASED
-
-
-# #   SAMPLES : HCCCFD_0001_Lv_M_WG_HCC-B-001-T1-R | HCCCFD_0001_Lv_P_WG_HCC-B-001-T0-R | HCCCFD_0001_Ly_R_WG_HCC-B-001-T0-R ------------------------------------------------------------------------------
-# #wf_run_id	n_lanes	date	workflow	limskeys	sequencing_release
-# c7a53f4be757568cf840eec1b59096618c591dd8bb413e6c2cfad555f7198d5d	7	2021-02-18	bamMergePreprocessing                             	4991_1_LDI51430|4991_1_LDI51431|5052_1_LDI51430|5052_2_LDI51430|5073_2_LDI57812|5073_3_LDI57812|5073_4_LDI57812	CHECK_RELEASE
-
-# CHECK RELEASE : 5052_1_LDI51430	PENDING	HCCCFD_0001_Lv_M_WG_HCC-B-001-T1-R	210129_A00469_0148_AHLTWNDSXY_1
-# 	vidarr:research/file/b434972e8009cae8bdb0fc6a3cc2375ac27bb64958389e7a46361a4066ac8490,vidarr:research/file/5d4b40ec4c87dda4ac17c271c78091fe70c321d5d2c5e11108461a2f3df12ecc
-# CHECK RELEASE : 5052_2_LDI51430	PENDING	HCCCFD_0001_Lv_M_WG_HCC-B-001-T1-R	210129_A00469_0148_AHLTWNDSXY_2
-# 	vidarr:research/file/b809736d1769bd5f73685bd6def1c3219971e5bed09c84ce5cab273c30767880,vidarr:research/file/563969da0351c1309e2ab84d4c46664676fde73acfa3c07af05cd1685d1f0768
-
-    
-    
-    
-    
-    
-    
-    
-    
-
-
-# v. review input files from any Somatic Calling workflows runs. (F1 workflows)This currently includes
-
-# mutect2 workflow runs
-# varscan workflow runs
-# delly workflow runs
-# this should be flexible to allow additional F1 workflows
-# vi. any F1 wfrun that has both the T and N bam file ids as an input should be shown in the block as a child
-
-# vii. review Parents from all F2 run. These are workflows that follow F1 workflows, and currently include
-
-# vep workflow runs (from mutect2)
-# sequenza workflow runs (from varscan)
-# mavis workflow runs (from delly)
-# viii. any F2 wfrun that has the F1 workflow run as a parent shold be sown i the bloack as a child of the F1 run
-
-
-
-
-    
+    conn = connect_to_db()
+    data = conn.execute("SELECT miso FROM Samples WHERE project_id = '{0}' AND case_id = '{1}';".format(project_name, case)).fetchall()
+    data = list(set(data))
+    assert len(data) == 1
+    miso_link = data[0]['miso']
     
     return render_template('WGS_case.html', routes = routes, blocks=blocks,
                             sample_case=case, project=project, pipelines=pipelines,
-                            case=case)
+                            case=case, miso_link=miso_link)
 
 
 
