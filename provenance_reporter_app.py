@@ -506,15 +506,19 @@ def get_pipelines(project_name):
 #     return D
 
 
-def get_call_ready_cases(project_name):
+def get_call_ready_cases(project_name, platform, library_type):
     '''
-    (str) -> dict
+    (str, str, str) -> dict
 
-    Returns a dictionary with samples and libraries and bmpp and downstream workflow ids for each case in a project
+    Returns a dictionary with samples and libraries and bmpp and downstream workflow ids for each case in a project,
+    restricting data to specified platform and library type
 
     Parameters
     ----------
     - project_name (str): Name of the project
+    - platform (str): Name of sequencing platform.
+                      Accepted values: novaseq, nextseq, hiseq, miseq
+    - library_type (str): 2 letters-code indicating the type of library                   
     '''
 
     # get all the samples for project name 
@@ -525,13 +529,13 @@ def get_call_ready_cases(project_name):
                           from Workflow_Inputs JOIN Libraries JOIN Workflows \
                           WHERE Libraries.project_id = '{0}' AND Workflow_Inputs.project_id = '{0}' \
                           AND Workflows.project_id = '{0}' AND Workflow_Inputs.wfrun_id = Workflows.wfrun_id \
-                          AND Workflow_Inputs.library = Libraries.library;".format(project_name)).fetchall()
+                          AND Workflow_Inputs.library = Libraries.library AND Libraries.library_type = '{1}';".format(project_name, library_type)).fetchall()
     conn.close()
     
     cases = {}
     for i in data:
         # select bmpp data sequenced on novaseq
-        if 'novaseq' in i['platform'].lower():
+        if platform in i['platform'].lower():
             if i['sample'] not in cases:
                 cases[i['sample']] = {'project': i['project_id'], 'samples': [], 'libraries': [], 'bmpp': []}
             cases[i['sample']]['samples'].append(i['ext_id'] + '_' + i['group_id'])
@@ -1179,7 +1183,7 @@ def whole_genome_sequencing(project_name):
     # conn.close()
 
     # get samples and libraries and workflow ids for each case
-    cases = get_call_ready_cases(project_name)
+    cases = get_call_ready_cases(project_name, 'novaseq', 'WG')
     samples = sorted(list(cases.keys()))
 
    
