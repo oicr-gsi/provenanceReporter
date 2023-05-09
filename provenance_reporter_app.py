@@ -525,6 +525,7 @@ def get_call_ready_cases(project_name, platform, library_type):
     conn = connect_to_db()
     data = conn.execute("SELECT Libraries.library, Libraries.sample, Libraries.project_id, \
                           Libraries.ext_id, Libraries.group_id, Libraries.library_type, \
+                          Libraries.tissue_type, Libraries.tissue_origin, \
                           Workflows.wf, Workflows.wfrun_id, Workflow_Inputs.platform \
                           from Workflow_Inputs JOIN Libraries JOIN Workflows \
                           WHERE Libraries.project_id = '{0}' AND Workflow_Inputs.project_id = '{0}' \
@@ -538,7 +539,10 @@ def get_call_ready_cases(project_name, platform, library_type):
         if platform in i['platform'].lower():
             if i['sample'] not in cases:
                 cases[i['sample']] = {'project': i['project_id'], 'samples': [], 'libraries': [], 'bmpp': []}
-            cases[i['sample']]['samples'].append(i['ext_id'] + '_' + i['group_id'])
+            
+            sample = '_'.join([i['sample'], i['tissue_type'], i['tissue_origin'], i['library_type'], i['group_id']]) 
+            cases[i['sample']]['samples'].append(sample)
+                       
             cases[i['sample']]['libraries'].append(i['library'])
             if 'bammergepreprocessing' in i['wf'].lower():
                 cases[i['sample']]['bmpp'].append(i['wfrun_id'])
