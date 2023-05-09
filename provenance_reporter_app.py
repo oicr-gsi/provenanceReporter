@@ -187,7 +187,8 @@ def get_bmpp_samples(project_name, bmpp_run_id):
         else:
             tissue = 'tumour'
         sample = '_'.join([i['sample'], i['tissue_type'], i['tissue_origin'], i['library_type'], i['group_id']]) 
-        samples[tissue].append(sample)
+        if sample not in samples[tissue]:
+            samples[tissue].append(sample)
 
     return samples
 
@@ -201,7 +202,11 @@ def get_case_bmpp_samples(project_name, bmpp_ids):
     '''
     
     
-    L = [get_bmpp_samples(project_name, i) for i in bmpp_ids]
+    L = []
+    for i in bmpp_ids:
+        samples = get_bmpp_samples(project_name, i)
+        if samples not in L:
+            L.append(samples)    
     D = {'normal': [], 'tumour': []}
     for d in L:
         D['normal'].extend(d['normal'])
