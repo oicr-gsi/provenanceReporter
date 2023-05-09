@@ -561,6 +561,8 @@ def get_call_ready_cases(project_name, platform, library_type):
             # get downstream workflows of dowmstream workflows
             for k in downstream_wf:
                 d = get_children_workflows(cases[i]['project'], k)
+                # filter out QC workflows
+                d = filter_out_QC_workflows(cases[i]['project'], d)
                 df = [n for m in d.values() for n in m]
                 downstream.extend(df)
         cases[i]['downstream'] = list(set(downstream)) 
