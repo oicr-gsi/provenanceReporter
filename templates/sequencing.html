@@ -24,8 +24,37 @@
         <span style="font-size:30px; font-style:normal;"> No sequence information to display</span>
       {% endif %}  
     </p>   
-    
-</div> 
+  </div> 
+
+      
+
+
+
+<div class="dropdown">
+  <button class="dropbtn">Select Platform</button>
+  <div class="dropdown-content">
+           
+      <input type="checkbox" id="platform" name="novaseq" value="novaseq" onchange="checkPlatform()" CHECKED>
+      <label for="novaseq"> NovaSeq</label><br>
+      <input type="checkbox" id="platform" name="hiseq" value="hiseq" CHECKED>
+      <label for="hiseq"> HiSeq</label><br>
+      <input type="checkbox" id="platform" name="miseq" value= "miseq" CHECKED>
+      <label for="miseq"> MiSeq</label><br><br>
+      <input type="submit" value="Submit">
+      
+  </div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
 
   {% if sequences %}
   
@@ -71,6 +100,12 @@
    {% endfor %}               
    </table>
 
+
+<footer>
+<p style="margin-left:auto;margin-right:auto; margin-top:150px; padding-bottom:0px;max-width:300px;position:relative;font-size:16px; font-style:normal; font-family: Arial, Helvetica, sans-serif; color: #A8A8A8;"> Data last updated {{project['last_updated'].split('_')[0]}} </p>
+</footer>
+
+
   
    <script>
    function searchFunction() {
@@ -94,6 +129,37 @@
     }
    document.getElementById("count").innerHTML = rowCount
    }
+
+
+   function checkPlatform(){
+    var input, filter, checkbox, table, tr, td, i, textValue;
+    var rowCount = 0
+    checkbox = document.getElementById('platform');
+    filter = checkbox.value.toUpperCase()
+    input = document.getElementById("platform");
+
+    table = document.getElementById("project_table");
+    tr = table.getElementsByTagName("tr");         
+    for (i = 1; i < tr.length; i++) {
+    td= tr[i];
+     if (td) {
+       txtValue = td.textContent || td.innerText;
+       if (checkbox.checked != false) {
+	    alert("Checkbox checked")
+            tr[i].style.display = "";
+            rowCount++;                   
+            
+
+    }else{
+	    alert("Not Checked")
+            tr[i].style.display = "none";
+    }
+  document.getElementById("count").innerHTML = rowCount
+  
+}
+}
+
+
   </script>
 
   {% endif %}
