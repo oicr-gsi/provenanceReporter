@@ -26,8 +26,8 @@
   </div> 
 
 
-<div class="somatic_block">
   {% for block in blocks %}
+     <div class="somatic_block">
      <p> {{ block }} </p>
      {% for sample in blocks[block] %}
        <p> {{ sample }} </p>
@@ -59,8 +59,10 @@
        {% endfor %}
        </table>
      {% endfor %}  
+     </div>
+     <br>
   {% endfor %}
-</div>
+
 
 
 
