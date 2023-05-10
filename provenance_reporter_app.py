@@ -341,7 +341,7 @@ def map_workflows_to_sample_pairs(project_name, platform, pairs):
 
 
 
-def map_workflows_to_parent(D):
+def map_workflows_to_parent(project_name, D):
     '''
     
     
@@ -349,8 +349,6 @@ def map_workflows_to_parent(D):
     
     parent_workflows = {}
     
-
-
     for samples in D:
         for j in D[samples]:
             parent = get_parent_workflows(project_name, j['wfrun_id'])
@@ -373,7 +371,7 @@ def find_analysis_blocks(project_name, D):
 
 
     # map each workflow to its parent(s)
-    parent_workflows = map_workflows_to_parent(D)
+    parent_workflows = map_workflows_to_parent(project_name, D)
     
     # sort bmpp-dowsntream workflows by block and sample     
     for samples in D:
