@@ -341,7 +341,25 @@ def map_workflows_to_sample_pairs(project_name, platform, pairs):
 
 
 
+def map_workflows_to_parent(D):
+    '''
+    
+    
+    '''
+    
+    parent_workflows = {}
+    
 
+
+    for samples in D:
+        for j in D[samples]:
+            parent = get_parent_workflows(project_name, j['wfrun_id'])
+            if j['wfrun_id'] not in parent_workflows:
+                parent_workflows[j['wfrun_id']] = []
+            for k in parent:
+                parent_workflows[j['wfrun_id']].extend(parent[k])
+
+    return parent_workflows
 
 
 
@@ -352,7 +370,12 @@ def find_analysis_blocks(project_name, D):
     '''
     
     blocks = {}
+
+
+    # map each workflow to its parent(s)
+    parent_workflows = map_workflows_to_parent(D)
     
+    # sort bmpp-dowsntream workflows by block and sample     
     for samples in D:
         for j in D[samples]:
             if 'mutect2' in j['wf'].lower() or 'varscan' in j['wf'].lower() or 'delly' in j['wf'].lower():
@@ -365,21 +388,24 @@ def find_analysis_blocks(project_name, D):
                     blocks[parent_workflow] = {}
                 if samples not in blocks[parent_workflow]:
                     blocks[parent_workflow][samples] = []
-                blocks[parent_workflow][samples].append(j)
-    
-    for i in blocks:
-        for samples in blocks[i]:
+                wfrunid = j['wfrun_id']
+                d = {wfrunid: {'parent': j, 'children': []}}
+                #blocks[parent_workflow][samples].append(j)
+                blocks[parent_workflow][samples].append(d)
+        
+    # sort workflows downstream of callers by block and sample, 
+    # keeping track of workflow aprent-child relationshsips    
+    for block in blocks:
+        for samples in D:
             for j in D[samples]:
                 if 'sequenza' in j['wf'].lower() or 'mavis' in j['wf'].lower() or 'varianteffectpredictor' in j['wf'].lower():
-                    parent = get_parent_workflows(project_name, j['wfrun_id'])
-                    parents = []
-                    for k in parent.values():
-                        parents.extend(k)
-                    for k in parents:
-                        for d in blocks[i][samples]:
-                            if k == d['wfrun_id']:
-                                blocks[i][samples].append(j)
-                                
+                    #parent = get_parent_workflows(project_name, j['wfrun_id'])
+                    upstream = parent_workflows[j['wfrun_id']]
+                    if samples in blocks[block]:
+                        for k in blocks[block][samples]:
+                            for m in upstream:
+                                if m in k:
+                                    k[m]['children'].append(j)
     return blocks                
                     
 
