@@ -39,16 +39,31 @@
            <th>platform</th>
            </thead>     
        
-       {% for i in blocks[block][sample] %}
-         <tr>
-           <td>{{i['wfrun_id']}}</td>
-           <td>{{i['wf']}}</td>
-           <td>{{ i['platform']}}</td>     
-         </tr>
-      {% endfor %}  
-      </table>
-     {% endfor %}
-   {% endfor %}
+       {% for d in blocks[block][sample] %}
+         {% for workflow in d %}
+           <tr>
+             <td>{{d[workflow]['parent']['wfrun_id']}}</td>
+             <td>{{d[workflow]['parent']['wf']}}</td>
+             <td>{{d[workflow]['parent']['platform']}}</td>     
+           </tr>
+           {% if d[workflow]['children'] %}
+             {% for k in d[workflow]['children'] %}
+               <tr>
+                 <td>{{k['wfrun_id']}}</td>
+                 <td>{{k['wf']}}</td>
+                 <td>{{k['platform']}}</td>
+               </tr>     
+             {% endfor %}         
+           {% endif %}
+         {% endfor %}    
+       {% endfor %}
+       </table>
+     {% endfor %}  
+  {% endfor %}
 </div>
 
+
+
 {% endblock %}
+
+
