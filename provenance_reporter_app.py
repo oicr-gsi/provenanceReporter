@@ -405,6 +405,33 @@ def find_analysis_blocks(project_name, D):
                                 if m in k:
                                     k[m]['children'].append(j)
     return blocks                
+
+
+def name_WGS_blocks(blocks):
+    '''
+    
+    
+    '''
+    counter = 1
+    L = list(blocks.keys())
+    names = []
+    for i in L:
+        k = 'WGS Analysis Block {0}'.format(counter)
+        names.append([i, k])
+        counter += 1
+    return names
+    
+    
+
+
+
+
+
+
+
+
+
+
                     
 
 def get_library_design(library_source):
@@ -1301,6 +1328,10 @@ def wgs_case(project_name, case):
     # find the blocks by mapping the analysis workflows to ttheir parent workflows    
     blocks = find_analysis_blocks(project_name, D)
     
+    # name each block
+    names = name_WGS_blocks(blocks)
+    
+    
     conn = connect_to_db()
     data = conn.execute("SELECT miso FROM Samples WHERE project_id = '{0}' AND case_id = '{1}';".format(project_name, case)).fetchall()
     data = list(set(data))
@@ -1309,7 +1340,7 @@ def wgs_case(project_name, case):
     
     return render_template('WGS_case.html', routes = routes, blocks=blocks,
                             sample_case=case, project=project, pipelines=pipelines,
-                            case=case, miso_link=miso_link)
+                            case=case, miso_link=miso_link, names=names)
 
 
 

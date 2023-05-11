@@ -26,10 +26,11 @@
   </div> 
 
 
-  {% for block in blocks %}
+  {% for block in names %}
      <div class="somatic_block">
-     <p> {{ block }} </p>
-     {% for sample in blocks[block] %}
+     <p> {{ block.1 }} </p>
+     <p> {{ block.0 }} </p>
+     {% for sample in blocks[block.0] %}
        <p> {{ sample }} </p>
        
        <table id="simple_table">
@@ -39,7 +40,7 @@
            <th>platform</th>
            </thead>     
        
-       {% for d in blocks[block][sample] %}
+       {% for d in blocks[block.0][sample] %}
          {% for workflow in d %}
            <tr>
              <td>{{d[workflow]['parent']['wfrun_id']}}</td>
