@@ -16,6 +16,10 @@ import time
 import pandas as pd
 import itertools
 
+import matplotlib.pyplot as plt
+import networkx as nx
+import numpy as np
+
 
 
 def connect_to_db():
@@ -405,6 +409,77 @@ def find_analysis_blocks(project_name, D):
                                 if m in k:
                                     k[m]['children'].append(j)
     return blocks                
+
+
+
+def make_adjacency_matrix(project_name, blocks, D):
+    '''
+    
+    
+    
+    '''
+    
+    parent_workflows = map_workflows_to_parent(project_name, D)
+    
+    # list all workflows downstream of each bmpp
+    W = {}
+    for block in blocks:
+        L = []
+        for sample in blocks[block]:
+            for d in blocks[block][sample]:
+                for workflow in d:
+                    L.append(d[workflow]['parent']['wfrun_id'])
+                    for k in d[workflow]['children']:
+                        L.append(k['wfrun_id'])
+        L.extend(block.split('.'))
+        L = sorted(list(set(L)))            
+        W[block] = L
+    
+       
+    matrix = {}
+    for block in W:
+        M = []
+        for i in W[block]:
+            m = []
+            for j in W[block]:
+                if i == j:
+                    m.append(0)
+                elif i in parent_workflows:
+                    if j in parent_workflows[i]:
+                        m.append(1)
+                    else:
+                        m.append(0)
+                elif i not in parent_workflows:
+                    if i in parent_workflows[j]:
+                        m.append(1)
+                    else:
+                        m.append(0)
+                    
+            M.append(m)
+    
+        matrix[block] = M
+
+    return matrix
+
+
+
+
+
+
+def show_graph_with_labels(adjacency_matrix, mylabels):
+    rows, cols = np.where(adjacency_matrix == 1)
+    edges = zip(rows.tolist(), cols.tolist())
+    gr = nx.Graph()
+    gr.add_edges_from(edges)
+    #nx.draw(gr, node_size=500, labels=mylabels, with_labels=True)
+    nx.draw(gr, node_size=500, with_labels=False)
+    
+    plt.show()
+
+
+
+
+
 
 
 def name_WGS_blocks(blocks):
