@@ -415,14 +415,27 @@ def find_analysis_blocks(project_name, D):
 
 
 
-def make_adjacency_matrix(project_name, blocks, D):
+def get_workflow_name(wfrun_id):
     '''
     
     
     
     '''
     
-    parent_workflows = map_workflows_to_parent(project_name, D)
+    
+    
+    conn = connect_to_db()    
+    data = conn.execute("SELECT Workflows.wf FROM Workflows WHERE Workflows.wfrun_id='{0}'".format(wfrun_id)).fetchall()
+    conn.close()   
+    data = list(set(data))
+
+    assert len(data) == 1
+    return data[0]['wf']
+
+    
+
+def list_block_workflows(blocks):
+    
     
     # list all workflows downstream of each bmpp
     W = {}
@@ -438,13 +451,26 @@ def make_adjacency_matrix(project_name, blocks, D):
         L = sorted(list(set(L)))            
         W[block] = L
     
+    return W
+ 
+
+def make_adjacency_matrix(blocks, block_workflows, parent_workflows):
+    '''
+    
+    
+    
+    '''
+    
+    
+    
+    
        
     matrix = {}
-    for block in W:
+    for block in block_workflows:
         M = []
-        for i in W[block]:
+        for i in block_workflows[block]:
             m = []
-            for j in W[block]:
+            for j in block_workflows[block]:
                 if i == j:
                     m.append(0)
                 elif i in parent_workflows:
@@ -472,7 +498,7 @@ def make_adjacency_matrix(project_name, blocks, D):
 def show_graph(adjacency_matrix, mylabels):
 
     figure = plt.figure()
-    #figure.set_size_inches(W, H)
+    #figure.set_size_inches(2.5, 2)
 
     # add a plot to figure (N row, N column, plot N)
     ax = figure.add_subplot(1, 1, 1)
@@ -484,9 +510,24 @@ def show_graph(adjacency_matrix, mylabels):
     edges = zip(rows.tolist(), cols.tolist())
     gr = nx.Graph()
     gr.add_edges_from(edges)
+    
     #nx.draw(gr, node_size=500, labels=mylabels, with_labels=True)
-    nx.draw(gr, node_size=500, with_labels=False)
-
+    
+    nodes = list(gr)
+    N = {}
+    for i in nodes:
+        N[i] = mylabels[i]
+    
+    
+    
+    
+    
+    
+    
+    if mylabels:
+        nx.draw(gr, node_size=500, with_labels=True, labels=N, linewidths=1.5)
+    else:
+        nx.draw(gr, node_size=500, with_labels=False, linewidths=1.5)
 
     # write title
     #ax.set_title(title, size = 14)
@@ -556,17 +597,30 @@ def convert_figure_to_base64(figure):
    
     return my_base64_jpgData
 
-def plot_workflow_network(matrix, labels= None):
+
+def get_node_labels(block_workflows):
+    
+    
+    # get the workflow names
+    workflow_names = {}
+    for block in block_workflows:
+        workflow_names[block] = [get_workflow_name(i) for i in block_workflows[block]]
+    return workflow_names
+
+
+def plot_workflow_network(matrix, labels):
     '''
     
     
     '''
     
+    
+        
     F = {}
     # convert to numpy 2-D array
     for block in matrix:
         matrix[block] = np.array(matrix[block])
-        figure = show_graph(matrix[block], mylabels=labels)   
+        figure = show_graph(matrix[block], mylabels=labels[block])   
         F[block] = figure
    
         # convert to base64
@@ -1512,11 +1566,20 @@ def wgs_case(project_name, case):
     # name each block
     names = name_WGS_blocks(blocks)
     
-    # convert workflow relationships to adjacency matrix for each block
-    matrix = make_adjacency_matrix(project_name, blocks, D)
+    # get the parent workflows for each block
+    parent_workflows = map_workflows_to_parent(project_name, D)
+    
+    # list all workflows for each block
+    block_workflows = list_block_workflows(blocks)
+    
+    # get the workflow names
+    workflow_names = get_node_labels(block_workflows)
         
+    # convert workflow relationships to adjacency matrix for each block
+    matrix = make_adjacency_matrix(blocks, block_workflows, parent_workflows)
+                                   
     # create figures
-    figures = plot_workflow_network(matrix, labels= None)
+    figures = plot_workflow_network(matrix, workflow_names)
     
     
     
