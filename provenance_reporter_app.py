@@ -16,10 +16,13 @@ import time
 import pandas as pd
 import itertools
 
+import matplotlib
+matplotlib.use('agg')
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
-
+import io
+import base64
 
 
 def connect_to_db():
@@ -466,18 +469,121 @@ def make_adjacency_matrix(project_name, blocks, D):
 
 
 
-def show_graph_with_labels(adjacency_matrix, mylabels):
+def show_graph(adjacency_matrix, mylabels):
+
+    figure = plt.figure()
+    #figure.set_size_inches(W, H)
+
+    # add a plot to figure (N row, N column, plot N)
+    ax = figure.add_subplot(1, 1, 1)
+
+
+
+    
     rows, cols = np.where(adjacency_matrix == 1)
     edges = zip(rows.tolist(), cols.tolist())
     gr = nx.Graph()
     gr.add_edges_from(edges)
     #nx.draw(gr, node_size=500, labels=mylabels, with_labels=True)
     nx.draw(gr, node_size=500, with_labels=False)
+
+
+    # write title
+    #ax.set_title(title, size = 14)
+        
+    # # add space between axis and tick labels
+    # ax.yaxis.labelpad = 18
+    # ax.xaxis.labelpad = 18
     
-    plt.show()
+    # # do not show lines around figure  
+    # ax.spines["top"].set_visible(False)    
+    # ax.spines["bottom"].set_visible(False)    
+    # ax.spines["right"].set_visible(False)    
+    # ax.spines["left"].set_visible(False)  
+    
+    # # do not show ticks
+    # plt.tick_params(axis='both', which='both', bottom=False, top=False,
+    #                 right=False, left=False, labelleft=False, labelbottom=False,
+    #                 labelright=False, colors = 'black', labelsize = 12, direction = 'out')  
+    
+    # # set up same network layout for all drawings
+    # Pos = nx.spring_layout(G)
+    # # draw edges    
+    # nx.draw_networkx_edges(gr, pos=1, width=0.7, edge_color='grey', style='solid',
+    #                         alpha=0.4, ax=ax, arrows=False, node_size=5,
+    #                         nodelist=AllNodes, node_shape='o')
+    
+    #nx.draw_networkx_edges(gr, pos=nx.spring_layout(gr), width=0.7, edge_color='grey', style='solid',
+    #                        alpha=0.4, ax=ax, arrows=False, node_size=5,
+    #                        node_shape='o')
+    
+    # draw all nodes, color according to degree
+    # nodelist = sorted(degree.keys())
+    # node_color = [degree[i] for i in nodelist]
+    
+   
+    # nodes = nx.draw_networkx_nodes(G, pos=Pos, with_labels=False, node_size=5,
+    #                                node_color=node_color, node_shape='o', alpha=0.3,
+    #                                linewidths=0, edgecolors='grey', ax=None,
+    #                                nodelist=nodelist, cmap=cmap)
+    # nodes.set_clim(min(node_color), max(node_color)+1) 
+
+    # # add discrete color bar for node degree
+    # divider = make_axes_locatable(ax)
+    # cax = divider.append_axes("bottom", size="5%", pad=0.05)
+    
+
+    # save figure    
+    plt.tight_layout()
+    #figure.savefig(Outputfile, bbox_inches = 'tight')
+    plt.close()
+
+    return figure
 
 
 
+def convert_figure_to_base64(figure):
+    
+    pass
+
+    my_stringIObytes = io.BytesIO()
+    #plt.savefig(my_stringIObytes, format='jpg')
+    figure.savefig(my_stringIObytes, format='png')
+    
+    my_stringIObytes.seek(0)
+    my_base64_jpgData = base64.b64encode(my_stringIObytes.read()).decode('utf-8')
+    #my_base64_jpgData = base64.b64encode(my_stringIObytes.read())
+   
+    return my_base64_jpgData
+
+def plot_workflow_network(matrix, labels= None):
+    '''
+    
+    
+    '''
+    
+    F = {}
+    # convert to numpy 2-D array
+    for block in matrix:
+        matrix[block] = np.array(matrix[block])
+        figure = show_graph(matrix[block], mylabels=labels)   
+        F[block] = figure
+   
+        # convert to base64
+        F[block] = convert_figure_to_base64(figure)
+   
+    return F
+  
+    
+  
+    
+  
+    
+  
+    
+  
+    
+    
 
 
 
@@ -1406,6 +1512,14 @@ def wgs_case(project_name, case):
     # name each block
     names = name_WGS_blocks(blocks)
     
+    # convert workflow relationships to adjacency matrix for each block
+    matrix = make_adjacency_matrix(project_name, blocks, D)
+        
+    # create figures
+    figures = plot_workflow_network(matrix, labels= None)
+    
+    
+    
     
     conn = connect_to_db()
     data = conn.execute("SELECT miso FROM Samples WHERE project_id = '{0}' AND case_id = '{1}';".format(project_name, case)).fetchall()
@@ -1415,7 +1529,7 @@ def wgs_case(project_name, case):
     
     return render_template('WGS_case.html', routes = routes, blocks=blocks,
                             sample_case=case, project=project, pipelines=pipelines,
-                            case=case, miso_link=miso_link, names=names)
+                            case=case, miso_link=miso_link, names=names, figures=figures)
 
 
 
