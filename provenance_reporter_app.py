@@ -509,6 +509,7 @@ def show_graph(adjacency_matrix, mylabels):
     rows, cols = np.where(adjacency_matrix == 1)
     edges = zip(rows.tolist(), cols.tolist())
     gr = nx.Graph()
+    
     gr.add_edges_from(edges)
     
     #nx.draw(gr, node_size=500, labels=mylabels, with_labels=True)
@@ -605,7 +606,20 @@ def get_node_labels(block_workflows):
     workflow_names = {}
     for block in block_workflows:
         workflow_names[block] = [get_workflow_name(i) for i in block_workflows[block]]
-    return workflow_names
+    
+    # rename labels
+    labels = {}
+    for block in workflow_names:
+        labels[block] = []
+        for workflow in workflow_names[block]:
+            workflow = workflow.split('_')[0]
+            if workflow.lower() == 'varianteffectpredictor':
+                workflow = 'VEP'
+            elif workflow.lower() == 'bammergepreprocessing':
+                workflow = 'bmpp'
+            labels[block].append(workflow)
+       
+    return labels
 
 
 def plot_workflow_network(matrix, labels):
