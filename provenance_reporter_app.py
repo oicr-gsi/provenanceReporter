@@ -1749,6 +1749,6 @@ def download_identifiers_table(project_name):
     return send_file(outputfile, as_attachment=True)
 
 
-# if __name__ == "__main__":
-#     app.run(host='0.0.0.0')
+if __name__ == "__main__":
+    app.run(host='0.0.0.0')
     
