@@ -21,21 +21,58 @@
 {% block content %}
   <div class="project_title">
     <p>
-      <span style="font-size:30px; font-style:normal;"> Somatic callers analysis blocks </span>
-    </p>  
+     <span style="font-size:30px; font-style:normal;"> Somatic callers analysis blocks </span>
+     <span> add a short description </span>
+   </p>  
   </div> 
-
 
   {% for block in names %}
      <div class="somatic_block">
-     <p> {{ block.1 }} </p>
-     <p> {{ block.0 }} </p>
+
+      <table id="block_header_table">
+        
+        <tr>
+          <td><span style="font-size:22px; font-style:bold;">{{ block.1 }}</span></td>
+          <td>Date: TBD</td>
+          <td>Complete: TBD</td>
+          <td>Release Status: TBD</td>
+          <td>Download: TBD</td>
+        </tr>
+      </table>
+
+     <p style="font-size:22px; font-style:bold;"> Call-ready workflows </p>     
+
+       <table id="block_table">
+         <thead>
+          <th>workflow_run_id</th>
+          <th>workflow</th>     
+          <th>samples</th>
+        </thead>     
+        
+        {% for bmpp_run in samples_bmpp[block.0] %}
+          <tr>
+            <td>{{bmpp_run}}</td>
+            <td>{{samples_bmpp[block.0][bmpp_run]['name']}}</td>
+            <td>
+              {% for i in samples_bmpp[block.0][bmpp_run]['samples']['normal'] %}
+                {{i}}
+              {% endfor %}
+              {% for i in samples_bmpp[block.0][bmpp_run]['samples']['tumour'] %}
+                {{i}} 
+              {% endfor %}
+            </td>
+          </tr>
+         {% endfor %}
+       </table>
+     
+     <p style="font-size:22px; font-style:bold;"> Caller workflows </p>
+
      {% for sample in blocks[block.0] %}
-       <p> {{ sample }} </p>
+       <p style="font-size:20px; font-style:bold;"> Samples: {{ sample }} </p>
        
-       <table id="simple_table">
+       <table id="block_table">
           <thead>
-           <th>workflow_run_if</th>
+           <th>workflow_run_id</th>
            <th>workflow</th>     
            <th>platform</th>
            </thead>     
@@ -60,23 +97,12 @@
        {% endfor %}
        </table>
      {% endfor %}  
-        
-     
 
-     <p> Workflow relationships: </p>
+     <p style="font-size:22px; font-style:bold;"> Workflow relationships: </p>
      <img src="data:image/png;base64,{{figures[block.0]}}" alt="workflow_network" title="workflows" style="padding-right: 8px; padding-left:8px; width:25%; height:25%"/>
-
-
-
      </div>
      <br>
-  
-
   {% endfor %}
-
-
-
-
 {% endblock %}
 
 

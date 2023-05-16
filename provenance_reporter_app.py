@@ -201,6 +201,49 @@ def get_bmpp_samples(project_name, bmpp_run_id):
 
 
 
+
+def sort_bmpp_samples(project_name, blocks):
+    
+    D = {}
+
+    for block in blocks:
+        bmpp_ids = block.split('.')
+        for i in bmpp_ids:
+            if block not in D:
+                D[block] = {}
+            D[block][i] = {'samples': get_bmpp_samples(project_name, i), 'name': get_workflow_name(i)}
+            
+    
+    return D
+
+
+
+
+
+# {'cc96bbe2e51b69bd0ad4f7acc00c2e8b19573bc539722455739b53a9bd1c770d': {'HCCCFD_0018_P_Lv_WG_HCC-B-076-T0-R | HCCCFD_0018_R_Ly_WG_HCC-B-076-T0-B-DNA': [{'7706f783541e948f07f84fd4549d62249003445113e8a157c096964424d6db07': {'parent': <sqlite3.Row at 0x1f5b062a410>,
+#      'children': [<sqlite3.Row at 0x1f5b062a330>]}},
+#    {'d0f18fc204a779a2f878264cfbf6950e43bccbc3135e2c93db7bc57ac74a7744': {'parent': <sqlite3.Row at 0x1f5b062a450>,
+#      'children': [<sqlite3.Row at 0x1f5b062a0d0>,
+#       <sqlite3.Row at 0x1f5b062a4d0>]}},
+#    {'1c0786c6f93b759372e68fa70d6e4669f1cf2e59fbd31d2e2aaec23296ec808f': {'parent': <sqlite3.Row at 0x1f5b062a1f0>,
+#      'children': [<sqlite3.Row at 0x1f5b062a510>]}}]},
+#  'a1ee7251539986b51a399acd7c94ca575342db213bf17117204891beafa79556': {'HCCCFD_0018_P_Lv_WG_HCC-B-076-T0-R | HCCCFD_0018_R_Ly_WG_HCC-B-076-T0-B-DNA': [{'b74bfd0f8bf863e2504be45202fdfde59aca4d2c8c2da2ad5c376419c984518d': {'parent': <sqlite3.Row at 0x1f5b062a4f0>,
+#      'children': []}},
+#    {'59c9f7e6db3f4dfb7e2f29704b13292d3cf7fcd61f0e23bcfe3ae52815343378': {'parent': <sqlite3.Row at 0x1f5b062a430>,
+#      'children': []}},
+#    {'2a928e16f9d2d73edc159e518bbcf159c943a1ed6a05f4d05ae47acc2b0459f8': {'parent': <sqlite3.Row at 0x1f5ae529830>,
+#      'children': []}}]}}
+
+
+
+
+
+
+
+
+            
+
+
 def get_case_bmpp_samples(project_name, bmpp_ids):
     '''
     (str, list)
@@ -519,16 +562,8 @@ def show_graph(adjacency_matrix, mylabels):
     for i in nodes:
         N[i] = mylabels[i]
     
+    nx.draw(gr, node_size=1200, node_color='#ffe066', font_size = 14, with_labels=True, labels=N, linewidths=2)
     
-    
-    
-    
-    
-    
-    if mylabels:
-        nx.draw(gr, node_size=500, with_labels=True, labels=N, linewidths=1.5)
-    else:
-        nx.draw(gr, node_size=500, with_labels=False, linewidths=1.5)
 
     # write title
     #ax.set_title(title, size = 14)
@@ -1595,8 +1630,8 @@ def wgs_case(project_name, case):
     # create figures
     figures = plot_workflow_network(matrix, workflow_names)
     
-    
-    
+    # get the samples for each bmpp id
+    samples_bmpp = sort_bmpp_samples(project_name, bmpp)
     
     conn = connect_to_db()
     data = conn.execute("SELECT miso FROM Samples WHERE project_id = '{0}' AND case_id = '{1}';".format(project_name, case)).fetchall()
@@ -1606,7 +1641,7 @@ def wgs_case(project_name, case):
     
     return render_template('WGS_case.html', routes = routes, blocks=blocks,
                             sample_case=case, project=project, pipelines=pipelines,
-                            case=case, miso_link=miso_link, names=names, figures=figures)
+                            case=case, miso_link=miso_link, names=names, figures=figures, samples_bmpp=samples_bmpp)
 
 
 
