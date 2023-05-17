@@ -514,7 +514,9 @@ def make_adjacency_matrix(blocks, block_workflows, parent_workflows):
         for i in block_workflows[block]:
             m = []
             for j in block_workflows[block]:
-                if i == j:
+                if i not in parent_workflows and j not in parent_workflows:
+                    m.append(0)
+                elif i == j:
                     m.append(0)
                 elif i in parent_workflows:
                     if j in parent_workflows[i]:
@@ -1749,6 +1751,6 @@ def download_identifiers_table(project_name):
     return send_file(outputfile, as_attachment=True)
 
 
-if __name__ == "__main__":
-    app.run(host='0.0.0.0')
+# if __name__ == "__main__":
+#     app.run(host='0.0.0.0')
     
