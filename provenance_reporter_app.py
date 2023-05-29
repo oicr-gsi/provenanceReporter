@@ -495,7 +495,64 @@ def list_block_workflows(blocks):
         W[block] = L
     
     return W
- 
+
+    
+
+def get_workflow_analysis_date(workflow_run_id):
+    
+    
+    # connect to db
+    conn = connect_to_db()
+    # extract project info
+    data = conn.execute("SELECT creation_date FROM Files WHERE wfrun_id='{0}'".format(workflow_run_id)).fetchall()
+    conn.close()
+    
+    data = list(set(data))
+    
+    # select the most recent date if dates differ
+    most_recent = data[0]['creation_date']
+    
+    for i in data:
+        if i['creation_date'] > most_recent:
+            most_recent = i['creation_date']
+    #most_recent = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(int(most_recent)))
+    return most_recent
+
+
+def convert_epoch_time(epoch):
+    
+    return time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(int(epoch)))
+
+    
+    
+def get_block_analysis_date(block_workflows):
+    
+    
+    most_recent = 0
+    # get the analysis date for each workflows in each block
+    block_date = {}
+    for block in block_workflows:
+        for wf in block_workflows[block]:
+            wf_date = get_workflow_analysis_date(wf)
+            if wf_date  > most_recent:
+                most_recent = wf_date
+        block_date[block] = convert_epoch_time(most_recent)
+    return block_date
+
+
+def get_block_workflows_date(block_workflows):
+    
+    D = {}
+    for block in block_workflows:
+        D[block] = {}
+        for wf in block_workflows[block]:
+            wf_date = convert_epoch_time(get_workflow_analysis_date(wf))
+            D[block][wf] = wf_date
+    return D
+
+
+
+
 
 def make_adjacency_matrix(blocks, block_workflows, parent_workflows):
     '''
@@ -1623,6 +1680,13 @@ def wgs_case(project_name, case):
     # list all workflows for each block
     block_workflows = list_block_workflows(blocks)
     
+    # assign date to each block. most recent file creation date from all workflows within block 
+    block_date = get_block_analysis_date(block_workflows)
+    
+    # get the date of each workflow within block
+    workflow_date = get_block_workflows_date(block_workflows)
+    
+    
     # get the workflow names
     workflow_names = get_node_labels(block_workflows)
         
@@ -1643,7 +1707,8 @@ def wgs_case(project_name, case):
     
     return render_template('WGS_case.html', routes = routes, blocks=blocks,
                             sample_case=case, project=project, pipelines=pipelines,
-                            case=case, miso_link=miso_link, names=names, figures=figures, samples_bmpp=samples_bmpp)
+                            case=case, miso_link=miso_link, names=names, figures=figures,
+                            samples_bmpp=samples_bmpp, block_date=block_date, workflow_date=workflow_date)
 
 
 

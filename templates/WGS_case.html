@@ -33,7 +33,7 @@
         
         <tr>
           <td><span style="font-size:22px; font-style:bold;">{{ block.1 }}</span></td>
-          <td>Date: TBD</td>
+          <td>Date: {{block_date[block.0]}} </td>
           <td>Complete: TBD</td>
           <td>Release Status: TBD</td>
           <td>Download: TBD</td>
@@ -45,7 +45,8 @@
        <table id="block_table">
          <thead>
           <th>workflow_run_id</th>
-          <th>workflow</th>     
+          <th>workflow</th>
+          <th>date</th>      
           <th>samples</th>
         </thead>     
         
@@ -53,6 +54,7 @@
           <tr>
             <td>{{bmpp_run}}</td>
             <td>{{samples_bmpp[block.0][bmpp_run]['name']}}</td>
+            <td>{{workflow_date[block.0][bmpp_run]}}</td>
             <td>
               {% for i in samples_bmpp[block.0][bmpp_run]['samples']['normal'] %}
                 {{i}}
@@ -73,7 +75,8 @@
        <table id="block_table">
           <thead>
            <th>workflow_run_id</th>
-           <th>workflow</th>     
+           <th>workflow</th>
+           <th>date</th>     
            <th>platform</th>
            </thead>     
        
@@ -82,6 +85,7 @@
            <tr>
              <td>{{d[workflow]['parent']['wfrun_id']}}</td>
              <td>{{d[workflow]['parent']['wf']}}</td>
+             <td>{{workflow_date[block.0][d[workflow]['parent']['wfrun_id']]}}</td>
              <td>{{d[workflow]['parent']['platform']}}</td>     
            </tr>
            {% if d[workflow]['children'] %}
@@ -89,6 +93,7 @@
                <tr>
                  <td>{{k['wfrun_id']}}</td>
                  <td>{{k['wf']}}</td>
+                 <td>{{workflow_date[block.0][k['wfrun_id']]}}</td>          
                  <td>{{k['platform']}}</td>
                </tr>     
              {% endfor %}         
