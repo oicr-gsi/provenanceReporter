@@ -1439,6 +1439,11 @@ routes = {'Whole Genome': 'whole_genome_sequencing'}
 app = Flask(__name__)
 
 
+
+
+
+
+
 @app.template_filter()
 def find_workflow_id(generic_name, bmpp_children_workflows, library):
     '''
@@ -1471,6 +1476,21 @@ def find_workflow_id(generic_name, bmpp_children_workflows, library):
     
 
 
+@app.template_filter()
+def shorten_workflow_id(workflow_run_id):
+    '''
+    (str) -> str
+    
+    Shorten the workflow run id to 8 characters + trailing dots
+             
+    Parameters
+    ----------
+    - workflow_run_id (str): Workflow unique run identifier
+    '''
+    
+    return workflow_run_id[:8] + '...'
+    
+    
 @app.route('/')
 def index():
     

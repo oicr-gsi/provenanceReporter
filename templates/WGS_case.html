@@ -52,7 +52,7 @@
         
         {% for bmpp_run in samples_bmpp[block.0] %}
           <tr>
-            <td>{{bmpp_run}}</td>
+            <td>{{bmpp_run | shorten_workflow_id}}</td>
             <td>{{samples_bmpp[block.0][bmpp_run]['name']}}</td>
             <td>{{workflow_date[block.0][bmpp_run]}}</td>
             <td>
@@ -83,7 +83,7 @@
        {% for d in blocks[block.0][sample] %}
          {% for workflow in d %}
            <tr>
-             <td>{{d[workflow]['parent']['wfrun_id']}}</td>
+             <td>{{d[workflow]['parent']['wfrun_id'] | shorten_workflow_id}}</td>
              <td>{{d[workflow]['parent']['wf']}}</td>
              <td>{{workflow_date[block.0][d[workflow]['parent']['wfrun_id']]}}</td>
              <td>{{d[workflow]['parent']['platform']}}</td>     
@@ -91,7 +91,7 @@
            {% if d[workflow]['children'] %}
              {% for k in d[workflow]['children'] %}
                <tr>
-                 <td>{{k['wfrun_id']}}</td>
+                 <td>{{k['wfrun_id'] | shorten_workflow_id}}</td>
                  <td>{{k['wf']}}</td>
                  <td>{{workflow_date[block.0][k['wfrun_id']]}}</td>          
                  <td>{{k['platform']}}</td>
