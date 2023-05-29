@@ -46,6 +46,7 @@
          <thead>
           <th>workflow_run_id</th>
           <th>workflow</th>
+          <th>file count</th>
           <th>date</th>      
           <th>samples</th>
         </thead>     
@@ -54,6 +55,7 @@
           <tr>
             <td>{{bmpp_run | shorten_workflow_id}}</td>
             <td>{{samples_bmpp[block.0][bmpp_run]['name']}}</td>
+            <td>{{file_counts[bmpp_run]}}</td>   
             <td>{{workflow_date[block.0][bmpp_run]}}</td>
             <td>
               <dl>
@@ -78,6 +80,7 @@
           <thead>
            <th>workflow_run_id</th>
            <th>workflow</th>
+           <th>file count</th>
            <th>date</th>     
            <th>platform</th>
            </thead>     
@@ -87,6 +90,7 @@
            <tr>
              <td>{{d[workflow]['parent']['wfrun_id'] | shorten_workflow_id}}</td>
              <td>{{d[workflow]['parent']['wf']}}</td>
+             <td>{{file_counts[d[workflow]['parent']['wfrun_id']]}}</td>              
              <td>{{workflow_date[block.0][d[workflow]['parent']['wfrun_id']]}}</td>
              <td>{{d[workflow]['parent']['platform']}}</td>     
            </tr>
@@ -95,6 +99,7 @@
                <tr>
                  <td>{{k['wfrun_id'] | shorten_workflow_id}}</td>
                  <td>{{k['wf']}}</td>
+                 <td>{{file_counts[k['wfrun_id']]}}</td>
                  <td>{{workflow_date[block.0][k['wfrun_id']]}}</td>          
                  <td>{{k['platform']}}</td>
                </tr>     

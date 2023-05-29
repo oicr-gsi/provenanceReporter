@@ -217,8 +217,31 @@ def sort_bmpp_samples(project_name, blocks):
     return D
 
 
+def get_workflow_file_count(workflow_id):
+    
+    conn = connect_to_db()
+    data = conn.execute("SELECT Files.file FROM Files WHERE Files.wfrun_id = '{0}'".format(workflow_id)).fetchall()
+    conn.close()
+
+    data = list(set(data))
+    
+    return len(data)
 
 
+def get_block_workflow_file_count(block_workflows):
+    
+    
+    D = {}
+    for block in block_workflows:
+        for workflow in block_workflows[block]:
+            D[workflow] = get_workflow_file_count(workflow)
+    return D
+    
+    
+    
+    
+    
+    
 
 # {'cc96bbe2e51b69bd0ad4f7acc00c2e8b19573bc539722455739b53a9bd1c770d': {'HCCCFD_0018_P_Lv_WG_HCC-B-076-T0-R | HCCCFD_0018_R_Ly_WG_HCC-B-076-T0-B-DNA': [{'7706f783541e948f07f84fd4549d62249003445113e8a157c096964424d6db07': {'parent': <sqlite3.Row at 0x1f5b062a410>,
 #      'children': [<sqlite3.Row at 0x1f5b062a330>]}},
@@ -1719,6 +1742,10 @@ def wgs_case(project_name, case):
     # get the samples for each bmpp id
     samples_bmpp = sort_bmpp_samples(project_name, bmpp)
     
+    # get the workflow file counts
+    file_counts = get_block_workflow_file_count(block_workflows)
+    
+    
     conn = connect_to_db()
     data = conn.execute("SELECT miso FROM Samples WHERE project_id = '{0}' AND case_id = '{1}';".format(project_name, case)).fetchall()
     data = list(set(data))
@@ -1728,7 +1755,8 @@ def wgs_case(project_name, case):
     return render_template('WGS_case.html', routes = routes, blocks=blocks,
                             sample_case=case, project=project, pipelines=pipelines,
                             case=case, miso_link=miso_link, names=names, figures=figures,
-                            samples_bmpp=samples_bmpp, block_date=block_date, workflow_date=workflow_date)
+                            samples_bmpp=samples_bmpp, block_date=block_date,
+                            workflow_date=workflow_date, file_counts=file_counts)
 
 
 
