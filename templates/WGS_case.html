@@ -56,12 +56,14 @@
             <td>{{samples_bmpp[block.0][bmpp_run]['name']}}</td>
             <td>{{workflow_date[block.0][bmpp_run]}}</td>
             <td>
+              <dl>
               {% for i in samples_bmpp[block.0][bmpp_run]['samples']['normal'] %}
-                {{i}}
+                <dt>{{i}}</dt>
               {% endfor %}
               {% for i in samples_bmpp[block.0][bmpp_run]['samples']['tumour'] %}
-                {{i}} 
+                <dt>{{i}}</dt> 
               {% endfor %}
+            </dl>
             </td>
           </tr>
          {% endfor %}
