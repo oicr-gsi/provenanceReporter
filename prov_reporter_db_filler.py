@@ -273,11 +273,17 @@ def collect_file_info_from_fpr(fpr, project_name):
             version = line[31]        
             # get workflow run accession
             workflow_run = line[36]
+            # get limskey
+            limskey = line[56]
             # collect file info
-            D[project][file_swid] = {'creation_date': creation_date, 'md5sum': md5sum,
-                                     'workflow': workflow, 'version': version,
-                                     'wfrun_id': workflow_run, 'file': file,
-                                     'library_type': library_type, 'attributes': attributes}
+            if file_swid not in D[project]:
+                D[project][file_swid] = {'creation_date': creation_date, 'md5sum': md5sum,
+                                         'workflow': workflow, 'version': version,
+                                         'wfrun_id': workflow_run, 'file': file,
+                                         'library_type': library_type, 'attributes': attributes,
+                                         'limskey': [limskey]}
+            else:
+                D[project][file_swid]['limskey'].append(limskey)
     infile.close()
     return D
 
@@ -496,11 +502,11 @@ def identify_parent_children_workflows(P, F):
                 parent_workflows = ['NA']
             if project not in parents:
                 parents[project] = {}
-            if workflow in parents[project]:
-                assert parents[project][workflow] == parent_workflows
-            else:
+            if workflow not in parents[project]:
                 parents[project][workflow] = parent_workflows
-        
+            else:
+                assert parents[project][workflow] == parent_workflows
+                                
     return parents
 
     
@@ -631,7 +637,7 @@ def define_column_names():
     column_names = {'Workflows': ['wfrun_id', 'wf', 'wfv', 'project_id', 'attributes'],
                     'Parents': ['parents_id', 'children_id', 'project_id'],
                     'Projects': ['project_id', 'pipeline', 'description', 'active', 'contact_name', 'contact_email', 'last_updated', 'expected_samples', 'sequenced_samples', 'library_types'],
-                    'Files': ['file_swid', 'project_id', 'md5sum', 'workflow', 'version', 'wfrun_id', 'file', 'library_type', 'attributes', 'creation_date'],
+                    'Files': ['file_swid', 'project_id', 'md5sum', 'workflow', 'version', 'wfrun_id', 'file', 'library_type', 'attributes', 'creation_date', 'limskey'],
                     'FilesQC': ['file_swid', 'project_id', 'skip', 'user', 'date', 'status', 'reference', 'fresh', 'ticket'],
                     'Libraries': ['library', 'sample', 'tissue_type', 'ext_id', 'tissue_origin',
                                   'library_type', 'prep', 'tissue_prep', 'sample_received_date', 'group_id', 'group_id_description', 'project_id'],
@@ -655,7 +661,7 @@ def define_column_types():
                                   'TEXT', 'VARCHAR(128)', 'VARCHAR(256)', 'VARCHAR(256)', 'VARCHAR(256)', 'INT', 'INT', 'VARCHAR(256)'],
                     'Files': ['VARCHAR(572) PRIMARY KEY NOT NULL UNIQUE', 'VARCHAR(128)',
                               'VARCHAR(256)', 'VARCHAR(128)', 'VARCHAR(128)',
-                              'VARCHAR(572)', 'TEXT', 'VARCHAR(128)', 'TEXT', 'INT'],
+                              'VARCHAR(572)', 'TEXT', 'VARCHAR(128)', 'TEXT', 'INT', 'VARCHAR(256)'],
                     'FilesQC': ['VARCHAR(572) PRIMARY KEY NOT NULL UNIQUE', 'VARCHAR(128)',
                                 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)',
                                 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)'],
@@ -1013,6 +1019,7 @@ def add_file_info_to_db(database, project, fpr, nabu_api, table = 'Files'):
         
         # add data
         for file_swid in D[project]:
+            D[project][file_swid]['limskey'] = ';'.join(list(set(D[project][file_swid]['limskey'])))
             L = [D[project][file_swid][i] for i in column_names if i in D[project][file_swid]]
             L.insert(0, project)
             L.insert(0, file_swid)
