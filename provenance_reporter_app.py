@@ -238,34 +238,36 @@ def get_block_workflow_file_count(block_workflows):
     return D
     
     
+
+def is_block_complete(block, expected_workflows):
+
+    if len(block) == 0:
+        complete = False
+    else:
+        complete = True
+        c = []
+        
+        for sample in block:
+            workflows = []
+            for d in block[sample]:
+                for workflow in d:
+                    workflows.append(d[workflow]['parent']['wf'])
+                    if d[workflow]['children']:
+                        for k in d[workflow]['children']:
+                            workflows.append(k['wf'])
+            # homogeneize workflow names by removing the matched suffix
+            for i in range(len(workflows)):
+                if '_' in workflows[i]:
+                    workflows[i] = workflows[i].split('_')[0]
+            # check that all workflows are present
+            if sorted(list(set(workflows))) != sorted(list(set(expected_workflows))):
+                complete = False
+            c.append(complete)
+        
+        complete = all(c)
+    return complete
     
     
-    
-    
-
-# {'cc96bbe2e51b69bd0ad4f7acc00c2e8b19573bc539722455739b53a9bd1c770d': {'HCCCFD_0018_P_Lv_WG_HCC-B-076-T0-R | HCCCFD_0018_R_Ly_WG_HCC-B-076-T0-B-DNA': [{'7706f783541e948f07f84fd4549d62249003445113e8a157c096964424d6db07': {'parent': <sqlite3.Row at 0x1f5b062a410>,
-#      'children': [<sqlite3.Row at 0x1f5b062a330>]}},
-#    {'d0f18fc204a779a2f878264cfbf6950e43bccbc3135e2c93db7bc57ac74a7744': {'parent': <sqlite3.Row at 0x1f5b062a450>,
-#      'children': [<sqlite3.Row at 0x1f5b062a0d0>,
-#       <sqlite3.Row at 0x1f5b062a4d0>]}},
-#    {'1c0786c6f93b759372e68fa70d6e4669f1cf2e59fbd31d2e2aaec23296ec808f': {'parent': <sqlite3.Row at 0x1f5b062a1f0>,
-#      'children': [<sqlite3.Row at 0x1f5b062a510>]}}]},
-#  'a1ee7251539986b51a399acd7c94ca575342db213bf17117204891beafa79556': {'HCCCFD_0018_P_Lv_WG_HCC-B-076-T0-R | HCCCFD_0018_R_Ly_WG_HCC-B-076-T0-B-DNA': [{'b74bfd0f8bf863e2504be45202fdfde59aca4d2c8c2da2ad5c376419c984518d': {'parent': <sqlite3.Row at 0x1f5b062a4f0>,
-#      'children': []}},
-#    {'59c9f7e6db3f4dfb7e2f29704b13292d3cf7fcd61f0e23bcfe3ae52815343378': {'parent': <sqlite3.Row at 0x1f5b062a430>,
-#      'children': []}},
-#    {'2a928e16f9d2d73edc159e518bbcf159c943a1ed6a05f4d05ae47acc2b0459f8': {'parent': <sqlite3.Row at 0x1f5ae529830>,
-#      'children': []}}]}}
-
-
-
-
-
-
-
-
-            
-
 
 def get_case_bmpp_samples(project_name, bmpp_ids):
     '''
@@ -1745,7 +1747,10 @@ def wgs_case(project_name, case):
     # get the workflow file counts
     file_counts = get_block_workflow_file_count(block_workflows)
     
-    
+    # check if blocks are complete
+    expected_workflows = sorted(['mutect2', 'variantEffectPredictor', 'delly', 'varscan', 'sequenza', 'mavis'])           
+    complete = {block: is_block_complete(blocks[block], expected_workflows) for block in blocks}
+        
     conn = connect_to_db()
     data = conn.execute("SELECT miso FROM Samples WHERE project_id = '{0}' AND case_id = '{1}';".format(project_name, case)).fetchall()
     data = list(set(data))
@@ -1756,7 +1761,7 @@ def wgs_case(project_name, case):
                             sample_case=case, project=project, pipelines=pipelines,
                             case=case, miso_link=miso_link, names=names, figures=figures,
                             samples_bmpp=samples_bmpp, block_date=block_date,
-                            workflow_date=workflow_date, file_counts=file_counts)
+                            workflow_date=workflow_date, file_counts=file_counts, complete=complete)
 
 
 
