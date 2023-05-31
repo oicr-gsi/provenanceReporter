@@ -287,9 +287,48 @@ def get_amount_data(block_workflows):
     
     D = {}
     for block in block_workflows:
+        D[block] = {}
         for workflow_id in block_workflows[block]:
-            D[workflow_id] = len(get_workflow_limskeys(workflow_id))
+            D[block][workflow_id] = len(get_workflow_limskeys(workflow_id))
     return D
+
+
+# def select_block(amount_data, bmpp):
+    
+#     # order blocks based on the total amount of lanes for the call-ready workflows within each block
+#     largest = 0
+#     first_block = ''
+    
+#     for block in amount_data:
+#         total = 0
+#         # sum all lanes for all call-ready workflows within each block
+#         for workflow_id in amount_data[block]:
+#             if workflow_id in bmpp:
+#                 total += amount_data[block][workflow_id]
+#         if largest < total:
+#             largest = total
+#             first_block = block
+                
+#     return first_block
+
+
+
+def order_blocks(amount_data, bmpp):
+    
+    # order blocks based on the total amount of lanes for the call-ready workflows within each block
+    L = []
+    for block in amount_data:
+        total = 0
+        # sum all lanes for all call-ready workflows within each block
+        for workflow_id in amount_data[block]:
+            if workflow_id in bmpp:
+                total += amount_data[block][workflow_id]
+        L.append([total, block])
+    
+    L = sorted(L, key=lambda x: x[0], reverse=True)
+                
+    return [i[1] for i in L]
+
 
 
 def get_file_release_status(file_swid):
@@ -835,43 +874,20 @@ def plot_workflow_network(matrix, labels):
   
     
   
-    
-  
-    
-  
-    
-  
-    
-    
-
-
-
-
-def name_WGS_blocks(blocks):
+def name_WGS_blocks(ordered_blocks):
     '''
-    
+    (list) -> list  
     
     '''
     counter = 1
-    L = list(blocks.keys())
     names = []
-    for i in L:
+    for i in ordered_blocks:
         k = 'WGS Analysis Block {0}'.format(counter)
         names.append([i, k])
         counter += 1
     return names
     
     
-
-
-
-
-
-
-
-
-
-
                     
 
 def get_library_design(library_source):
@@ -1788,9 +1804,6 @@ def wgs_case(project_name, case):
     # find the blocks by mapping the analysis workflows to ttheir parent workflows    
     blocks = find_analysis_blocks(project_name, D)
     
-    # name each block
-    names = name_WGS_blocks(blocks)
-    
     # get the parent workflows for each block
     parent_workflows = map_workflows_to_parent(project_name, D)
     
@@ -1802,8 +1815,7 @@ def wgs_case(project_name, case):
     
     # get the date of each workflow within block
     workflow_date = get_block_workflows_date(block_workflows)
-    
-    
+        
     # get the workflow names
     workflow_names = get_node_labels(block_workflows)
         
@@ -1825,11 +1837,17 @@ def wgs_case(project_name, case):
     # get the amount of data for each workflow
     amount_data = get_amount_data(block_workflows)
     
-    
     # check if blocks are complete
     expected_workflows = sorted(['mutect2', 'variantEffectPredictor', 'delly', 'varscan', 'sequenza', 'mavis'])           
     complete = {block: is_block_complete(blocks[block], expected_workflows) for block in blocks}
    
+    # order blocks based on the amount of data
+    ordered_blocks = order_blocks(amount_data, bmpp)
+
+    # name each block according to the selected block order
+    names = name_WGS_blocks(ordered_blocks)
+     
+    
     conn = connect_to_db()
     data = conn.execute("SELECT miso FROM Samples WHERE project_id = '{0}' AND case_id = '{1}';".format(project_name, case)).fetchall()
     data = list(set(data))
