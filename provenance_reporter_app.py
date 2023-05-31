@@ -25,7 +25,7 @@ import io
 import base64
 
 
-def connect_to_db():
+def connect_to_db(database='merged.db'):
     '''
     (None) -> sqlite3.Connection
     
@@ -33,7 +33,7 @@ def connect_to_db():
     This database contains information extracted from FPR
     '''
     
-    conn = sqlite3.connect('merged.db')
+    conn = sqlite3.connect(database)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -266,8 +266,71 @@ def is_block_complete(block, expected_workflows):
         
         complete = all(c)
     return complete
+
+
+def get_workflow_limskeys(workflow_id):
     
     
+    conn = connect_to_db()
+    data = conn.execute("SELECT Workflow_Inputs.limskey FROM Workflow_Inputs WHERE Workflow_Inputs.wfrun_id = '{0}'".format(workflow_id)).fetchall()
+    conn.close()
+
+    data = list(set(data))
+
+    limskeys = [i['limskey'] for i in data]
+    #limskeys = list(set(limskeys()))                    
+        
+    return limskeys
+
+
+def get_file_release_status(file_swid):
+    
+    
+    conn = connect_to_db()
+    
+    data = conn.execute("SELECT FilesQC.status FROM FilesQC WHERE FilesQC.file_swid = '{0}';".format(file_swid)).fetchall()
+    conn.close()
+
+    status = data[0]['status']    
+    
+    return status
+
+
+def get_workflow_release_status(workflow_id):
+        
+    # get workflow limskeys
+    limskeys = get_workflow_limskeys(workflow_id)
+    
+    limskeys = list(set(limskeys))
+    
+    # get file_swid
+    file_swids = []
+    conn = connect_to_db()
+    
+    for i in limskeys:
+        # ignore fastq-import workflows
+        data = conn.execute("SELECT Files.file_swid FROM Files WHERE Files.limskey = '{0}' \
+                            AND LOWER(Files.workflow) IN ('casava', 'bcl2fastq');".format(i)).fetchall()
+        file_swids.extend([j['file_swid'] for j in data])
+    conn.close()
+
+    file_swids = list(set(file_swids))
+
+    status = all(map(lambda x: x.lower() == 'pass', [get_file_release_status(i) for i in file_swids])) 
+    
+    return status
+    
+
+def get_block_release_status(block_workflows):
+    
+    D = {}
+    for block in block_workflows:
+        workflows = block.split('.')
+        #status = all([get_workflow_release_status(j) for j in block_workflows[block]])
+        status = all([get_workflow_release_status(j) for j in workflows])
+        D[block] = status
+    return D
+        
 
 def get_case_bmpp_samples(project_name, bmpp_ids):
     '''
@@ -1747,10 +1810,13 @@ def wgs_case(project_name, case):
     # get the workflow file counts
     file_counts = get_block_workflow_file_count(block_workflows)
     
+    # get release status of input sequences for each block
+    release_status = get_block_release_status(block_workflows)
+    
     # check if blocks are complete
     expected_workflows = sorted(['mutect2', 'variantEffectPredictor', 'delly', 'varscan', 'sequenza', 'mavis'])           
     complete = {block: is_block_complete(blocks[block], expected_workflows) for block in blocks}
-        
+   
     conn = connect_to_db()
     data = conn.execute("SELECT miso FROM Samples WHERE project_id = '{0}' AND case_id = '{1}';".format(project_name, case)).fetchall()
     data = list(set(data))
@@ -1761,7 +1827,8 @@ def wgs_case(project_name, case):
                             sample_case=case, project=project, pipelines=pipelines,
                             case=case, miso_link=miso_link, names=names, figures=figures,
                             samples_bmpp=samples_bmpp, block_date=block_date,
-                            workflow_date=workflow_date, file_counts=file_counts, complete=complete)
+                            workflow_date=workflow_date, file_counts=file_counts,
+                            complete=complete, release_status=release_status)
 
 
 

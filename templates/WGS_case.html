@@ -20,10 +20,8 @@
 
 {% block content %}
   <div class="project_title">
-    <p>
-     <span style="font-size:30px; font-style:normal;"> Somatic callers analysis blocks </span>
-     <span> add a short description </span>
-   </p>  
+    <p><span style="font-size:30px; font-style:normal;"> Somatic callers analysis blocks </span></p>  
+    <p><span style="font-size:16px; font-style:normal;"> An analysis block is defined by   are defined Somatic callers analysis blocks </span></p>  
   </div> 
 
   {% for block in names %}
@@ -39,7 +37,11 @@
           {% else %}
             <td>Complete: <span style="font-size:32px;color:#ff3300;">&#10006;</span></td>
           {% endif %}
-          <td>Release Status: TBD</td>
+          {% if release_status[block.0] %}
+            <td>Release Status: <span style="font-size:32px;color:#70db70">&#10004;</span></td>
+          {% else %}
+            <td>Release Status: <span style="font-size:32px;color:#ff3300;">&#10006;</span></td>
+          {% endif %}
           <td>Download: TBD</td>
         </tr>
       </table>
