@@ -283,6 +283,15 @@ def get_workflow_limskeys(workflow_id):
     return limskeys
 
 
+def get_amount_data(block_workflows):
+    
+    D = {}
+    for block in block_workflows:
+        for workflow_id in block_workflows[block]:
+            D[workflow_id] = len(get_workflow_limskeys(workflow_id))
+    return D
+
+
 def get_file_release_status(file_swid):
     
     
@@ -1813,6 +1822,10 @@ def wgs_case(project_name, case):
     # get release status of input sequences for each block
     release_status = get_block_release_status(block_workflows)
     
+    # get the amount of data for each workflow
+    amount_data = get_amount_data(block_workflows)
+    
+    
     # check if blocks are complete
     expected_workflows = sorted(['mutect2', 'variantEffectPredictor', 'delly', 'varscan', 'sequenza', 'mavis'])           
     complete = {block: is_block_complete(blocks[block], expected_workflows) for block in blocks}
@@ -1828,7 +1841,7 @@ def wgs_case(project_name, case):
                             case=case, miso_link=miso_link, names=names, figures=figures,
                             samples_bmpp=samples_bmpp, block_date=block_date,
                             workflow_date=workflow_date, file_counts=file_counts,
-                            complete=complete, release_status=release_status)
+                            complete=complete, release_status=release_status, amount_data=amount_data)
 
 
 
