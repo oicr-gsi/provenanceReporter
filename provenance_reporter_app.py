@@ -1886,7 +1886,7 @@ def wgs_case(project_name, case):
     figures = plot_workflow_network(matrix, workflow_names)
     
     # get the samples for each bmpp id
-    samples_bmpp = sort_bmpp_samples(project_name, bmpp)
+    samples_bmpp = sort_bmpp_samples(project_name, blocks)
     
     # get the workflow file counts
     file_counts = get_block_workflow_file_count(block_workflows)
