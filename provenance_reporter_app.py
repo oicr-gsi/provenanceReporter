@@ -228,6 +228,10 @@ def get_workflow_file_count(workflow_id):
     return len(data)
 
 
+
+
+
+
 def get_block_workflow_file_count(block_workflows):
     
     
@@ -313,16 +317,20 @@ def get_amount_data(block_workflows):
 
 
 
-def order_blocks(amount_data, bmpp):
+def order_blocks(blocks, amount_data):
+    
+    
+    block_names = blocks.keys()
     
     # order blocks based on the total amount of lanes for the call-ready workflows within each block
     L = []
-    for block in amount_data:
+    for block in block_names:
         total = 0
         # sum all lanes for all call-ready workflows within each block
-        for workflow_id in amount_data[block]:
-            if workflow_id in bmpp:
-                total += amount_data[block][workflow_id]
+        workflows = list(map(lambda x: x.strip(), block.split('.')))
+        for workflow_id in workflows:
+            assert block in amount_data
+            total += amount_data[block][workflow_id]
         L.append([total, block])
     
     L = sorted(L, key=lambda x: x[0], reverse=True)
@@ -690,6 +698,46 @@ def get_block_workflows_date(block_workflows):
 
 
 
+def create_block_json(project_name, blocks, block):
+    
+    # organize the workflows by block and samples
+    D = {}
+        
+    for sample in blocks[block]:
+        sample_id = '.'.join(list(map(lambda x: x.strip(), sample.split('|'))))
+        D[sample_id] = []
+        D[sample_id].extend(block.split('.'))
+        for d in blocks[block][sample]:
+            for workflow in d:
+                D[sample_id].append(d[workflow]['parent']['wfrun_id'])
+                if d[workflow]['children']:
+                    for k in d[workflow]['children']:
+                        D[sample_id].append(k['wfrun_id'])
+                    
+    block_data = {}
+            
+    conn = connect_to_db()
+        
+    for sample in D:
+        if sample not in block_data:
+            block_data[sample] = {}
+        for workflow_id in D[sample]:
+            data = conn.execute("SELECT Workflows.wfrun_id, Workflows.wf, Workflows.wfv FROM Workflows \
+                                WHERE Workflows.project_id = '{0}' AND Workflows.wfrun_id = '{1}';".format(project_name, workflow_id)).fetchall()
+            for i in data:
+                workflow_name = i['wf']
+                wfrun_id = i['wfrun_id']
+                workflow_version = i['wfv']
+                block_data[sample][workflow_name] = {'workflow_id': wfrun_id, 'workflow_version': workflow_version}
+                                            
+    conn.close()                
+                    
+    return block_data                
+        
+        
+        
+
+
 def make_adjacency_matrix(blocks, block_workflows, parent_workflows):
     '''
     
@@ -888,6 +936,18 @@ def name_WGS_blocks(ordered_blocks):
     return names
     
     
+    
+def get_miso_sample_link(project_name, case):
+    
+    conn = connect_to_db()
+    data = conn.execute("SELECT miso FROM Samples WHERE project_id = '{0}' AND case_id = '{1}';".format(project_name, case)).fetchall()
+    data = list(set(data))
+    #assert len(data) == 1
+    miso_link = data[0]['miso']
+    
+    return miso_link
+    
+        
                     
 
 def get_library_design(library_source):
@@ -1842,18 +1902,14 @@ def wgs_case(project_name, case):
     complete = {block: is_block_complete(blocks[block], expected_workflows) for block in blocks}
    
     # order blocks based on the amount of data
-    ordered_blocks = order_blocks(amount_data, bmpp)
+    ordered_blocks = order_blocks(blocks, amount_data)
 
     # name each block according to the selected block order
     names = name_WGS_blocks(ordered_blocks)
      
-    
-    conn = connect_to_db()
-    data = conn.execute("SELECT miso FROM Samples WHERE project_id = '{0}' AND case_id = '{1}';".format(project_name, case)).fetchall()
-    data = list(set(data))
-    assert len(data) == 1
-    miso_link = data[0]['miso']
-    
+    # get miso link
+    miso_link = get_miso_sample_link(project_name, case)
+        
     return render_template('WGS_case.html', routes = routes, blocks=blocks,
                             sample_case=case, project=project, pipelines=pipelines,
                             case=case, miso_link=miso_link, names=names, figures=figures,
@@ -1873,46 +1929,81 @@ def wgs_case(project_name, case):
 
 
 
-@app.route('/download_bmpp_data/<project_name>/<case>/<bmpp_id>')
-def get_bmpp_data(project_name, case, bmpp_id):
-    '''
+# @app.route('/download_bmpp_data/<project_name>/<case>/<bmpp_id>')
+# def get_bmpp_data(project_name, case, bmpp_id):
+#     '''
     
     
-    '''
+#     '''
     
-    # get bmpp downstream workflow info
-    bmpp_children_workflows = get_bmpp_downstream_workflows(project_name, bmpp_id)
+#     # get bmpp downstream workflow info
+#     bmpp_children_workflows = get_bmpp_downstream_workflows(project_name, bmpp_id)
     
-    # format bmpp downstream workflow info for DARE
-    D = {}
-    for i in bmpp_children_workflows:
-        for workflow in bmpp_children_workflows[i]:
-            sample = bmpp_children_workflows[i][workflow]['sample'].replace(';', '.')
-            workflow_id = bmpp_children_workflows[i][workflow]['workflow_id']
-            version = bmpp_children_workflows[i][workflow]['version']    
-            if sample not in D:
-                D[sample] = {}
-            D[sample][workflow] = {"workflow_id": workflow_id, "workflow_version": version}
+#     # format bmpp downstream workflow info for DARE
+#     D = {}
+#     for i in bmpp_children_workflows:
+#         for workflow in bmpp_children_workflows[i]:
+#             sample = bmpp_children_workflows[i][workflow]['sample'].replace(';', '.')
+#             workflow_id = bmpp_children_workflows[i][workflow]['workflow_id']
+#             version = bmpp_children_workflows[i][workflow]['version']    
+#             if sample not in D:
+#                 D[sample] = {}
+#             D[sample][workflow] = {"workflow_id": workflow_id, "workflow_version": version}
     
-    # add bmpp workflow info
-    conn = connect_to_db()
-    data = conn.execute("SELECT Workflows.wfrun_id, Workflows.wfv, Workflows.wf FROM Workflows \
-                        WHERE Workflows.project_id = '{0}' AND Workflows.wfrun_id = '{1}';".format(project_name, bmpp_id)).fetchall()
-    data = list(set(data))
-    d = dict(data[0])
-    conn.close()
+#     # add bmpp workflow info
+#     conn = connect_to_db()
+#     data = conn.execute("SELECT Workflows.wfrun_id, Workflows.wfv, Workflows.wf FROM Workflows \
+#                         WHERE Workflows.project_id = '{0}' AND Workflows.wfrun_id = '{1}';".format(project_name, bmpp_id)).fetchall()
+#     data = list(set(data))
+#     d = dict(data[0])
+#     conn.close()
     
-    for sample in D:
-        D[sample][d['wf']] = {'workflow_id': d['wfrun_id'], 'workflow_version': d['wfv']}
+#     for sample in D:
+#         D[sample][d['wf']] = {'workflow_id': d['wfrun_id'], 'workflow_version': d['wfv']}
        
+#     # send the json to outoutfile                    
+#     return Response(
+#         response=json.dumps(D),
+#         mimetype="application/json",
+#         status=200,
+#         headers={"Content-disposition": "attachment; filename={0}_WGS_{1}_{2}.json".format(project_name, case, bmpp_id)})
+
+
+@app.route('/download_wgs_block/<project_name>/<case>/<block>/<blocks>')
+def download_block_data(project_name, case, block, blocks):
+    '''
+    
+    
+    '''
+    
+    # create json with workflow information for block for DARE
+    block_data = create_block_json(project_name, blocks, block)
+
+
+    # block_data = {'29fe75c18ba3b098e5404cd7fc961e604452882d3c175e31a8e6d31c8ca18a5e': {},
+    #  'HCCCFD_0005_P_Lv_WG_HCC-B-005-T0-R.HCCCFD_0005_R_Ly_WG_HCC-B-005-T0-R': {'bamMergePreprocessing': {'workflow_id': '29fe75c18ba3b098e5404cd7fc961e604452882d3c175e31a8e6d31c8ca18a5e',
+    #    'workflow_version': '2.0.3'},
+    #   'varscan': {'workflow_id': '55a7ba91c133a6a8786e4ddf0f55189f00e057d49a52f0ae68eea0d809615d97',
+    #    'workflow_version': '2.2.4'},
+    #   'sequenza': {'workflow_id': 'de242cdd367344ecf0476b37a0843653e1178183a8e480a4386262121d9bc701',
+    #    'workflow_version': '1.0.0'},
+    #   'mutect2_matched': {'workflow_id': '8fc94eb8f4273ba98060019d58e5cf7c6cbe458f35b9070af65fcaf671fd5241',
+    #    'workflow_version': '1.0.4'},
+    #   'variantEffectPredictor_matched': {'workflow_id': 'cd96ae694dce27167cd08abfd6148bb6473366b17ab5448c77fdd3a465cf67c2',
+    #    'workflow_version': '2.1.51'},
+    #   'delly_matched': {'workflow_id': '681cf2d9ae3e46d7c6d057489959e29ddb9647864e9029d0ef396bc6610879f8',
+    #    'workflow_version': '2.3.0'},
+    #   'mavis': {'workflow_id': 'b08208329f18841bca0f65de4f87f8e4c5391f2c2f2b4029c3a63a600774ef00',
+    #    'workflow_version': '3.0.3'}}}
+
+
+
     # send the json to outoutfile                    
     return Response(
-        response=json.dumps(D),
+        response=json.dumps(block_data),
         mimetype="application/json",
         status=200,
-        headers={"Content-disposition": "attachment; filename={0}_WGS_{1}_{2}.json".format(project_name, case, bmpp_id)})
-
-
+        headers={"Content-disposition": "attachment; filename={0}_WGS_{1}_{2}.json".format(project_name, case, block)})
 
 
 
