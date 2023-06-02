@@ -233,6 +233,10 @@ def collect_file_info_from_fpr(fpr, project_name):
                 continue             
             if project not in D:
                 D[project] = {}
+            # check if file is skipped
+            if line[51].lower() == 'true':
+                continue
+                   
             # get creation date
             creation_date = line[0]
             # convert creation date into epoch time
@@ -1167,7 +1171,7 @@ def add_samples_info_to_db(database, project, pinery, table):
             cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
             conn.commit()
  
-    conn.close()
+        conn.close()
 
 
 def collect_lims_info(args):
