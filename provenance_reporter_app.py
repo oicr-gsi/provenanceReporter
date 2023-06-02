@@ -702,7 +702,7 @@ def create_block_json(project_name, blocks, block):
     
     # organize the workflows by block and samples
     D = {}
-        
+    
     for sample in blocks[block]:
         sample_id = '.'.join(list(map(lambda x: x.strip(), sample.split('|'))))
         D[sample_id] = []
@@ -1969,34 +1969,35 @@ def wgs_case(project_name, case):
 #         headers={"Content-disposition": "attachment; filename={0}_WGS_{1}_{2}.json".format(project_name, case, bmpp_id)})
 
 
-@app.route('/download_wgs_block/<project_name>/<case>/<block>/<blocks>')
-def download_block_data(project_name, case, block, blocks):
+@app.route('/download_wgs_block/<project_name>/<case>/<block>')
+def download_block_data(project_name, case, block):
     '''
     
     
     '''
+    
+    
+    
+    # build the somatic calling block
+
+    # identify all call ready bmpp runs for novaseq
+    bmpp = get_bmpp_case(project_name, case, 'novaseq', 'WG')    
+    
+    # identify the samples processed
+    samples = get_case_bmpp_samples(project_name, bmpp)
+    
+    # match all T/N pairs
+    pairs = group_normal_tumor_pairs(samples)
+    
+    # find analysis workflows for each N/T pairs
+    # remove sample pairs without analysis workflows
+    D = map_workflows_to_sample_pairs(project_name, 'novaseq', pairs)
+    
+    # find the blocks by mapping the analysis workflows to ttheir parent workflows    
+    blocks = find_analysis_blocks(project_name, D)
     
     # create json with workflow information for block for DARE
     block_data = create_block_json(project_name, blocks, block)
-
-
-    # block_data = {'29fe75c18ba3b098e5404cd7fc961e604452882d3c175e31a8e6d31c8ca18a5e': {},
-    #  'HCCCFD_0005_P_Lv_WG_HCC-B-005-T0-R.HCCCFD_0005_R_Ly_WG_HCC-B-005-T0-R': {'bamMergePreprocessing': {'workflow_id': '29fe75c18ba3b098e5404cd7fc961e604452882d3c175e31a8e6d31c8ca18a5e',
-    #    'workflow_version': '2.0.3'},
-    #   'varscan': {'workflow_id': '55a7ba91c133a6a8786e4ddf0f55189f00e057d49a52f0ae68eea0d809615d97',
-    #    'workflow_version': '2.2.4'},
-    #   'sequenza': {'workflow_id': 'de242cdd367344ecf0476b37a0843653e1178183a8e480a4386262121d9bc701',
-    #    'workflow_version': '1.0.0'},
-    #   'mutect2_matched': {'workflow_id': '8fc94eb8f4273ba98060019d58e5cf7c6cbe458f35b9070af65fcaf671fd5241',
-    #    'workflow_version': '1.0.4'},
-    #   'variantEffectPredictor_matched': {'workflow_id': 'cd96ae694dce27167cd08abfd6148bb6473366b17ab5448c77fdd3a465cf67c2',
-    #    'workflow_version': '2.1.51'},
-    #   'delly_matched': {'workflow_id': '681cf2d9ae3e46d7c6d057489959e29ddb9647864e9029d0ef396bc6610879f8',
-    #    'workflow_version': '2.3.0'},
-    #   'mavis': {'workflow_id': 'b08208329f18841bca0f65de4f87f8e4c5391f2c2f2b4029c3a63a600774ef00',
-    #    'workflow_version': '3.0.3'}}}
-
-
 
     # send the json to outoutfile                    
     return Response(

@@ -43,7 +43,7 @@
             <td>Release Status: <span style="font-size:32px;color:#ff3300;">&#10006;</span></td>
           {% endif %}
           <td>
-           <button id="download_button"><a href="{{url_for('download_block_data', project_name=project['project_id'], case=case, block=block.0, blocks=blocks)}}">Download json</a></button>
+           <button id="download_button"><a href="{{url_for('download_block_data', project_name=project['project_id'], case=case, block=block.0)}}">Download json</a></button>
           </td>
         </tr>
       </table>
