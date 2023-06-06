@@ -6,11 +6,9 @@
  <a href="{{ url_for('sequencing', project_name=project['project_id']) }}">Sequencing</a> 
  {% for i in pipelines %}
    {% if i in routes %}
-     {% if i == 'Whole Genome' %}
-       <a href="{{ url_for(routes[i], project_name=project['project_id']) }}">{{i}}</a>
-     {% endif %}   
+     <a href="{{ url_for(routes[i], project_name=project['project_id']) }}">{{i}}</a>
    {% else %}
-       <a href="#{{i}}">{{i}}</a>
+     <a href="#{{i}}">{{i}}</a>
    {% endif %}  
  {% endfor %}   
  <a class="split" href="{{ miso_link }}" target="_blank">{{ sample_case }}</a> 
