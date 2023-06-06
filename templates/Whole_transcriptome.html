@@ -63,7 +63,7 @@
          {% endfor %}
        </td>
        <td>
-         <a class="project_links" href="{{ url_for('wgs_case', project_name=project['project_id'], case=i)}}">{{cases[i]['bmpp'] | length}}</a>
+         <a class="project_links" href="{{ url_for('wgs_case', project_name=project['project_id'], case=i)}}">{{cases[i]['star'] | length}}</a>
        </td>
        <td>
          <a class="project_links" href="{{ url_for('wgs_case', project_name=project['project_id'], case=i)}}">{{cases[i]['downstream'] | length}}</a>
