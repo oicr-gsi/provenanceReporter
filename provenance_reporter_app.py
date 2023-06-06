@@ -24,18 +24,9 @@ import numpy as np
 import io
 import base64
 
+from whole_transcriptome import get_WT_call_ready_cases
+from utilities import connect_to_db, get_children_workflows, filter_out_QC_workflows
 
-def connect_to_db(database='merged.db'):
-    '''
-    (None) -> sqlite3.Connection
-    
-    Returns a connection to SqLite database prov_report.db.
-    This database contains information extracted from FPR
-    '''
-    
-    conn = sqlite3.connect(database)
-    conn.row_factory = sqlite3.Row
-    return conn
 
 
 
@@ -1148,6 +1139,7 @@ def get_call_ready_cases(project_name, platform, library_type):
 
 
 
+
 def get_bmpp_files(data):
     '''
     (list) -> (str, str, list)
@@ -1262,36 +1254,6 @@ def get_parent_workflows(project_name, workflow_id):
     return D
 
 
-def get_children_workflows(project_name, workflow_id):
-    '''
-    (str, str) -> list
-    
-    Returns a dictionary with workflow name, list of workflow_ids that are all children of 
-    workflow_id (i.e immediate downstream workflow) for a given project_name
-    
-    Parameters
-    ----------
-    - project_name (str): Name of project of interest
-    - bmpp_id (str): bamMergePreprocessing workflow id 
-    '''
-    
-    conn = connect_to_db()
-    
-    data = conn.execute("SELECT Workflows.wf, Parents.children_id FROM Parents JOIN Workflows \
-                        WHERE Parents.project_id = '{0}' AND Workflows.project_id = '{0}' \
-                        AND Parents.parents_id = '{1}' AND Workflows.wfrun_id = Parents.children_id;".format(project_name, workflow_id)).fetchall()
-    data= list(set(data))
-    
-    D = {}
-    for i in data:
-        if i['wf'] in D:
-            D[i['wf']].append(i['children_id'])
-            D[i['wf']] = list(set(D[i['wf']]))
-        else:
-            D[i['wf']] = [i['children_id']]
-    conn.close()
-    
-    return D
 
 
 def get_workflow_files(project_name, workflow_id):
@@ -1322,23 +1284,6 @@ def get_workflow_files(project_name, workflow_id):
     return L, creation_date
 
 
-def filter_out_QC_workflows(project_name, workflows):
-    '''
-    (str, dict) -> dict
-    
-    Returns a dictionary of workflow name, list of workflow ids removing any QC workflows
-        
-    Parameters
-    ----------
-    - project_name (str): name of project of interest
-    - workflows (dict): Dictionary of workflow, list of workflow ids that are either parent or children of an other workflow
-    '''
-
-    to_remove = [i for i in workflows if i.lower().split('_')[0] in ['wgsmetrics', 'insertsizemetrics', 
-                         'bamqc', 'calculatecontamination', 'callability']]
-    for i in to_remove:
-        del workflows[i]
-    return workflows
 
     
 def bmpp_input_raw_seq_status(project_name, bmpp_id):
@@ -1604,7 +1549,7 @@ def get_sample_counts(project_name, case):
 
 
 # map pipelines to views
-routes = {'Whole Genome': 'whole_genome_sequencing'}
+routes = {'Whole Genome': 'whole_genome_sequencing', 'Whole Transcriptome': 'whole_transcriptome'}
 
     
 
@@ -1920,6 +1865,29 @@ def wgs_case(project_name, case):
 
 
 
+
+@app.route('/<project_name>/whole_transcriptome')
+def whole_transcriptome(project_name):
+    
+    # get the project info for project_name from db
+    project = get_project_info(project_name)
+    
+    # get the pipelines from the library definitions in db
+    pipelines = get_pipelines(project_name)
+        
+    # get samples and libraries and workflow ids for each case
+    cases = get_WT_call_ready_cases(project_name, 'novaseq', 'WT')
+    samples = sorted(list(cases.keys()))
+
+    return render_template('Whole_transcriptome.html', routes = routes, project=project,
+                           samples=samples, cases=cases, pipelines=pipelines)
+
+
+
+# @app.route('/<project_name>/whole_transcriptome/<case>')
+# def wt_case(project_name, case):
+    
+#     pass
 
 
 
