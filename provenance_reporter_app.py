@@ -1477,7 +1477,7 @@ def get_cases(project_name):
     '''
     
     conn = connect_to_db()
-    data = conn.execute("SELECT case_id, donor_id, species, sex, created_date, modified_date, miso FROM Samples WHERE project_id = '{0}'".format(project_name)).fetchall()
+    data = conn.execute("SELECT case_id, donor_id, species, sex, created_date, modified_date, miso, parent_project FROM Samples WHERE project_id = '{0}'".format(project_name)).fetchall()
     
     # data = sorted([(i['case_id'], i) for i in data])
     #data = [i[1] for i in data]
