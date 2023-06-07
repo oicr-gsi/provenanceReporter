@@ -1479,14 +1479,9 @@ def get_cases(project_name):
     conn = connect_to_db()
     data = conn.execute("SELECT case_id, donor_id, species, sex, created_date, modified_date, miso, parent_project FROM Samples WHERE project_id = '{0}'".format(project_name)).fetchall()
     
-    # data = sorted([(i['case_id'], i) for i in data])
-    #data = [i[1] for i in data]
-    
     data = [dict(i) for i in data]
-    
-    
+       
     return data
-
 
 
 
@@ -1671,38 +1666,6 @@ def sequencing(project_name):
 
 
 
-# @app.route('/<project_name>/whole_genome_sequencing')
-# def whole_genome_sequencing(project_name):
-    
-#     # get the project info for project_name from db
-#     project = get_project_info(project_name)
-    
-#     # get the pipelines from the library definitions in db
-#     pipelines = get_pipelines(project_name)
-        
-#     conn = connect_to_db()
-#     #extract sample, library and workflow information for call ready workflow bamMergePreprocessing
-#     data = conn.execute("SELECT Files.creation_date, Libraries.library, Libraries.sample, \
-#                           Libraries.ext_id, Libraries.group_id, Libraries.tissue_type, \
-#                           Libraries.tissue_origin, Workflow_Inputs.run, Workflow_Inputs.lane, \
-#                           Workflow_Inputs.platform, Workflows.wf, Workflows.wfv, Workflows.wfrun_id \
-#                           from Files JOIN Libraries JOIN Workflow_Inputs JOIN Workflows \
-#                           WHERE Files.project_id = '{0}' AND Libraries.project_id = '{0}' \
-#                           AND Workflow_Inputs.project_id = '{0}' AND Workflows.project_id = '{0}' \
-#                           AND Files.wfrun_id = Workflow_Inputs.wfrun_id  AND Workflow_Inputs.wfrun_id = Workflows.wfrun_id AND Workflow_Inputs.library = Libraries.library \
-#                           AND LOWER(SUBSTR(Workflows.wf, 1, 21)) = 'bammergepreprocessing';".format(project_name)).fetchall()
-#     conn.close()
-
-#     # get samples and libraries for the most recent bmpp run for each case in project
-#     cases = get_call_ready_cases(data)
-    
-#     samples = sorted(list(cases.keys()))
-
-   
-#     return render_template('Whole_Genome_Sequencing.html', routes = routes, project=project, samples=samples, cases=cases, pipelines=pipelines)
-
-
-
 @app.route('/<project_name>/whole_genome_sequencing')
 def whole_genome_sequencing(project_name):
     
@@ -1712,74 +1675,12 @@ def whole_genome_sequencing(project_name):
     # get the pipelines from the library definitions in db
     pipelines = get_pipelines(project_name)
         
-    # conn = connect_to_db()
-    # #extract sample, library and workflow information for call ready workflow bamMergePreprocessing
-    # # data = conn.execute("SELECT Files.creation_date, Libraries.library, Libraries.sample, \
-    # #                       Libraries.ext_id, Libraries.group_id, Libraries.tissue_type, \
-    # #                       Libraries.tissue_origin, Workflow_Inputs.run, Workflow_Inputs.lane, \
-    # #                       Workflow_Inputs.platform, Workflows.wf, Workflows.wfv, Workflows.wfrun_id \
-    # #                       from Files JOIN Libraries JOIN Workflow_Inputs JOIN Workflows \
-    # #                       WHERE Files.project_id = '{0}' AND Libraries.project_id = '{0}' \
-    # #                       AND Workflow_Inputs.project_id = '{0}' AND Workflows.project_id = '{0}' \
-    # #                       AND Files.wfrun_id = Workflow_Inputs.wfrun_id  AND Workflow_Inputs.wfrun_id = Workflows.wfrun_id AND Workflow_Inputs.library = Libraries.library \
-    # #                       AND LOWER(SUBSTR(Workflows.wf, 1, 21)) = 'bammergepreprocessing';".format(project_name)).fetchall()
-    # conn.close()
-
     # get samples and libraries and workflow ids for each case
     cases = get_call_ready_cases(project_name, 'novaseq', 'WG')
     samples = sorted(list(cases.keys()))
 
    
     return render_template('Whole_Genome_Sequencing.html', routes = routes, project=project, samples=samples, cases=cases, pipelines=pipelines)
-
-
-
-
-
-
-
-# @app.route('/<project_name>/whole_genome_sequencing/<case>')
-# def wgs_case(project_name, case):
-    
-#     # get the project info for project_name from db
-#     project = get_project_info(project_name)
-    
-#     # get the pipelines from the library definitions in db
-#     pipelines = get_pipelines(project_name)
-        
-#     # extract sample, library and workflow information for call ready workflow bamMergePreprocessing
-#     conn = connect_to_db()
-#     data = conn.execute("SELECT Files.creation_date, Files.file, Libraries.library, Libraries.sample, \
-#                          Libraries.ext_id, Libraries.group_id, Libraries.tissue_type, \
-#                          Libraries.tissue_origin, Workflow_Inputs.run, Workflow_Inputs.lane, \
-#                          Workflow_Inputs.platform, Workflows.wf, Workflows.wfv, Workflows.wfrun_id \
-#                          from Files JOIN Libraries JOIN Workflow_Inputs JOIN Workflows \
-#                          WHERE Files.project_id = '{0}' AND Libraries.project_id = '{0}' \
-#                          AND Workflow_Inputs.project_id = '{0}' AND Workflows.project_id = '{0}' \
-#                          AND Files.wfrun_id = Workflow_Inputs.wfrun_id  AND Workflow_Inputs.wfrun_id = Workflows.wfrun_id AND Workflow_Inputs.library = Libraries.library \
-#                          AND LOWER(SUBSTR(Workflows.wf, 1, 21)) = 'bammergepreprocessing' AND Libraries.sample ='{1}'".format(project_name, case)).fetchall()
-#     conn.close()
-
-#     # get sample, library and file info for for the most recent bmpp run for case in project
-#     bmpp_id, bmpp_files, bmpp_info = get_bmpp_files(data)
-    
-#     # get QC status of bmpp input fastq files
-#     fastq_status = bmpp_input_raw_seq_status(project_name, bmpp_id)
-
-#     # get the bmpp downstream workflows
-#     bmpp_children_workflows = get_bmpp_downstream_workflows(project_name, bmpp_id)
-    
-#     for libraries in bmpp_children_workflows:
-#         for workflow in bmpp_children_workflows[libraries]:
-#             if bmpp_children_workflows[libraries][workflow]['files']:
-#                 files = [os.path.dirname(bmpp_children_workflows[libraries][workflow]['files'][0])] + sorted(map(lambda x: os.path.basename(x), bmpp_children_workflows[libraries][workflow]['files']))
-#                 bmpp_children_workflows[libraries][workflow]['files'] = files
-    
-#     return render_template('WGS_case.html', routes = routes, fastq_status=fastq_status,
-#                             bmpp_info=bmpp_info, bmpp_id=bmpp_id, bmpp_files=bmpp_files,
-#                             sample_case=case, project=project, pipelines=pipelines,
-#                             bmpp_children_workflows=bmpp_children_workflows, case=case)
-
 
 
 @app.route('/<project_name>/whole_genome_sequencing/<case>')
@@ -1895,46 +1796,6 @@ def whole_transcriptome(project_name):
 
 
 
-
-
-# @app.route('/download_bmpp_data/<project_name>/<case>/<bmpp_id>')
-# def get_bmpp_data(project_name, case, bmpp_id):
-#     '''
-    
-    
-#     '''
-    
-#     # get bmpp downstream workflow info
-#     bmpp_children_workflows = get_bmpp_downstream_workflows(project_name, bmpp_id)
-    
-#     # format bmpp downstream workflow info for DARE
-#     D = {}
-#     for i in bmpp_children_workflows:
-#         for workflow in bmpp_children_workflows[i]:
-#             sample = bmpp_children_workflows[i][workflow]['sample'].replace(';', '.')
-#             workflow_id = bmpp_children_workflows[i][workflow]['workflow_id']
-#             version = bmpp_children_workflows[i][workflow]['version']    
-#             if sample not in D:
-#                 D[sample] = {}
-#             D[sample][workflow] = {"workflow_id": workflow_id, "workflow_version": version}
-    
-#     # add bmpp workflow info
-#     conn = connect_to_db()
-#     data = conn.execute("SELECT Workflows.wfrun_id, Workflows.wfv, Workflows.wf FROM Workflows \
-#                         WHERE Workflows.project_id = '{0}' AND Workflows.wfrun_id = '{1}';".format(project_name, bmpp_id)).fetchall()
-#     data = list(set(data))
-#     d = dict(data[0])
-#     conn.close()
-    
-#     for sample in D:
-#         D[sample][d['wf']] = {'workflow_id': d['wfrun_id'], 'workflow_version': d['wfv']}
-       
-#     # send the json to outoutfile                    
-#     return Response(
-#         response=json.dumps(D),
-#         mimetype="application/json",
-#         status=200,
-#         headers={"Content-disposition": "attachment; filename={0}_WGS_{1}_{2}.json".format(project_name, case, bmpp_id)})
 
 
 @app.route('/download_wgs_block/<project_name>/<case>/<block>')
