@@ -24,9 +24,9 @@ import numpy as np
 import io
 import base64
 
-from whole_transcriptome import get_WT_call_ready_cases
+from whole_transcriptome import get_WT_call_ready_cases, get_star_case
 from utilities import connect_to_db, get_children_workflows, filter_out_QC_workflows
-
+from analysis_block import get_workflow_name, sort_call_ready_samples, get_case_call_ready_samples
 
 
 
@@ -162,50 +162,10 @@ def get_bmpp_case(project_name, case, platform, library_type):
     return bmpps
 
 
-def get_bmpp_samples(project_name, bmpp_run_id):
-    '''
-    
-    
-    
-    '''
-    conn = connect_to_db()
-    data = conn.execute("SELECT Libraries.sample, Libraries.group_id, Libraries.library, Libraries.tissue_type, \
-                        Libraries.tissue_origin, Libraries.library_type \
-                        FROM Libraries JOIN Workflow_Inputs WHERE Workflow_Inputs.library = Libraries.library \
-                        AND Workflow_Inputs.wfrun_id = '{0}' AND Libraries.project_id = '{1}' \
-                        AND Workflow_Inputs.project_id = '{1}'".format(bmpp_run_id, project_name)).fetchall()
-    conn.close()
-
-    data = list(set(data))
-    
-    samples = {'normal': [], 'tumour': []}
-    for i in data:
-        if i['tissue_type'] == 'R':
-            tissue = 'normal'
-        else:
-            tissue = 'tumour'
-        sample = '_'.join([i['sample'], i['tissue_type'], i['tissue_origin'], i['library_type'], i['group_id']]) 
-        if sample not in samples[tissue]:
-            samples[tissue].append(sample)
-
-    return samples
 
 
 
 
-def sort_bmpp_samples(project_name, blocks):
-    
-    D = {}
-
-    for block in blocks:
-        bmpp_ids = block.split('.')
-        for i in bmpp_ids:
-            if block not in D:
-                D[block] = {}
-            D[block][i] = {'samples': get_bmpp_samples(project_name, i), 'name': get_workflow_name(i)}
-            
-    
-    return D
 
 
 def get_workflow_file_count(workflow_id):
@@ -379,24 +339,6 @@ def get_block_release_status(block_workflows):
     return D
         
 
-def get_case_bmpp_samples(project_name, bmpp_ids):
-    '''
-    (str, list)
-    
-    
-    '''
-    
-    
-    L = []
-    for i in bmpp_ids:
-        samples = get_bmpp_samples(project_name, i)
-        if samples not in L:
-            L.append(samples)    
-    D = {'normal': [], 'tumour': []}
-    for d in L:
-        D['normal'].extend(d['normal'])
-        D['tumour'].extend(d['tumour'])
-    return D
     
 
 
@@ -593,22 +535,6 @@ def find_analysis_blocks(project_name, D):
 
 
 
-def get_workflow_name(wfrun_id):
-    '''
-    
-    
-    
-    '''
-    
-    
-    
-    conn = connect_to_db()    
-    data = conn.execute("SELECT Workflows.wf FROM Workflows WHERE Workflows.wfrun_id='{0}'".format(wfrun_id)).fetchall()
-    conn.close()   
-    data = list(set(data))
-
-    assert len(data) == 1
-    return data[0]['wf']
 
     
 
@@ -1698,7 +1624,7 @@ def wgs_case(project_name, case):
     bmpp = get_bmpp_case(project_name, case, 'novaseq', 'WG')    
     
     # identify the samples processed
-    samples = get_case_bmpp_samples(project_name, bmpp)
+    samples = get_case_call_ready_samples(project_name, bmpp)
     
     # match all T/N pairs
     pairs = group_normal_tumor_pairs(samples)
@@ -1732,7 +1658,7 @@ def wgs_case(project_name, case):
     figures = plot_workflow_network(matrix, workflow_names)
     
     # get the samples for each bmpp id
-    samples_bmpp = sort_bmpp_samples(project_name, blocks)
+    samples_bmpp = sort_call_ready_samples(project_name, blocks)
     
     # get the workflow file counts
     file_counts = get_block_workflow_file_count(block_workflows)
@@ -1785,10 +1711,86 @@ def whole_transcriptome(project_name):
 
 
 
-# @app.route('/<project_name>/whole_transcriptome/<case>')
-# def wt_case(project_name, case):
+@app.route('/<project_name>/whole_transcriptome/<case>')
+def wt_case(project_name, case):
     
-#     pass
+    # get the project info for project_name from db
+    project = get_project_info(project_name)
+    
+    # get the pipelines from the library definitions in db
+    pipelines = get_pipelines(project_name)
+        
+    # build the somatic calling block
+
+    # identify all call ready star runs for novaseq
+    star = get_star_case(project_name, case, 'novaseq', 'WT')
+    
+    # identify the samples processed
+    samples = get_case_call_ready_samples(project_name, star)
+    
+    # # match all T/N pairs
+    # pairs = group_normal_tumor_pairs(samples)
+    
+    # # find analysis workflows for each N/T pairs
+    # # remove sample pairs without analysis workflows
+    # D = map_workflows_to_sample_pairs(project_name, 'novaseq', pairs)
+    
+    # # find the blocks by mapping the analysis workflows to ttheir parent workflows    
+    # blocks = find_analysis_blocks(project_name, D)
+    
+    # # get the parent workflows for each block
+    # parent_workflows = map_workflows_to_parent(project_name, D)
+    
+    # # list all workflows for each block
+    # block_workflows = list_block_workflows(blocks)
+    
+    # # assign date to each block. most recent file creation date from all workflows within block 
+    # block_date = get_block_analysis_date(block_workflows)
+    
+    # # get the date of each workflow within block
+    # workflow_date = get_block_workflows_date(block_workflows)
+        
+    # # get the workflow names
+    # workflow_names = get_node_labels(block_workflows)
+        
+    # # convert workflow relationships to adjacency matrix for each block
+    # matrix = make_adjacency_matrix(blocks, block_workflows, parent_workflows)
+                                   
+    # # create figures
+    # figures = plot_workflow_network(matrix, workflow_names)
+    
+    # # get the samples for each bmpp id
+    # samples_bmpp = sort_call_ready_samples(project_name, blocks)
+    
+    # # get the workflow file counts
+    # file_counts = get_block_workflow_file_count(block_workflows)
+    
+    # # get release status of input sequences for each block
+    # release_status = get_block_release_status(block_workflows)
+    
+    # # get the amount of data for each workflow
+    # amount_data = get_amount_data(block_workflows)
+    
+    # # check if blocks are complete
+    # expected_workflows = sorted(['mutect2', 'variantEffectPredictor', 'delly', 'varscan', 'sequenza', 'mavis'])           
+    # complete = {block: is_block_complete(blocks[block], expected_workflows) for block in blocks}
+   
+    # # order blocks based on the amount of data
+    # ordered_blocks = order_blocks(blocks, amount_data)
+
+    # # name each block according to the selected block order
+    # names = name_WGS_blocks(ordered_blocks)
+     
+    # # get miso link
+    # miso_link = get_miso_sample_link(project_name, case)
+        
+    # return render_template('WGS_case.html', routes = routes, blocks=blocks,
+    #                         sample_case=case, project=project, pipelines=pipelines,
+    #                         case=case, miso_link=miso_link, names=names, figures=figures,
+    #                         samples_bmpp=samples_bmpp, block_date=block_date,
+    #                         workflow_date=workflow_date, file_counts=file_counts,
+    #                         complete=complete, release_status=release_status, amount_data=amount_data)
+
 
 
 
@@ -1813,7 +1815,7 @@ def download_block_data(project_name, case, block):
     bmpp = get_bmpp_case(project_name, case, 'novaseq', 'WG')    
     
     # identify the samples processed
-    samples = get_case_bmpp_samples(project_name, bmpp)
+    samples = get_case_call_ready_samples(project_name, bmpp)
     
     # match all T/N pairs
     pairs = group_normal_tumor_pairs(samples)
