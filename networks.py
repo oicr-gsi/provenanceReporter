@@ -86,34 +86,6 @@ def make_adjacency_matrix(block_workflows, parent_workflows):
                 M.append(m)
             matrix[block][bmpp] = M
 
-                    
-    
-    
-    
-    # for block in block_workflows:
-    #     M = []
-    #     for i in block_workflows[block]:
-    #         m = []
-    #         for j in block_workflows[block]:
-    #             if i not in parent_workflows and j not in parent_workflows:
-    #                 m.append(0)
-    #             elif i == j:
-    #                 m.append(0)
-    #             elif i in parent_workflows:
-    #                 if j in parent_workflows[i]:
-    #                     m.append(1)
-    #                 else:
-    #                     m.append(0)
-    #             elif i not in parent_workflows:
-    #                 if i in parent_workflows[j]:
-    #                     m.append(1)
-    #                 else:
-    #                     m.append(0)
-                    
-    #         M.append(m)
-    
-    #     matrix[block] = M
-
     return matrix
 
 

@@ -97,75 +97,6 @@ def get_case_call_ready_samples(project_name, bmpp_ids):
 
 
 
-
-
-# def map_libraries_to_samples(project_name, sample):
-#     '''
-    
-    
-    
-#     '''
-   
-#     s = sample.split('_')
-#     donor = s[0] + '_' + s[1]
-    
-#     tissue_type = s[2]
-#     tissue_origin = s[3]
-#     library_type = s[4]
-#     group_id = '_'.join(s[5:])
-#     conn = connect_to_db()
-#     data = conn.execute("SELECT Libraries.library FROM Libraries WHERE libraries.sample = '{0}' AND \
-#                         Libraries.group_id = '{1}' AND Libraries.tissue_type = '{2}' AND \
-#                         Libraries.tissue_origin = '{3}' AND Libraries.library_type = '{4}' AND \
-#                         Libraries.project_id = '{5}'".format(donor, group_id, tissue_type, tissue_origin, library_type, project_name)).fetchall()
-#     conn.close()
-
-#     libraries= [i['library'] for i in data]
-#     return libraries
-
-
-
-
-# def map_analysis_workflows_to_sample(project_name, sample, platform):
-#     '''
-#     (list)
-    
-    
-    
-#     '''
-
-    
-    
-#     libraries = map_libraries_to_samples(project_name, sample)
-    
-    
-#     L = []
-#     for library in libraries:
-#         conn = connect_to_db()    
-#         data = conn.execute("SELECT Workflow_Inputs.wfrun_id, Workflow_Inputs.platform, Workflows.wf FROM \
-#                             Workflow_Inputs JOIN Workflows WHERE Workflow_Inputs.library == '{0}' \
-#                             AND Workflow_Inputs.wfrun_id = Workflows.wfrun_id AND \
-#                             Workflow_Inputs.project_id = '{1}' AND LOWER(Workflows.wf) NOT IN \
-#                             ('wgsmetrics', 'insertsizemetrics', 'bamqc', 'calculatecontamination', \
-#                              'calculatecontamination_lane_level', 'callability', 'fastqc', \
-#                              'crosscheckfingerprintscollector_bam', 'crosscheckfingerprintscollector', \
-#                              'fingerprintcollector', 'bamqc_lane_level', 'bamqc_call_ready', 'bwamem', \
-#                              'bammergepreprocessing', 'ichorcna_lane_level', 'ichorcna', 'tmbanalysis', \
-#                              'casava', 'bcl2fastq', 'fileimportforanalysis', 'fileimport', \
-#                              'import_fastq')".format(library, project_name)).fetchall()
-#         conn.close()   
-#         data = list(set(data))
-#         to_remove = [i for i in data if platform not in i['platform'].lower()]
-#         for i in to_remove:
-#             data.remove(i)
-#         L.extend(data)
-#     L = list(set(L))
-#     return L
-
-
-
-
-
 def map_analysis_workflows_to_sample(project_name, sample, platform):
     '''
     (list)
@@ -252,47 +183,6 @@ def map_workflows_to_sample_pairs(project_name, platform, pairs):
     
     return D
 
-
-
-
-
-
-
-
-
-
-
-
-# def get_case_samples(project_name, case):
-#     '''
-    
-    
-    
-#     '''
-#     conn = connect_to_db()
-#     data = conn.execute("SELECT Libraries.sample, Libraries.group_id, Libraries.library, \
-#                         Libraries.tissue_type, Libraries.tissue_origin, Libraries.library_type \
-#                         FROM Libraries JOIN Workflow_Inputs WHERE Workflow_Inputs.library = Libraries.library \
-#                         AND Workflow_Inputs.wfrun_id = '{0}' AND Libraries.project_id = '{1}' \
-#                         AND Workflow_Inputs.project_id = '{1}'".format(bmpp_run_id, project_name)).fetchall()
-#     conn.close()
-
-#     data = list(set(data))
-    
-#     samples = {'normal': [], 'tumour': []}
-#     for i in data:
-#         if i['tissue_type'] == 'R':
-#             tissue = 'normal'
-#         else:
-#             tissue = 'tumour'
-#         sample = '_'.join([i['sample'], i['tissue_type'], i['tissue_origin'], i['library_type'], i['group_id']]) 
-#         if sample not in samples[tissue]:
-#             samples[tissue].append(sample)
-
-#     return samples
-
-
-####################
 
 
 def get_case_samples(project_name, case, library_type):
@@ -398,53 +288,6 @@ def map_sample_pairs_to_bmpp_runs(project_name, platform, pairs):
     return D
 
 
-# def find_analysis_blocks(project_name, D):
-#     '''
-    
-    
-#     '''
-    
-#     blocks = {}
-
-
-#     # map each workflow to its parent(s)
-#     parent_workflows = map_workflows_to_parent(project_name, D)
-    
-#     # sort bmpp-dowsntream workflows by block and sample     
-#     for samples in D:
-#         for j in D[samples]:
-#             if 'mutect2' in j['wf'].lower() or 'varscan' in j['wf'].lower() or 'delly' in j['wf'].lower():
-#                 # get input workflow(s)
-#                 parents = get_parent_workflows(project_name, j['wfrun_id'])
-#                 assert len(parents.keys()) == 1
-#                 assert 'bamMergePreprocessing' in list(parents.keys())[0]
-#                 parent_workflow = '.'.join(sorted(parents[list(parents.keys())[0]]))
-#                 if parent_workflow not in blocks:
-#                     blocks[parent_workflow] = {}
-#                 if samples not in blocks[parent_workflow]:
-#                     blocks[parent_workflow][samples] = []
-#                 wfrunid = j['wfrun_id']
-#                 d = {wfrunid: {'parent': j, 'children': []}}
-#                 #blocks[parent_workflow][samples].append(j)
-#                 blocks[parent_workflow][samples].append(d)
-        
-#     # sort workflows downstream of callers by block and sample, 
-#     # keeping track of workflow aprent-child relationshsips    
-#     for block in blocks:
-#         for samples in D:
-#             for j in D[samples]:
-#                 if 'sequenza' in j['wf'].lower() or 'mavis' in j['wf'].lower() or 'varianteffectpredictor' in j['wf'].lower():
-#                     #parent = get_parent_workflows(project_name, j['wfrun_id'])
-#                     upstream = parent_workflows[j['wfrun_id']]
-#                     if samples in blocks[block]:
-#                         for k in blocks[block][samples]:
-#                             for m in upstream:
-#                                 if m in k:
-#                                     k[m]['children'].append(j)
-#     return blocks                
-
-
-
 
 def map_workflows_to_parent(project_name, D):
     '''
@@ -497,55 +340,6 @@ def get_parent_workflows(project_name, workflow_id):
 
 
 
-
-# def find_analysis_blocks(project_name, D):
-#     '''
-    
-    
-#     '''
-    
-#     blocks = {}
-
-
-#     # map each workflow to its parent(s)
-#     parent_workflows = map_workflows_to_parent(project_name, D)
-    
-#     # get the bmpp sort bmpp-dowsntream workflows by block and sample     
-#     for samples in D:
-#         for j in D[samples]:
-#             if 'mutect2' in j['wf'].lower() or 'varscan' in j['wf'].lower() or 'delly' in j['wf'].lower():
-#                 # get input workflow(s)
-#                 parents = get_parent_workflows(project_name, j['wfrun_id'])
-#                 assert len(parents.keys()) == 1
-#                 assert 'bamMergePreprocessing' in list(parents.keys())[0]
-#                 parent_workflow = '.'.join(sorted(parents[list(parents.keys())[0]]))
-#                 if parent_workflow not in blocks:
-#                     blocks[parent_workflow] = {}
-#                 if samples not in blocks[parent_workflow]:
-#                     blocks[parent_workflow][samples] = []
-#                 wfrunid = j['wfrun_id']
-#                 d = {wfrunid: {'parent': j, 'children': []}}
-#                 #blocks[parent_workflow][samples].append(j)
-#                 blocks[parent_workflow][samples].append(d)
-        
-#     # sort workflows downstream of callers by block and sample, 
-#     # keeping track of workflow aprent-child relationshsips    
-#     for block in blocks:
-#         for samples in D:
-#             for j in D[samples]:
-#                 if 'sequenza' in j['wf'].lower() or 'mavis' in j['wf'].lower() or 'varianteffectpredictor' in j['wf'].lower():
-#                     #parent = get_parent_workflows(project_name, j['wfrun_id'])
-#                     upstream = parent_workflows[j['wfrun_id']]
-#                     if samples in blocks[block]:
-#                         for k in blocks[block][samples]:
-#                             for m in upstream:
-#                                 if m in k:
-#                                     k[m]['children'].append(j)
-#     return blocks                
-
-
-
-
 def find_analysis_blocks(project_name, D, parent_workflows, bmpp):
     '''
     
@@ -558,9 +352,6 @@ def find_analysis_blocks(project_name, D, parent_workflows, bmpp):
     # record all parent workflows
     L = []
 
-    # map each workflow to its parent(s)
-    #parent_workflows = map_workflows_to_parent(project_name, D)
-    
     # get the bmpp sort bmpp-dowsntream workflows by block and sample     
     for samples in D:
         for j in D[samples]:
@@ -636,20 +427,10 @@ def get_workflow_analysis_date(workflow_run_id):
     
     data = list(set(data))
     
-    # # select the most recent date if dates differ
-    # most_recent = data[0]['creation_date']
-        
-    # for i in data:
-    #     assert i['creation_date'] == most_recent
-    #     if i['creation_date'] > most_recent:
-    #         most_recent = i['creation_date']
-    
     # select creation date of any file
     most_recent = data[0]['creation_date']
     
     return most_recent
-
-
 
 
 def get_block_analysis_date(block_workflows):
