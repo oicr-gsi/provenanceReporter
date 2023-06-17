@@ -6,7 +6,7 @@ Created on Tue Jun  6 15:04:02 2023
 """
 
 import sqlite3
-
+import time
 
 
 
@@ -73,4 +73,57 @@ def filter_out_QC_workflows(project_name, workflows):
         del workflows[i]
     return workflows
 
+
+def convert_epoch_time(epoch):
+    '''
+    (str) -> str
+    
+    Returns epoch time in readable format
+    
+    Parameters
+    ----------
+    - epoch (str)
+    '''
+    
+    return time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(int(epoch)))
+
+
+
+def get_workflow_name(wfrun_id):
+    '''
+    (str) -> str
+
+    Returns the name of the workflow defined by workflow run id    
+    
+    Parameters
+    ----------
+    - wfrun_id (str): Workflow run identifier
+    '''
+        
+    conn = connect_to_db()    
+    data = conn.execute("SELECT Workflows.wf FROM Workflows WHERE Workflows.wfrun_id='{0}'".format(wfrun_id)).fetchall()
+    conn.close()   
+    data = list(set(data))
+
+    return data[0]['wf']
+
+
+def get_miso_sample_link(project_name, case):
+    '''
+    (str, str) -> str
+    
+    Returns a link to the sample MISO page
+    
+    Parameters
+    ----------
+    - project_name (str): Project of interest
+    - case (str): Sample name
+    '''
+    
+    conn = connect_to_db()
+    data = conn.execute("SELECT miso FROM Samples WHERE project_id = '{0}' AND case_id = '{1}';".format(project_name, case)).fetchall()
+    data = list(set(data))
+    miso_link = data[0]['miso']
+    
+    return miso_link
 

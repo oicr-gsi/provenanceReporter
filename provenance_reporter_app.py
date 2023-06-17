@@ -25,9 +25,13 @@ import io
 import base64
 
 from whole_transcriptome import get_WT_call_ready_cases, get_star_case
-from utilities import connect_to_db, get_children_workflows, filter_out_QC_workflows
-from analysis_block import get_workflow_name, sort_call_ready_samples, get_case_call_ready_samples
-
+from utilities import connect_to_db, get_children_workflows, filter_out_QC_workflows, \
+    get_miso_sample_link
+from whole_genome import get_bmpp_case, get_case_call_ready_samples, group_normal_tumor_pairs, \
+    find_analysis_blocks, map_workflows_to_sample_pairs, map_workflows_to_parent, list_block_workflows, \
+    get_block_analysis_date, sort_call_ready_samples, get_block_workflow_file_count, get_block_release_status, \
+    get_amount_data, is_block_complete, order_blocks, name_WGS_blocks, create_block_json    
+from networks import get_node_labels, make_adjacency_matrix, plot_workflow_network
 
 
 def group_sequences(L):
@@ -140,26 +144,26 @@ def get_sequences(L):
     return F
 
 
-def get_bmpp_case(project_name, case, platform, library_type):
-    '''
+# def get_bmpp_case(project_name, case, platform, library_type):
+#     '''
     
     
     
-    '''
-    conn = connect_to_db()
-    data = conn.execute("SELECT Libraries.sample, Libraries.library, Libraries.library_type, Workflow_Inputs.lane, \
-                         Workflow_Inputs.platform, Workflow_Inputs.wfrun_id, Workflows.wf, \
-                         Workflows.wfrun_id FROM Libraries JOIN Workflow_Inputs JOIN Workflows \
-                         WHERE Libraries.project_id = '{0}' AND Workflow_Inputs.project_id = '{0}' \
-                         AND Workflows.project_id = '{0}' AND Workflows.wfrun_id = Workflow_Inputs.wfrun_id \
-                         AND Workflow_Inputs.library = Libraries.library \
-                         AND LOWER(SUBSTR(Workflows.wf, 1, 21)) = 'bammergepreprocessing' \
-                         AND Libraries.sample ='{1}'".format(project_name, case)).fetchall()
-    conn.close()
+#     '''
+#     conn = connect_to_db()
+#     data = conn.execute("SELECT Libraries.sample, Libraries.library, Libraries.library_type, Workflow_Inputs.lane, \
+#                          Workflow_Inputs.platform, Workflow_Inputs.wfrun_id, Workflows.wf, \
+#                          Workflows.wfrun_id FROM Libraries JOIN Workflow_Inputs JOIN Workflows \
+#                          WHERE Libraries.project_id = '{0}' AND Workflow_Inputs.project_id = '{0}' \
+#                          AND Workflows.project_id = '{0}' AND Workflows.wfrun_id = Workflow_Inputs.wfrun_id \
+#                          AND Workflow_Inputs.library = Libraries.library \
+#                          AND LOWER(SUBSTR(Workflows.wf, 1, 21)) = 'bammergepreprocessing' \
+#                          AND Libraries.sample ='{1}'".format(project_name, case)).fetchall()
+#     conn.close()
 
-    bmpps = list(set([i['wfrun_id'] for i in data if platform in i['platform'].lower() and library_type == i['library_type']]))
+#     bmpps = list(set([i['wfrun_id'] for i in data if platform in i['platform'].lower() and library_type == i['library_type']]))
     
-    return bmpps
+#     return bmpps
 
 
 
@@ -168,84 +172,19 @@ def get_bmpp_case(project_name, case, platform, library_type):
 
 
 
-def get_workflow_file_count(workflow_id):
-    
-    conn = connect_to_db()
-    data = conn.execute("SELECT Files.file FROM Files WHERE Files.wfrun_id = '{0}'".format(workflow_id)).fetchall()
-    conn.close()
-
-    data = list(set(data))
-    
-    return len(data)
 
 
 
 
 
 
-def get_block_workflow_file_count(block_workflows):
-    
-    
-    D = {}
-    for block in block_workflows:
-        for workflow in block_workflows[block]:
-            D[workflow] = get_workflow_file_count(workflow)
-    return D
     
     
 
-def is_block_complete(block, expected_workflows):
-
-    if len(block) == 0:
-        complete = False
-    else:
-        complete = True
-        c = []
-        
-        for sample in block:
-            workflows = []
-            for d in block[sample]:
-                for workflow in d:
-                    workflows.append(d[workflow]['parent']['wf'])
-                    if d[workflow]['children']:
-                        for k in d[workflow]['children']:
-                            workflows.append(k['wf'])
-            # homogeneize workflow names by removing the matched suffix
-            for i in range(len(workflows)):
-                if '_' in workflows[i]:
-                    workflows[i] = workflows[i].split('_')[0]
-            # check that all workflows are present
-            if sorted(list(set(workflows))) != sorted(list(set(expected_workflows))):
-                complete = False
-            c.append(complete)
-        
-        complete = all(c)
-    return complete
 
 
-def get_workflow_limskeys(workflow_id):
-    
-    
-    conn = connect_to_db()
-    data = conn.execute("SELECT Workflow_Inputs.limskey FROM Workflow_Inputs WHERE Workflow_Inputs.wfrun_id = '{0}'".format(workflow_id)).fetchall()
-    conn.close()
-
-    data = list(set(data))
-
-    limskeys = [i['limskey'] for i in data]
-    #limskeys = list(set(limskeys()))                    
-        
-    return limskeys
 
 
-def get_amount_data(block_workflows):
-    
-    D = {}
-    for block in block_workflows:
-        D[block] = {}
-        for workflow_id in block_workflows[block]:
-            D[block][workflow_id] = len(get_workflow_limskeys(workflow_id))
-    return D
 
 
 # def select_block(amount_data, bmpp):
@@ -268,604 +207,76 @@ def get_amount_data(block_workflows):
 
 
 
-def order_blocks(blocks, amount_data):
-    
-    
-    block_names = blocks.keys()
-    
-    # order blocks based on the total amount of lanes for the call-ready workflows within each block
-    L = []
-    for block in block_names:
-        total = 0
-        # sum all lanes for all call-ready workflows within each block
-        workflows = list(map(lambda x: x.strip(), block.split('.')))
-        for workflow_id in workflows:
-            assert block in amount_data
-            total += amount_data[block][workflow_id]
-        L.append([total, block])
-    
-    L = sorted(L, key=lambda x: x[0], reverse=True)
-                
-    return [i[1] for i in L]
 
 
 
-def get_file_release_status(file_swid):
-    
-    
-    conn = connect_to_db()
-    
-    data = conn.execute("SELECT FilesQC.status FROM FilesQC WHERE FilesQC.file_swid = '{0}';".format(file_swid)).fetchall()
-    conn.close()
-
-    status = data[0]['status']    
-    
-    return status
 
 
-def get_workflow_release_status(workflow_id):
-        
-    # get workflow limskeys
-    limskeys = get_workflow_limskeys(workflow_id)
-    
-    limskeys = list(set(limskeys))
-    
-    # get file_swid
-    file_swids = []
-    conn = connect_to_db()
-    
-    for i in limskeys:
-        # ignore fastq-import workflows
-        data = conn.execute("SELECT Files.file_swid FROM Files WHERE Files.limskey = '{0}' \
-                            AND LOWER(Files.workflow) IN ('casava', 'bcl2fastq');".format(i)).fetchall()
-        file_swids.extend([j['file_swid'] for j in data])
-    conn.close()
-
-    file_swids = list(set(file_swids))
-
-    status = all(map(lambda x: x.lower() == 'pass', [get_file_release_status(i) for i in file_swids])) 
-    
-    return status
     
 
-def get_block_release_status(block_workflows):
-    
-    D = {}
-    for block in block_workflows:
-        workflows = block.split('.')
-        #status = all([get_workflow_release_status(j) for j in block_workflows[block]])
-        status = all([get_workflow_release_status(j) for j in workflows])
-        D[block] = status
-    return D
         
 
     
 
 
-def group_normal_tumor_pairs(samples):
-    '''
+# def group_normal_tumor_pairs(samples):
+#     '''
     
     
-    '''
+#     '''
     
-    pairs = []
-    if samples['normal'] and samples['tumour']:
-        for i in samples['normal']:
-            for j in samples['tumour']:
-                pairs.append(sorted([i, j]))
-    elif samples['normal']:
-        for i in samples['normal']:
-            pairs.append([i])
-    elif samples['tumour']:
-        for i in samples['tumour']:
-            pairs.append([i])
+#     pairs = []
+#     if samples['normal'] and samples['tumour']:
+#         for i in samples['normal']:
+#             for j in samples['tumour']:
+#                 pairs.append(sorted([i, j]))
+#     elif samples['normal']:
+#         for i in samples['normal']:
+#             pairs.append([i])
+#     elif samples['tumour']:
+#         for i in samples['tumour']:
+#             pairs.append([i])
        
-    return pairs
+#     return pairs
 
 
 
-def map_libraries_to_samples(project_name, sample):
-    '''
-    
-    
-    
-    '''
-   
-    s = sample.split('_')
-    donor = s[0] + '_' + s[1]
-    
-    tissue_type = s[2]
-    tissue_origin = s[3]
-    library_type = s[4]
-    group_id = '_'.join(s[5:])
-    conn = connect_to_db()
-    data = conn.execute("SELECT Libraries.library FROM Libraries WHERE libraries.sample = '{0}' AND \
-                        Libraries.group_id = '{1}' AND Libraries.tissue_type = '{2}' AND \
-                        Libraries.tissue_origin = '{3}' AND Libraries.library_type = '{4}' AND \
-                        Libraries.project_id = '{5}'".format(donor, group_id, tissue_type, tissue_origin, library_type, project_name)).fetchall()
-    conn.close()
-
-    libraries= [i['library'] for i in data]
-    return libraries
     
 
    
-def map_analysis_workflows_to_sample(project_name, sample, platform):
-    '''
-    (list)
-    
-    
-    
-    '''
-
-    
-    
-    libraries = map_libraries_to_samples(project_name, sample)
-    
-    
-    L = []
-    for library in libraries:
-        conn = connect_to_db()    
-        data = conn.execute("SELECT Workflow_Inputs.wfrun_id, Workflow_Inputs.platform, Workflows.wf FROM \
-                            Workflow_Inputs JOIN Workflows WHERE Workflow_Inputs.library == '{0}' \
-                            AND Workflow_Inputs.wfrun_id = Workflows.wfrun_id AND \
-                            Workflow_Inputs.project_id = '{1}' AND LOWER(Workflows.wf) NOT IN \
-                            ('wgsmetrics', 'insertsizemetrics', 'bamqc', 'calculatecontamination', \
-                             'calculatecontamination_lane_level', 'callability', 'fastqc', \
-                             'crosscheckfingerprintscollector_bam', 'crosscheckfingerprintscollector', \
-                             'fingerprintcollector', 'bamqc_lane_level', 'bamqc_call_ready', 'bwamem', \
-                             'bammergepreprocessing', 'ichorcna_lane_level', 'ichorcna', 'tmbanalysis', \
-                             'casava', 'bcl2fastq', 'fileimportforanalysis', 'fileimport', \
-                             'import_fastq')".format(library, project_name)).fetchall()
-        conn.close()   
-        data = list(set(data))
-        to_remove = [i for i in data if platform not in i['platform'].lower()]
-        for i in to_remove:
-            data.remove(i)
-        L.extend(data)
-    L = list(set(L))
-    return L
-
-
-def find_common_workflows(project_name, platform, samples):
-    '''
-    
-    
-    '''
-
-    
-    
-    L1 = map_analysis_workflows_to_sample(project_name, samples[0], platform)
-    L2 = map_analysis_workflows_to_sample(project_name, samples[1], platform)
-    
-    merged = []
-    for i in L1:
-        for j in L2:
-            if i == j:
-                merged.append(i)
-    return merged
-    
-
-def map_workflows_to_sample_pairs(project_name, platform, pairs):
-    '''
-    -> dict
-    
-    
-    
-    '''
-    
-    D = {}
-    for i in pairs:
-        j = ' | '.join(sorted(i))
-        L = find_common_workflows(project_name, platform, i)
-        #D[j] = list(map(lambda x: dict(x), L))
-        D[j] = L 
-    to_remove = [i for i in D if len(D[i]) == 0]    
-    for i in to_remove:
-        del D[i]
-    
-    return D
 
 
 
-def map_workflows_to_parent(project_name, D):
-    '''
-    
-    
-    '''
-    
-    parent_workflows = {}
-    
-    for samples in D:
-        for j in D[samples]:
-            parent = get_parent_workflows(project_name, j['wfrun_id'])
-            if j['wfrun_id'] not in parent_workflows:
-                parent_workflows[j['wfrun_id']] = []
-            for k in parent:
-                parent_workflows[j['wfrun_id']].extend(parent[k])
-
-    return parent_workflows
 
 
 
-def find_analysis_blocks(project_name, D):
-    '''
-    
-    
-    '''
-    
-    blocks = {}
 
 
-    # map each workflow to its parent(s)
-    parent_workflows = map_workflows_to_parent(project_name, D)
-    
-    # sort bmpp-dowsntream workflows by block and sample     
-    for samples in D:
-        for j in D[samples]:
-            if 'mutect2' in j['wf'].lower() or 'varscan' in j['wf'].lower() or 'delly' in j['wf'].lower():
-                # get input workflow(s)
-                parents = get_parent_workflows(project_name, j['wfrun_id'])
-                assert len(parents.keys()) == 1
-                assert 'bamMergePreprocessing' in list(parents.keys())[0]
-                parent_workflow = '.'.join(sorted(parents[list(parents.keys())[0]]))
-                if parent_workflow not in blocks:
-                    blocks[parent_workflow] = {}
-                if samples not in blocks[parent_workflow]:
-                    blocks[parent_workflow][samples] = []
-                wfrunid = j['wfrun_id']
-                d = {wfrunid: {'parent': j, 'children': []}}
-                #blocks[parent_workflow][samples].append(j)
-                blocks[parent_workflow][samples].append(d)
-        
-    # sort workflows downstream of callers by block and sample, 
-    # keeping track of workflow aprent-child relationshsips    
-    for block in blocks:
-        for samples in D:
-            for j in D[samples]:
-                if 'sequenza' in j['wf'].lower() or 'mavis' in j['wf'].lower() or 'varianteffectpredictor' in j['wf'].lower():
-                    #parent = get_parent_workflows(project_name, j['wfrun_id'])
-                    upstream = parent_workflows[j['wfrun_id']]
-                    if samples in blocks[block]:
-                        for k in blocks[block][samples]:
-                            for m in upstream:
-                                if m in k:
-                                    k[m]['children'].append(j)
-    return blocks                
+
 
 
 
 
     
 
-def list_block_workflows(blocks):
-    
-    
-    # list all workflows downstream of each bmpp
-    W = {}
-    for block in blocks:
-        L = []
-        for sample in blocks[block]:
-            for d in blocks[block][sample]:
-                for workflow in d:
-                    L.append(d[workflow]['parent']['wfrun_id'])
-                    for k in d[workflow]['children']:
-                        L.append(k['wfrun_id'])
-        L.extend(block.split('.'))
-        L = sorted(list(set(L)))            
-        W[block] = L
-    
-    return W
 
     
 
-def get_workflow_analysis_date(workflow_run_id):
-    
-    
-    # connect to db
-    conn = connect_to_db()
-    # extract project info
-    data = conn.execute("SELECT creation_date FROM Files WHERE wfrun_id='{0}'".format(workflow_run_id)).fetchall()
-    conn.close()
-    
-    data = list(set(data))
-    
-    # select the most recent date if dates differ
-    most_recent = data[0]['creation_date']
-    
-    for i in data:
-        if i['creation_date'] > most_recent:
-            most_recent = i['creation_date']
-    #most_recent = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(int(most_recent)))
-    return most_recent
 
 
-def convert_epoch_time(epoch):
-    
-    return time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(int(epoch)))
 
     
     
-def get_block_analysis_date(block_workflows):
-    
-    
-    most_recent = 0
-    # get the analysis date for each workflows in each block
-    block_date = {}
-    for block in block_workflows:
-        for wf in block_workflows[block]:
-            wf_date = get_workflow_analysis_date(wf)
-            if wf_date  > most_recent:
-                most_recent = wf_date
-        block_date[block] = convert_epoch_time(most_recent)
-    return block_date
-
-
-def get_block_workflows_date(block_workflows):
-    
-    D = {}
-    for block in block_workflows:
-        D[block] = {}
-        for wf in block_workflows[block]:
-            wf_date = convert_epoch_time(get_workflow_analysis_date(wf))
-            D[block][wf] = wf_date
-    return D
 
 
 
 
 
-def create_block_json(project_name, blocks, block):
-    
-    # organize the workflows by block and samples
-    D = {}
-    
-    for sample in blocks[block]:
-        sample_id = '.'.join(list(map(lambda x: x.strip(), sample.split('|'))))
-        D[sample_id] = []
-        D[sample_id].extend(block.split('.'))
-        for d in blocks[block][sample]:
-            for workflow in d:
-                D[sample_id].append(d[workflow]['parent']['wfrun_id'])
-                if d[workflow]['children']:
-                    for k in d[workflow]['children']:
-                        D[sample_id].append(k['wfrun_id'])
-                    
-    block_data = {}
-            
-    conn = connect_to_db()
-        
-    for sample in D:
-        if sample not in block_data:
-            block_data[sample] = {}
-        for workflow_id in D[sample]:
-            data = conn.execute("SELECT Workflows.wfrun_id, Workflows.wf, Workflows.wfv FROM Workflows \
-                                WHERE Workflows.project_id = '{0}' AND Workflows.wfrun_id = '{1}';".format(project_name, workflow_id)).fetchall()
-            for i in data:
-                workflow_name = i['wf']
-                wfrun_id = i['wfrun_id']
-                workflow_version = i['wfv']
-                block_data[sample][workflow_name] = {'workflow_id': wfrun_id, 'workflow_version': workflow_version}
-                                            
-    conn.close()                
-                    
-    return block_data                
+
+
         
         
-        
-
-
-def make_adjacency_matrix(blocks, block_workflows, parent_workflows):
-    '''
-    
-    
-    
-    '''
-    
-    
-    
-    
-       
-    matrix = {}
-    for block in block_workflows:
-        M = []
-        for i in block_workflows[block]:
-            m = []
-            for j in block_workflows[block]:
-                if i not in parent_workflows and j not in parent_workflows:
-                    m.append(0)
-                elif i == j:
-                    m.append(0)
-                elif i in parent_workflows:
-                    if j in parent_workflows[i]:
-                        m.append(1)
-                    else:
-                        m.append(0)
-                elif i not in parent_workflows:
-                    if i in parent_workflows[j]:
-                        m.append(1)
-                    else:
-                        m.append(0)
-                    
-            M.append(m)
-    
-        matrix[block] = M
-
-    return matrix
-
-
-
-
-
-
-def show_graph(adjacency_matrix, mylabels):
-
-    figure = plt.figure()
-    #figure.set_size_inches(2.5, 2)
-
-    # add a plot to figure (N row, N column, plot N)
-    ax = figure.add_subplot(1, 1, 1)
-
-
-
-    
-    rows, cols = np.where(adjacency_matrix == 1)
-    edges = zip(rows.tolist(), cols.tolist())
-    gr = nx.Graph()
-    
-    gr.add_edges_from(edges)
-    
-    #nx.draw(gr, node_size=500, labels=mylabels, with_labels=True)
-    
-    nodes = list(gr)
-    N = {}
-    for i in nodes:
-        N[i] = mylabels[i]
-    
-    nx.draw(gr, node_size=1200, node_color='#ffe066', font_size = 14, with_labels=True, labels=N, linewidths=2)
-    
-
-    # write title
-    #ax.set_title(title, size = 14)
-        
-    # # add space between axis and tick labels
-    # ax.yaxis.labelpad = 18
-    # ax.xaxis.labelpad = 18
-    
-    # # do not show lines around figure  
-    # ax.spines["top"].set_visible(False)    
-    # ax.spines["bottom"].set_visible(False)    
-    # ax.spines["right"].set_visible(False)    
-    # ax.spines["left"].set_visible(False)  
-    
-    # # do not show ticks
-    # plt.tick_params(axis='both', which='both', bottom=False, top=False,
-    #                 right=False, left=False, labelleft=False, labelbottom=False,
-    #                 labelright=False, colors = 'black', labelsize = 12, direction = 'out')  
-    
-    # # set up same network layout for all drawings
-    # Pos = nx.spring_layout(G)
-    # # draw edges    
-    # nx.draw_networkx_edges(gr, pos=1, width=0.7, edge_color='grey', style='solid',
-    #                         alpha=0.4, ax=ax, arrows=False, node_size=5,
-    #                         nodelist=AllNodes, node_shape='o')
-    
-    #nx.draw_networkx_edges(gr, pos=nx.spring_layout(gr), width=0.7, edge_color='grey', style='solid',
-    #                        alpha=0.4, ax=ax, arrows=False, node_size=5,
-    #                        node_shape='o')
-    
-    # draw all nodes, color according to degree
-    # nodelist = sorted(degree.keys())
-    # node_color = [degree[i] for i in nodelist]
-    
-   
-    # nodes = nx.draw_networkx_nodes(G, pos=Pos, with_labels=False, node_size=5,
-    #                                node_color=node_color, node_shape='o', alpha=0.3,
-    #                                linewidths=0, edgecolors='grey', ax=None,
-    #                                nodelist=nodelist, cmap=cmap)
-    # nodes.set_clim(min(node_color), max(node_color)+1) 
-
-    # # add discrete color bar for node degree
-    # divider = make_axes_locatable(ax)
-    # cax = divider.append_axes("bottom", size="5%", pad=0.05)
-    
-
-    # save figure    
-    plt.tight_layout()
-    #figure.savefig(Outputfile, bbox_inches = 'tight')
-    plt.close()
-
-    return figure
-
-
-
-def convert_figure_to_base64(figure):
-    
-    pass
-
-    my_stringIObytes = io.BytesIO()
-    #plt.savefig(my_stringIObytes, format='jpg')
-    figure.savefig(my_stringIObytes, format='png')
-    
-    my_stringIObytes.seek(0)
-    my_base64_jpgData = base64.b64encode(my_stringIObytes.read()).decode('utf-8')
-    #my_base64_jpgData = base64.b64encode(my_stringIObytes.read())
-   
-    return my_base64_jpgData
-
-
-def get_node_labels(block_workflows):
-    
-    
-    # get the workflow names
-    workflow_names = {}
-    for block in block_workflows:
-        workflow_names[block] = [get_workflow_name(i) for i in block_workflows[block]]
-    
-    # rename labels
-    labels = {}
-    for block in workflow_names:
-        labels[block] = []
-        for workflow in workflow_names[block]:
-            workflow = workflow.split('_')[0]
-            if workflow.lower() == 'varianteffectpredictor':
-                workflow = 'VEP'
-            elif workflow.lower() == 'bammergepreprocessing':
-                workflow = 'bmpp'
-            labels[block].append(workflow)
-       
-    return labels
-
-
-def plot_workflow_network(matrix, labels):
-    '''
-    
-    
-    '''
-    
-    
-        
-    F = {}
-    # convert to numpy 2-D array
-    for block in matrix:
-        matrix[block] = np.array(matrix[block])
-        figure = show_graph(matrix[block], mylabels=labels[block])   
-        F[block] = figure
-   
-        # convert to base64
-        F[block] = convert_figure_to_base64(figure)
-   
-    return F
-  
-    
-  
-def name_WGS_blocks(ordered_blocks):
-    '''
-    (list) -> list  
-    
-    '''
-    counter = 1
-    names = []
-    for i in ordered_blocks:
-        k = 'WGS Analysis Block {0}'.format(counter)
-        names.append([i, k])
-        counter += 1
-    return names
-    
-    
-    
-def get_miso_sample_link(project_name, case):
-    
-    conn = connect_to_db()
-    data = conn.execute("SELECT miso FROM Samples WHERE project_id = '{0}' AND case_id = '{1}';".format(project_name, case)).fetchall()
-    data = list(set(data))
-    #assert len(data) == 1
-    miso_link = data[0]['miso']
-    
-    return miso_link
-    
-        
-                    
+                   
 
 def get_library_design(library_source):
     '''
@@ -1149,36 +560,6 @@ def get_bmpp_files(data):
 
 
 
-def get_parent_workflows(project_name, workflow_id):
-    '''
-    (str, str) -> dict
-    
-    Returns a dictionary with workflow name, list of workflow_ids that are all parent of 
-    workflow_id (i.e immediate upstream workflow) for a given project_name
-    
-    Parameters
-    ----------
-    - project_name (str): Name of project of interest
-    - bmpp_id (str): bamMergePreprocessing workflow id 
-    '''
-    
-    conn = connect_to_db()
-    data = conn.execute("SELECT Workflows.wf, Parents.parents_id FROM Parents JOIN Workflows \
-                        WHERE Parents.project_id = '{0}' AND Workflows.project_id = '{0}' \
-                        AND Parents.children_id = '{1}' AND Workflows.wfrun_id = Parents.parents_id;".format(project_name, workflow_id)).fetchall()
-    data= list(set(data))
-    
-    D = {}
-    for i in data:
-        if i['wf'] in D:
-            D[i['wf']].append(i['parents_id'])
-            D[i['wf']] = sorted(list(set(D[i['wf']])))
-        else:
-            D[i['wf']] = [i['parents_id']]
-    conn.close()
-    
-    return D
-
 
 
 
@@ -1212,56 +593,56 @@ def get_workflow_files(project_name, workflow_id):
 
 
     
-def bmpp_input_raw_seq_status(project_name, bmpp_id):
-    '''
-    (str, str) -> bool
+# def bmpp_input_raw_seq_status(project_name, bmpp_id):
+#     '''
+#     (str, str) -> bool
 
-    Returns True if all the input fastqs, excepting fastqs from import workflows, 
-    to the bmpp workflow run bmpp_id have been released and False otherwise
+#     Returns True if all the input fastqs, excepting fastqs from import workflows, 
+#     to the bmpp workflow run bmpp_id have been released and False otherwise
     
-    Parameters
-    ----------
-    - project_name (str): Name of project of interest
-    - bmpp_id (str): bamMergePreprocessing workflow id 
-    '''
+#     Parameters
+#     ----------
+#     - project_name (str): Name of project of interest
+#     - bmpp_id (str): bamMergePreprocessing workflow id 
+#     '''
     
-    # get bwamem input workflow ids
-    d = get_parent_workflows(project_name, bmpp_id)
-    bwamem_ids = d['bwaMem']
-    # get the fastq-generating worflow ids
-    fastqs_workflow_ids = []
-    for workflow_id in bwamem_ids:
-        d = get_parent_workflows(project_name, workflow_id)
-        for i in d:
-            fastqs_workflow_ids.extend(d[i])
-    fastqs_workflow_ids = list(set(fastqs_workflow_ids))
+#     # get bwamem input workflow ids
+#     d = get_parent_workflows(project_name, bmpp_id)
+#     bwamem_ids = d['bwaMem']
+#     # get the fastq-generating worflow ids
+#     fastqs_workflow_ids = []
+#     for workflow_id in bwamem_ids:
+#         d = get_parent_workflows(project_name, workflow_id)
+#         for i in d:
+#             fastqs_workflow_ids.extend(d[i])
+#     fastqs_workflow_ids = list(set(fastqs_workflow_ids))
     
-    conn = connect_to_db()
+#     conn = connect_to_db()
     
-    # track release status of all fastqs 
-    D = {}
+#     # track release status of all fastqs 
+#     D = {}
     
-    # get the file swids of the fastq-generating workflows
-    for workflow_id in fastqs_workflow_ids:
-        data = conn.execute("SELECT Workflows.wf, Files.file_swid, FilesQC.status  \
-                              FROM Workflows JOIN Files JOIN FilesQC WHERE Files.project_id = '{0}' \
-                              AND Workflows.project_id = '{0}' AND FilesQC.project_id = '{0}' AND  \
-                              Files.wfrun_id = '{1}' AND FilesQC.file_swid = Files.file_swid AND \
-                              Workflows.wfrun_id = '{1}';".format(project_name, workflow_id)).fetchall()
+#     # get the file swids of the fastq-generating workflows
+#     for workflow_id in fastqs_workflow_ids:
+#         data = conn.execute("SELECT Workflows.wf, Files.file_swid, FilesQC.status  \
+#                               FROM Workflows JOIN Files JOIN FilesQC WHERE Files.project_id = '{0}' \
+#                               AND Workflows.project_id = '{0}' AND FilesQC.project_id = '{0}' AND  \
+#                               Files.wfrun_id = '{1}' AND FilesQC.file_swid = Files.file_swid AND \
+#                               Workflows.wfrun_id = '{1}';".format(project_name, workflow_id)).fetchall()
             
-        # # skip import workflows because fastqs from these workflow may not need to be shared back
-        for i in data:
-            if 'import' not in i['wf'].lower():
-                assert i['file_swid'] not in D
-                D[i['file_swid']] = i['status']
+#         # # skip import workflows because fastqs from these workflow may not need to be shared back
+#         for i in data:
+#             if 'import' not in i['wf'].lower():
+#                 assert i['file_swid'] not in D
+#                 D[i['file_swid']] = i['status']
     
     
-    conn.close()
+#     conn.close()
     
-    if D:
-        return all(map(lambda x: x.lower() == 'pass', list(D.values())))
-    else:
-        return False
+#     if D:
+#         return all(map(lambda x: x.lower() == 'pass', list(D.values())))
+#     else:
+#         return False
        
         
 def get_workflow_info(project_name, workflow_id):
@@ -1321,64 +702,64 @@ def get_workflow_info(project_name, workflow_id):
         
            
 
-def get_bmpp_downstream_workflows(project_name, bmpp_id):
-    '''
-    (str, str) -> dict
+# def get_bmpp_downstream_workflows(project_name, bmpp_id):
+#     '''
+#     (str, str) -> dict
 
-    Returns a dictionary with information about dowmstream bmpp_id workflows in project_name
+#     Returns a dictionary with information about dowmstream bmpp_id workflows in project_name
     
-    Parameters
-    ----------
-    - project_name (str): Name of project of interest
-    - bmpp_id (str): bamMergePreprocessing workflow id 
-    '''
+#     Parameters
+#     ----------
+#     - project_name (str): Name of project of interest
+#     - bmpp_id (str): bamMergePreprocessing workflow id 
+#     '''
     
-    # get the bmpp downstream workflows
-    downstream_workflows = get_children_workflows(project_name, bmpp_id)
-    # filter out QC workflows
-    downstream_workflows = filter_out_QC_workflows(project_name, downstream_workflows)
+#     # get the bmpp downstream workflows
+#     downstream_workflows = get_children_workflows(project_name, bmpp_id)
+#     # filter out QC workflows
+#     downstream_workflows = filter_out_QC_workflows(project_name, downstream_workflows)
 
-    D = {}
+#     D = {}
     
-    for workflow in downstream_workflows:
-        for workflow_id in downstream_workflows[workflow]:
-            # group all downstream workflows per library pair
-            d = get_workflow_info(project_name, workflow_id)
-            assert d
-            libraries = list(d.keys())[0]
-            if libraries not in D:
-                D[libraries] = {}
-            D[libraries][d[libraries]['workflow']] = d[libraries] 
-            # get the downstream workflow (ie mavis, VEP, delly)
-            child_workflow = get_children_workflows(project_name, workflow_id)
-            child_workflow = filter_out_QC_workflows(project_name, child_workflow)
-            if child_workflow:
-                for i in child_workflow:
-                    for j in child_workflow[i]:
-                        w = get_workflow_info(project_name, j)
-                        if w:
-                            D[libraries][w[libraries]['workflow']] = w[libraries]
+#     for workflow in downstream_workflows:
+#         for workflow_id in downstream_workflows[workflow]:
+#             # group all downstream workflows per library pair
+#             d = get_workflow_info(project_name, workflow_id)
+#             assert d
+#             libraries = list(d.keys())[0]
+#             if libraries not in D:
+#                 D[libraries] = {}
+#             D[libraries][d[libraries]['workflow']] = d[libraries] 
+#             # get the downstream workflow (ie mavis, VEP, delly)
+#             child_workflow = get_children_workflows(project_name, workflow_id)
+#             child_workflow = filter_out_QC_workflows(project_name, child_workflow)
+#             if child_workflow:
+#                 for i in child_workflow:
+#                     for j in child_workflow[i]:
+#                         w = get_workflow_info(project_name, j)
+#                         if w:
+#                             D[libraries][w[libraries]['workflow']] = w[libraries]
     
-    # add parent workflows
-    for libraries in D:
-        for workflow in D[libraries]:
-            parent_workflow = get_parent_workflows(project_name, D[libraries][workflow]['workflow_id'])
-            if 'parent' not in D[libraries][workflow]:
-                D[libraries][workflow]['parent'] = []
-            if parent_workflow not in D[libraries][workflow]['parent']:
-                D[libraries][workflow]['parent'].append(parent_workflow)
+#     # add parent workflows
+#     for libraries in D:
+#         for workflow in D[libraries]:
+#             parent_workflow = get_parent_workflows(project_name, D[libraries][workflow]['workflow_id'])
+#             if 'parent' not in D[libraries][workflow]:
+#                 D[libraries][workflow]['parent'] = []
+#             if parent_workflow not in D[libraries][workflow]['parent']:
+#                 D[libraries][workflow]['parent'].append(parent_workflow)
         
-   # get the files for each workflow
-    for libraries in D:
-        for workflow in D[libraries]:
-            files, creation_date = get_workflow_files(project_name, D[libraries][workflow]['workflow_id'])
-            D[libraries][workflow]['files'] = files
-            # convert epoch time to standard time
-            if creation_date:
-                creation_date = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(int(creation_date)))
-            D[libraries][workflow]['creation_date'] = creation_date
+#    # get the files for each workflow
+#     for libraries in D:
+#         for workflow in D[libraries]:
+#             files, creation_date = get_workflow_files(project_name, D[libraries][workflow]['workflow_id'])
+#             D[libraries][workflow]['files'] = files
+#             # convert epoch time to standard time
+#             if creation_date:
+#                 creation_date = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(int(creation_date)))
+#             D[libraries][workflow]['creation_date'] = creation_date
     
-    return D
+#     return D
 
 
 
@@ -1617,42 +998,38 @@ def wgs_case(project_name, case):
     
     # get the pipelines from the library definitions in db
     pipelines = get_pipelines(project_name)
-        
-    # build the somatic calling block
+    
+    # get all the bmpp runs for WG library type and Novaseq platform
+    bmpp = get_bmpp_case(project_name, case, 'novaseq', 'WG')
 
-    # identify all call ready bmpp runs for novaseq
-    bmpp = get_bmpp_case(project_name, case, 'novaseq', 'WG')    
-    
-    # identify the samples processed
+    # identify all the samples processed
     samples = get_case_call_ready_samples(project_name, bmpp)
-    
-    # match all T/N pairs
+
+    # get all pairs N/T samples
     pairs = group_normal_tumor_pairs(samples)
     
     # find analysis workflows for each N/T pairs
     # remove sample pairs without analysis workflows
     D = map_workflows_to_sample_pairs(project_name, 'novaseq', pairs)
     
-    # find the blocks by mapping the analysis workflows to ttheir parent workflows    
-    blocks = find_analysis_blocks(project_name, D)
-    
     # get the parent workflows for each block
     parent_workflows = map_workflows_to_parent(project_name, D)
+    
+    # find the blocks by mapping the analysis workflows to ttheir parent workflows    
+    blocks = find_analysis_blocks(project_name, D, parent_workflows, bmpp)
     
     # list all workflows for each block
     block_workflows = list_block_workflows(blocks)
     
     # assign date to each block. most recent file creation date from all workflows within block 
-    block_date = get_block_analysis_date(block_workflows)
-    
     # get the date of each workflow within block
-    workflow_date = get_block_workflows_date(block_workflows)
-        
+    block_date, workflow_date = get_block_analysis_date(block_workflows)
+    
     # get the workflow names
     workflow_names = get_node_labels(block_workflows)
-        
+
     # convert workflow relationships to adjacency matrix for each block
-    matrix = make_adjacency_matrix(blocks, block_workflows, parent_workflows)
+    matrix = make_adjacency_matrix(block_workflows, parent_workflows)
                                    
     # create figures
     figures = plot_workflow_network(matrix, workflow_names)
@@ -1671,25 +1048,28 @@ def wgs_case(project_name, case):
     
     # check if blocks are complete
     expected_workflows = sorted(['mutect2', 'variantEffectPredictor', 'delly', 'varscan', 'sequenza', 'mavis'])           
-    complete = {block: is_block_complete(blocks[block], expected_workflows) for block in blocks}
-   
+    complete = is_block_complete(blocks, expected_workflows)
+    
     # order blocks based on the amount of data
     ordered_blocks = order_blocks(blocks, amount_data)
 
     # name each block according to the selected block order
     names = name_WGS_blocks(ordered_blocks)
-     
+    
     # get miso link
     miso_link = get_miso_sample_link(project_name, case)
-        
-    return render_template('WGS_case.html', routes = routes, blocks=blocks,
-                            sample_case=case, project=project, pipelines=pipelines,
-                            case=case, miso_link=miso_link, names=names, figures=figures,
-                            samples_bmpp=samples_bmpp, block_date=block_date,
-                            workflow_date=workflow_date, file_counts=file_counts,
-                            complete=complete, release_status=release_status, amount_data=amount_data)
-
-
+    
+    # sort sample pairs names
+    sample_pairs_names = sorted(list(blocks.keys()))
+    
+    
+    return render_template('WGS_case.html', project=project, routes = routes,
+                           case=case, pipelines=pipelines, sample_pairs_names=sample_pairs_names,
+                           blocks=blocks, names=names, ordered_blocks=ordered_blocks,
+                           miso_link=miso_link, complete=complete, release_status=release_status,
+                           block_date=block_date, workflow_date=workflow_date,
+                           figures=figures, samples_bmpp=samples_bmpp, 
+                           file_counts=file_counts, amount_data=amount_data, )
 
 
 
@@ -1808,8 +1188,8 @@ def whole_transcriptome(project_name):
 
 
 
-@app.route('/download_wgs_block/<project_name>/<case>/<block>')
-def download_block_data(project_name, case, block):
+@app.route('/download_wgs_block/<project_name>/<case>/<block>/<bmpp_parent>')
+def download_block_data(project_name, case, block, bmpp_parent):
     '''
     
     
@@ -1819,24 +1199,27 @@ def download_block_data(project_name, case, block):
     
     # build the somatic calling block
 
-    # identify all call ready bmpp runs for novaseq
-    bmpp = get_bmpp_case(project_name, case, 'novaseq', 'WG')    
-    
-    # identify the samples processed
+    # get all the bmpp runs for WG library type and Novaseq platform
+    bmpp = get_bmpp_case(project_name, case, 'novaseq', 'WG')
+
+    # identify all the samples processed
     samples = get_case_call_ready_samples(project_name, bmpp)
-    
-    # match all T/N pairs
+
+    # get all pairs N/T samples
     pairs = group_normal_tumor_pairs(samples)
-    
+
     # find analysis workflows for each N/T pairs
     # remove sample pairs without analysis workflows
     D = map_workflows_to_sample_pairs(project_name, 'novaseq', pairs)
-    
+
+    # get the parent workflows for each block
+    parent_workflows = map_workflows_to_parent(project_name, D)
+
     # find the blocks by mapping the analysis workflows to ttheir parent workflows    
-    blocks = find_analysis_blocks(project_name, D)
+    blocks = find_analysis_blocks(project_name, D, parent_workflows, bmpp)
     
     # create json with workflow information for block for DARE
-    block_data = create_block_json(project_name, blocks, block)
+    block_data = create_block_json(project_name, blocks, block, bmpp_parent)
 
     # send the json to outoutfile                    
     return Response(
