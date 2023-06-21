@@ -427,9 +427,12 @@ def get_workflow_analysis_date(workflow_run_id):
     
     data = list(set(data))
     
-    # select creation date of any file
-    most_recent = data[0]['creation_date']
-    
+    if data:
+        # select creation date of any file
+        most_recent = data[0]['creation_date']
+    else:
+        most_recent = 'NA'
+        
     return most_recent
 
 
@@ -459,10 +462,16 @@ def get_block_analysis_date(block_workflows):
             # get the analysis date for each workflow
             for wf in block_workflows[block][bmpp]:
                 wf_date = get_workflow_analysis_date(wf)
-                workflow_dates[block][bmpp][wf] = convert_epoch_time(wf_date)
-                if wf_date  > most_recent:
-                    most_recent = wf_date
-            block_date[block][bmpp] = convert_epoch_time(most_recent)
+                if wf_date != 'NA':
+                    workflow_dates[block][bmpp][wf] = convert_epoch_time(wf_date)
+                    if wf_date  > most_recent:
+                        most_recent = wf_date
+                else:
+                    workflow_dates[block][bmpp][wf] = 'NA'
+            if most_recent:
+                block_date[block][bmpp] = convert_epoch_time(most_recent)
+            else:
+                block_date[block][bmpp] = 'NA'
     return block_date, workflow_dates
 
 
