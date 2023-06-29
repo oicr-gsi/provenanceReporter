@@ -88,7 +88,7 @@ def remove_non_analysis_workflows(data):
                     'bammergepreprocessing', 'ichorcna_lane_level', 'ichorcna', 'tmbanalysis', 
                     'casava', 'bcl2fastq', 'fileimportforanalysis', 'fileimport', 
                     'import_fastq', 'dnaseqqc', 'hotspotfingerprintcollector', 
-                    'wgsmetrics_call_ready', 'rnaseqqc_lane_level')
+                    'wgsmetrics_call_ready', 'rnaseqqc_lane_level', 'rnaseqqc_call_ready')
     
     to_remove = [i for i in data if i['wf'].lower() in non_analysis_workflows]
     for i in to_remove:
