@@ -6,7 +6,7 @@ Created on Fri Jun  9 10:42:36 2023
 """
 
 
-from utilities import connect_to_db, convert_epoch_time, get_workflow_name
+from utilities import connect_to_db, convert_epoch_time, get_workflow_name, remove_non_analysis_workflows
 
 
 
@@ -115,26 +115,39 @@ def map_analysis_workflows_to_sample(project_name, sample, platform):
     
     
     conn = connect_to_db()    
+    # data = conn.execute("SELECT Workflow_Inputs.wfrun_id, Workflow_Inputs.platform, Workflows.wf FROM \
+    #                      Workflow_Inputs JOIN Workflows JOIN Libraries WHERE Workflow_Inputs.library = Libraries.library \
+    #                      AND Workflow_Inputs.wfrun_id = Workflows.wfrun_id AND \
+    #                      Workflow_Inputs.project_id = '{0}' AND Libraries.project_id = '{0}' \
+    #                      AND Workflows.project_id = '{0}' AND Libraries.sample = '{1}' AND \
+    #                      Libraries.library_type = '{2}' AND Libraries.tissue_origin = '{3}' AND \
+    #                      Libraries.tissue_type = '{4}' AND Libraries.group_id = '{5}' \
+    #                      AND LOWER(Workflows.wf) NOT IN \
+    #                      ('wgsmetrics', 'insertsizemetrics', 'bamqc', 'calculatecontamination', \
+    #                      'calculatecontamination_lane_level', 'callability', 'fastqc', \
+    #                      'crosscheckfingerprintscollector_bam', 'crosscheckfingerprintscollector', \
+    #                      'fingerprintcollector', 'bamqc_lane_level', 'bamqc_call_ready', 'bwamem', \
+    #                      'bammergepreprocessing', 'ichorcna_lane_level', 'ichorcna', 'tmbanalysis', \
+    #                      'casava', 'bcl2fastq', 'fileimportforanalysis', 'fileimport', \
+    #                      'import_fastq', 'dnaseqqc', 'hotspotfingerprintcollector', \
+    #                      'wgsmetrics_call_ready')".format(project_name, case, library_type, tissue_origin, tissue_type, group_id)).fetchall()
+        
+    
     data = conn.execute("SELECT Workflow_Inputs.wfrun_id, Workflow_Inputs.platform, Workflows.wf FROM \
                          Workflow_Inputs JOIN Workflows JOIN Libraries WHERE Workflow_Inputs.library = Libraries.library \
                          AND Workflow_Inputs.wfrun_id = Workflows.wfrun_id AND \
                          Workflow_Inputs.project_id = '{0}' AND Libraries.project_id = '{0}' \
                          AND Workflows.project_id = '{0}' AND Libraries.sample = '{1}' AND \
                          Libraries.library_type = '{2}' AND Libraries.tissue_origin = '{3}' AND \
-                         Libraries.tissue_type = '{4}' AND Libraries.group_id = '{5}' \
-                         AND LOWER(Workflows.wf) NOT IN \
-                         ('wgsmetrics', 'insertsizemetrics', 'bamqc', 'calculatecontamination', \
-                         'calculatecontamination_lane_level', 'callability', 'fastqc', \
-                         'crosscheckfingerprintscollector_bam', 'crosscheckfingerprintscollector', \
-                         'fingerprintcollector', 'bamqc_lane_level', 'bamqc_call_ready', 'bwamem', \
-                         'bammergepreprocessing', 'ichorcna_lane_level', 'ichorcna', 'tmbanalysis', \
-                         'casava', 'bcl2fastq', 'fileimportforanalysis', 'fileimport', \
-                         'import_fastq', 'dnaseqqc', 'hotspotfingerprintcollector', \
-                         'wgsmetrics_call_ready')".format(project_name, case, library_type, tissue_origin, tissue_type, group_id)).fetchall()
-        
-        
+                         Libraries.tissue_type = '{4}' AND Libraries.group_id = '{5}'".format(project_name, case, library_type, tissue_origin, tissue_type, group_id)).fetchall()
+    
+    
     conn.close()   
     data = list(set(data))
+    
+    # remove non analysis worfkflows
+    data = remove_non_analysis_workflows(data)
+        
     to_remove = [i for i in data if platform not in i['platform'].lower()]
     for i in to_remove:
         data.remove(i)

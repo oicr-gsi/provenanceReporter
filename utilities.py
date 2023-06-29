@@ -73,6 +73,36 @@ def filter_out_QC_workflows(project_name, workflows):
         del workflows[i]
     return workflows
 
+def remove_non_analysis_workflows(data):
+    '''
+    (list) -> list
+    
+    
+    '''
+    
+    
+    non_analysis_workflows = ('wgsmetrics', 'insertsizemetrics', 'bamqc', 'calculatecontamination',
+                    'calculatecontamination_lane_level', 'callability', 'fastqc',
+                    'crosscheckfingerprintscollector_bam', 'crosscheckfingerprintscollector',
+                    'fingerprintcollector', 'bamqc_lane_level', 'bamqc_call_ready', 'bwamem', 
+                    'bammergepreprocessing', 'ichorcna_lane_level', 'ichorcna', 'tmbanalysis', 
+                    'casava', 'bcl2fastq', 'fileimportforanalysis', 'fileimport', 
+                    'import_fastq', 'dnaseqqc', 'hotspotfingerprintcollector', 
+                    'wgsmetrics_call_ready', 'rnaseqqc_lane_level')
+    
+    to_remove = [i for i in data if i['wf'].lower() in non_analysis_workflows]
+    for i in to_remove:
+        data.remove(i)
+    
+    return data
+        
+
+
+
+
+
+
+
 
 def convert_epoch_time(epoch):
     '''
