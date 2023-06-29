@@ -24,7 +24,6 @@ import numpy as np
 import io
 import base64
 
-from whole_transcriptome import get_WT_call_ready_cases, get_star_case
 from utilities import connect_to_db, get_children_workflows, filter_out_QC_workflows, \
     get_miso_sample_link
 from whole_genome import get_bmpp_case, get_case_call_ready_samples, group_normal_tumor_pairs, \
@@ -32,6 +31,24 @@ from whole_genome import get_bmpp_case, get_case_call_ready_samples, group_norma
     get_block_analysis_date, sort_call_ready_samples, get_block_workflow_file_count, get_block_release_status, \
     get_amount_data, is_block_complete, order_blocks, name_WGS_blocks, create_block_json    
 from networks import get_node_labels, make_adjacency_matrix, plot_workflow_network
+from whole_transcriptome import get_WT_call_ready_cases, get_star_case, get_WT_case_call_ready_samples, \
+    map_workflows_to_samples, find_WT_analysis_blocks
+
+
+
+def get_project_info():
+    
+    
+    
+    # connect to db and extract project info
+    conn = connect_to_db()
+    projects = conn.execute('SELECT * FROM Projects').fetchall()
+    conn.close()
+    
+    projects = sorted([(i['project_id'], i) for i in projects])
+    projects = [i[1] for i in projects]
+    
+    return projects
 
 
 def group_sequences(L):
@@ -709,7 +726,7 @@ def wgs_case(project_name, case):
     # get the parent workflows for each block
     parent_workflows = map_workflows_to_parent(project_name, D)
     
-    # find the blocks by mapping the analysis workflows to ttheir parent workflows    
+    # find the blocks by mapping the analysis workflows to their parent workflows    
     blocks = find_analysis_blocks(project_name, D, parent_workflows, bmpp)
     
     # list all workflows for each block
@@ -785,25 +802,98 @@ def whole_transcriptome(project_name):
 
 
 
-# @app.route('/<project_name>/whole_transcriptome/<case>')
-# def wt_case(project_name, case):
+@app.route('/<project_name>/whole_transcriptome/<case>')
+def wt_case(project_name, case):
     
-#     # get the project info for project_name from db
-#     project = get_project_info(project_name)
+    # get the project info for project_name from db
+    project = get_project_info(project_name)
     
-#     # get the pipelines from the library definitions in db
-#     pipelines = get_pipelines(project_name)
+    # get the pipelines from the library definitions in db
+    pipelines = get_pipelines(project_name)
         
-#     # # build the somatic calling block
+    # build the somatic calling block
 
-#     # # identify all call ready star runs for novaseq
-#     # star = get_star_case(project_name, case, 'novaseq', 'WT')
+    # identify all call ready star runs for novaseq
+    star = get_star_case(project_name, case, 'novaseq', 'WT')
     
-#     # # identify the samples processed
-#     # samples = get_case_call_ready_samples(project_name, star)
+    # identify the samples processed
+    samples = get_WT_case_call_ready_samples(project_name, star)
+    
+    # remove samples without analysis workflows
+    D = map_workflows_to_samples(project_name, 'novaseq', samples)
+
+    # get the parent workflows for each block
+    parent_workflows = map_workflows_to_parent(project_name, D)
+        
+    blocks = find_WT_analysis_blocks(project_name, D, parent_workflows, star)
+    
+    # list all workflows for each block
+    block_workflows = list_block_workflows(blocks)
+    
+    # assign date to each block. most recent file creation date from all workflows within block 
+    # get the date of each workflow within block
+    block_date, workflow_date = get_block_analysis_date(block_workflows)
+    
+    # get the workflow names
+    workflow_names = get_node_labels(block_workflows)
+
+    # convert workflow relationships to adjacency matrix for each block
+    matrix = make_adjacency_matrix(block_workflows, parent_workflows)
+                                
+    # create figures
+    figures = plot_workflow_network(matrix, workflow_names)
     
     
     
+    
+    
+    
+    
+    
+    
+    
+    # get the samples for each bmpp id
+    samples_bmpp = sort_call_ready_samples(project_name, blocks)
+    
+    # get the workflow file counts
+    file_counts = get_block_workflow_file_count(block_workflows)
+    
+    # get release status of input sequences for each block
+    release_status = get_block_release_status(block_workflows)
+    
+    # get the amount of data for each workflow
+    amount_data = get_amount_data(block_workflows)
+    
+    # check if blocks are complete
+    expected_workflows = sorted(['mutect2', 'variantEffectPredictor', 'delly', 'varscan', 'sequenza', 'mavis'])           
+    complete = is_block_complete(blocks, expected_workflows)
+    
+    # order blocks based on the amount of data
+    ordered_blocks = order_blocks(blocks, amount_data)
+
+    # name each block according to the selected block order
+    names = name_WGS_blocks(ordered_blocks)
+    
+    # get miso link
+    miso_link = get_miso_sample_link(project_name, case)
+    
+    # sort sample pairs names
+    sample_pairs_names = sorted(list(blocks.keys()))
+    
+    
+    return render_template('WGS_case.html', project=project, routes = routes,
+                           case=case, pipelines=pipelines, sample_pairs_names=sample_pairs_names,
+                           blocks=blocks, names=names, ordered_blocks=ordered_blocks,
+                           miso_link=miso_link, complete=complete, release_status=release_status,
+                           block_date=block_date, workflow_date=workflow_date,
+                           figures=figures, samples_bmpp=samples_bmpp, 
+                           file_counts=file_counts, amount_data=amount_data, )
+
+    
+    
+    
+    
+    ##########
     
     
     
@@ -874,7 +964,7 @@ def whole_transcriptome(project_name):
 #     #                         workflow_date=workflow_date, file_counts=file_counts,
 #     #                         complete=complete, release_status=release_status, amount_data=amount_data)
 
-#     return render_template('WT_case.html', routes = routes, project=project, pipelines=pipelines)
+    return render_template('WT_case.html', routes = routes, project=project, pipelines=pipelines)
 
 
 
