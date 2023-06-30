@@ -231,3 +231,24 @@ def find_WT_analysis_blocks(project_name, D, parent_workflows, star):
     return blocks                
 
 
+def name_WT_blocks(ordered_blocks):
+    '''
+    (dict) -> dict  
+    
+    Returns a dictionary with sub-blocks names for each sample (ie, block)
+    
+    Parameters
+    ----------
+    - ordered_blocks (dict): Dictionary with star parent worflows ordered by amount of data for each sample 
+    '''
+    
+    
+    names = {}
+    for block in ordered_blocks:
+        counter = 1
+        names[block] = {}
+        for i in ordered_blocks[block]:
+            k = 'WT Analysis Block {0}'.format(counter)
+            names[block][i] = k
+            counter += 1
+    return names

@@ -32,7 +32,7 @@ from whole_genome import get_bmpp_case, get_case_call_ready_samples, group_norma
     get_amount_data, is_block_complete, order_blocks, name_WGS_blocks, create_block_json    
 from networks import get_node_labels, make_adjacency_matrix, plot_workflow_network
 from whole_transcriptome import get_WT_call_ready_cases, get_star_case, get_WT_case_call_ready_samples, \
-    map_workflows_to_samples, find_WT_analysis_blocks
+    map_workflows_to_samples, find_WT_analysis_blocks, name_WT_blocks
 
 
 
@@ -843,17 +843,8 @@ def wt_case(project_name, case):
     # create figures
     figures = plot_workflow_network(matrix, workflow_names)
     
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    # get the samples for each bmpp id
-    samples_bmpp = sort_call_ready_samples(project_name, blocks)
+    # get the samples for each star id
+    samples_star = sort_call_ready_samples(project_name, blocks)
     
     # get the workflow file counts
     file_counts = get_block_workflow_file_count(block_workflows)
@@ -865,14 +856,14 @@ def wt_case(project_name, case):
     amount_data = get_amount_data(block_workflows)
     
     # check if blocks are complete
-    expected_workflows = sorted(['mutect2', 'variantEffectPredictor', 'delly', 'varscan', 'sequenza', 'mavis'])           
+    expected_workflows = sorted(['arriba', 'rsem', 'star', 'starfusion', 'mavis'])           
     complete = is_block_complete(blocks, expected_workflows)
     
     # order blocks based on the amount of data
     ordered_blocks = order_blocks(blocks, amount_data)
 
     # name each block according to the selected block order
-    names = name_WGS_blocks(ordered_blocks)
+    names = name_WT_blocks(ordered_blocks)
     
     # get miso link
     miso_link = get_miso_sample_link(project_name, case)
@@ -881,12 +872,12 @@ def wt_case(project_name, case):
     sample_pairs_names = sorted(list(blocks.keys()))
     
     
-    return render_template('WGS_case.html', project=project, routes = routes,
+    return render_template('WT_case.html', project=project, routes = routes,
                            case=case, pipelines=pipelines, sample_pairs_names=sample_pairs_names,
                            blocks=blocks, names=names, ordered_blocks=ordered_blocks,
                            miso_link=miso_link, complete=complete, release_status=release_status,
                            block_date=block_date, workflow_date=workflow_date,
-                           figures=figures, samples_bmpp=samples_bmpp, 
+                           figures=figures, samples_star=samples_star, 
                            file_counts=file_counts, amount_data=amount_data, )
 
     
