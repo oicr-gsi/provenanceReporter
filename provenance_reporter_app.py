@@ -880,88 +880,6 @@ def wt_case(project_name, case):
                            figures=figures, samples_star=samples_star, 
                            file_counts=file_counts, amount_data=amount_data, )
 
-    
-    
-    
-    
-    ##########
-    
-    
-    
-    
-    
-    
-    
-#     # # match all T/N pairs
-#     # pairs = group_normal_tumor_pairs(samples)
-    
-#     # # find analysis workflows for each N/T pairs
-#     # # remove sample pairs without analysis workflows
-#     # D = map_workflows_to_sample_pairs(project_name, 'novaseq', pairs)
-    
-#     # # find the blocks by mapping the analysis workflows to ttheir parent workflows    
-#     # blocks = find_analysis_blocks(project_name, D)
-    
-#     # # get the parent workflows for each block
-#     # parent_workflows = map_workflows_to_parent(project_name, D)
-    
-#     # # list all workflows for each block
-#     # block_workflows = list_block_workflows(blocks)
-    
-#     # # assign date to each block. most recent file creation date from all workflows within block 
-#     # block_date = get_block_analysis_date(block_workflows)
-    
-#     # # get the date of each workflow within block
-#     # workflow_date = get_block_workflows_date(block_workflows)
-        
-#     # # get the workflow names
-#     # workflow_names = get_node_labels(block_workflows)
-        
-#     # # convert workflow relationships to adjacency matrix for each block
-#     # matrix = make_adjacency_matrix(blocks, block_workflows, parent_workflows)
-                                   
-#     # # create figures
-#     # figures = plot_workflow_network(matrix, workflow_names)
-    
-#     # # get the samples for each bmpp id
-#     # samples_bmpp = sort_call_ready_samples(project_name, blocks)
-    
-#     # # get the workflow file counts
-#     # file_counts = get_block_workflow_file_count(block_workflows)
-    
-#     # # get release status of input sequences for each block
-#     # release_status = get_block_release_status(block_workflows)
-    
-#     # # get the amount of data for each workflow
-#     # amount_data = get_amount_data(block_workflows)
-    
-#     # # check if blocks are complete
-#     # expected_workflows = sorted(['mutect2', 'variantEffectPredictor', 'delly', 'varscan', 'sequenza', 'mavis'])           
-#     # complete = {block: is_block_complete(blocks[block], expected_workflows) for block in blocks}
-   
-#     # # order blocks based on the amount of data
-#     # ordered_blocks = order_blocks(blocks, amount_data)
-
-#     # # name each block according to the selected block order
-#     # names = name_WGS_blocks(ordered_blocks)
-     
-#     # # get miso link
-#     # miso_link = get_miso_sample_link(project_name, case)
-        
-#     # return render_template('WGS_case.html', routes = routes, blocks=blocks,
-#     #                         sample_case=case, project=project, pipelines=pipelines,
-#     #                         case=case, miso_link=miso_link, names=names, figures=figures,
-#     #                         samples_bmpp=samples_bmpp, block_date=block_date,
-#     #                         workflow_date=workflow_date, file_counts=file_counts,
-#     #                         complete=complete, release_status=release_status, amount_data=amount_data)
-
-    return render_template('WT_case.html', routes = routes, project=project, pipelines=pipelines)
-
-
-
-
-
-
 
 @app.route('/download_wgs_block/<project_name>/<case>/<block>/<bmpp_parent>')
 def download_block_data(project_name, case, block, bmpp_parent):
@@ -1004,6 +922,42 @@ def download_block_data(project_name, case, block, bmpp_parent):
         headers={"Content-disposition": "attachment; filename={0}_WGS_{1}_{2}.json".format(project_name, case, block)})
 
 
+
+
+
+@app.route('/download_wt_block/<project_name>/<case>/<block>/<star_parent>')
+def download_WT_block_data(project_name, case, block, star_parent):
+
+    
+
+    # build the somatic calling block
+
+    # identify all call ready star runs for novaseq
+    star = get_star_case(project_name, case, 'novaseq', 'WT')
+    
+    # identify the samples processed
+    samples = get_WT_case_call_ready_samples(project_name, star)
+    
+    # remove samples without analysis workflows
+    D = map_workflows_to_samples(project_name, 'novaseq', samples)
+
+    # get the parent workflows for each block
+    parent_workflows = map_workflows_to_parent(project_name, D)
+    
+    # find the blocks
+    blocks = find_WT_analysis_blocks(project_name, D, parent_workflows, star)
+    
+    # create json with workflow information for block for DARE
+    block_data = create_block_json(project_name, blocks, block, star_parent)
+
+    # send the json to outoutfile                    
+    return Response(
+        response=json.dumps(block_data),
+        mimetype="application/json",
+        status=200,
+        headers={"Content-disposition": "attachment; filename={0}_WT_{1}_{2}.json".format(project_name, case, block)})
+
+    
 
 @app.route('/download_cases/<project_name>')
 def download_cases_table(project_name):
