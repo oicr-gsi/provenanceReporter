@@ -101,9 +101,9 @@
         <td>{{ i['created_date'] }}</td>
         <td>{{ i['modified_date'] }}</td>
 
-        <td>{{ i['normals'] }}</td>
-        <td>{{ i['tumors'] }}</td>
-        <td>{{ i['libraries'] }}</td>
+        <td>{{ counts[i['case_id']]['normal'] }}</td>
+        <td>{{ counts[i['case_id']]['tumor'] }}</td>
+        <td>{{ counts[i['case_id']]['library'] }}</td>
 
 
 

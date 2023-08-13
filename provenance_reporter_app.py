@@ -35,22 +35,6 @@ from whole_transcriptome import get_WT_call_ready_cases, get_star_case, get_WT_c
     map_workflows_to_samples, find_WT_analysis_blocks, name_WT_blocks
 
 
-
-def get_project_info():
-    
-    
-    
-    # connect to db and extract project info
-    conn = connect_to_db()
-    projects = conn.execute('SELECT * FROM Projects').fetchall()
-    conn.close()
-    
-    projects = sorted([(i['project_id'], i) for i in projects])
-    projects = [i[1] for i in projects]
-    
-    return projects
-
-
 def group_sequences(L):
     '''
     (list) -> list
@@ -191,18 +175,14 @@ def get_project_info(project_name):
     
     Parameters
     ----------
-    - project_name 9str): Project of interest
+    - project_name (str): Project of interest
     '''
-    
     # connect to db
     conn = connect_to_db()
     # extract project info
-    projects = conn.execute('SELECT * FROM Projects').fetchall()
+    project = conn.execute('SELECT * FROM Projects WHERE project_id=\"{0}\"'.format(project_name)).fetchall()[0]
     conn.close()
     
-    # keep info for project_name
-    project = [i for i in projects if i['project_id'] == project_name][0]
-        
     return project
     
     
@@ -222,9 +202,10 @@ def get_pipelines(project_name):
     # connect to db
     conn = connect_to_db()
     # extract library source
-    library_source = conn.execute("SELECT library_type FROM Files WHERE project_id = '{0}';".format(project_name)).fetchall()
+    library_source = conn.execute("SELECT DISTINCT library_type FROM Files WHERE project_id = '{0}';".format(project_name)).fetchall()
+    library_source = list(set([i['library_type'] for i in  list(set(library_source))]))
     # get the library definitions
-    pipelines = [get_library_design(j) for j in sorted(list(set([i['library_type'] for i in library_source]))) if get_library_design(j)]
+    pipelines = [get_library_design(j) for j in library_source if get_library_design(j)]
     conn.close()
     
     return pipelines
@@ -490,12 +471,17 @@ def get_samples(project_name):
 
 def get_cases(project_name):
     '''
+    (str) -> list
     
+    Returns a list of dictionaries with case information
     
+    Paramaters
+    -----------
+    - project_name (str): Project of interest
     '''
     
     conn = connect_to_db()
-    data = conn.execute("SELECT case_id, donor_id, species, sex, created_date, modified_date, miso, parent_project FROM Samples WHERE project_id = '{0}'".format(project_name)).fetchall()
+    data = conn.execute("SELECT DISTINCT case_id, donor_id, species, sex, created_date, modified_date, miso, parent_project FROM Samples WHERE project_id = '{0}'".format(project_name)).fetchall()
     
     data = [dict(i) for i in data]
        
@@ -505,59 +491,108 @@ def get_cases(project_name):
 
 def get_last_sequencing(project_name):
     '''
+    (str) -> str
     
+    Returns the date of the last sequencing for the project of interest
     
+    Paramaters
+    ----------
+    - project_name (str): Project of interest
     '''
     
     conn = connect_to_db()
-    sequencing = conn.execute("SELECT Workflow_Inputs.run, Files.creation_date FROM Workflow_Inputs JOIN Files \
+    sequencing = conn.execute("SELECT DISTINCT Workflow_Inputs.run FROM Workflow_Inputs JOIN Files \
                               WHERE Workflow_Inputs.project_id = '{0}' AND Files.project_id = '{0}' \
                               AND Files.wfrun_id = Workflow_Inputs.wfrun_id \
                               AND LOWER(Files.workflow) in ('casava', 'bcl2fastq', 'fileimportforanalysis', 'fileimport', 'import_fastq');".format(project_name)).fetchall()
     conn.close()
+    
     # get the most recent creation date of fastq generating workflows
     
     if sequencing:
         sequencing = list(set(sequencing))
-        seq_dates = [i['run'] for i in sequencing]
-        for i in range(len(seq_dates)):
-            seq_dates[i] = seq_dates[i].split('_')
-            if any(list(map(lambda x: x.isdigit(), seq_dates[i]))):
-                j = list(map(lambda x: x.isdigit(), seq_dates[i])).index(True)
-                seq_dates[i] = seq_dates[i][j]
-            else:
-                seq_dates[i] = ''
-            
-        seq_dates = list(set(seq_dates))
-        if '' in seq_dates:
-            seq_dates.remove('')
-        seq_dates.sort()
-        seq_date = seq_dates[-1]
+        sequencing = [i['run'] for i in sequencing]
+        sequencing = map(lambda x: x.split('_'), sequencing)
+        seq_dates = [i for i in sequencing if any(list(map(lambda x: x.isdigit(), i)))]
+        
+        F = lambda y: list(map(lambda x: x.isdigit(), y)).index(True)
+        date_index = list(map(lambda x: F(x), seq_dates))
+        seq_dates = [seq_dates[i][date_index[i]] for i in range(len(date_index))]
+        seq_date = sorted(list(set(seq_dates)))[-1]
         seq_date = '20' + str(seq_date)[:2] + '-' + str(seq_date)[2:4] + '-' + str(seq_date)[4:]
         
     else:
         seq_date = 'NA'
     return seq_date
     
+    
 
-def get_sample_counts(project_name, case):
+def get_sample_counts(project_name):
     '''
+    (str) - > dict
     
+    Returns a dictionary with library and sample counts for each donor of a project of interest
     
+    Parameters
+    ----------
+    - project_name (str): Name of project of interest
     '''
     
     conn = connect_to_db()
     
-    data = conn.execute("SELECT library, sample, tissue_type, group_id FROM Libraries WHERE project_id = '{0}' and sample = '{1}';".format(project_name, case)).fetchall()
+    data = conn.execute("SELECT DISTINCT library, sample, tissue_type, group_id FROM Libraries WHERE project_id = '{0}';".format(project_name)).fetchall()
     conn.close()
 
-    libraries = len(set([dict(i)['library'] for i in data]))
-    samples = [(dict(i)['sample'] + '_' + dict(i)['group_id'], dict(i)['tissue_type']) for i in data]
-    normals = len(set([i[0] + '_' + i[1] for i in samples if i[1] == 'R']))    
-    tumors = len(set([i[0] + '_' + i[1] for i in samples if i[1] != 'R']))
-        
-    return normals, tumors, libraries
+    counts = {}
+    for i in data:
+        donor = i['sample']
+        library = i['library']
+        if i['tissue_type'] == 'R':
+            normal = i['sample'] + '_' + i['group_id']      
+            tumor = ''
+        else:
+            normal = ''
+            tumor = i['sample'] + '_' + i['group_id']
+        if donor not in counts:
+            counts[donor] = {}
+        if 'library' not in counts[donor]:
+            counts[donor]['library'] = set()
+        if 'normal' not in counts[donor]:
+            counts[donor]['normal'] = set()
+        if 'tumor' not in counts[donor]:
+            counts[donor]['tumor'] = set()
+        counts[donor]['library'].add(library)
+        if normal:
+            counts[donor]['normal'].add(normal)
+        elif tumor:
+            counts[donor]['tumor'].add(tumor)
+
+
+    for i in counts:
+        counts[i]['library'] = len(counts[i]['library'])
+        counts[i]['normal'] = len(counts[i]['normal'])
+        counts[i]['tumor'] = len(counts[i]['tumor'])
+               
+                    
+    return counts            
+
+
+def add_missing_donors(cases, counts):
+    '''
+    (list, dict) -> dict
     
+    Update the sample counts with 0 values when donor_id found in cases is not already in counts
+    
+    Parameters
+    ----------
+    - cases (list): List of dictionary with case information
+    - counts (dict): Dictionary with library and sample counts for each donor
+    '''
+        
+    for i in cases:
+        if i['case_id'] not in counts:
+            counts[i['case_id']] = {'library': 0, 'normal': 0, 'tumor': 0}
+    return counts    
 
 
 
@@ -638,21 +673,23 @@ def index():
 @app.route('/<project_name>')
 def project_page(project_name):
     
+    
     # get the project info for project_name from db
     project = get_project_info(project_name)
     # get the pipelines from the library definitions in db
     pipelines = get_pipelines(project_name)
+    
     # get case information
     cases = get_cases(project_name)
+    # get library and sample counts
+    counts = get_sample_counts(project_name)
+    # add missing donors to counts (ie, when counts are 0)
+    counts = add_missing_donors(cases, counts)
     
-    for i in range(len(cases)):
-        normals, tumors, libraries = get_sample_counts(project_name, cases[i]['case_id'])
-        cases[i]['normals'], cases[i]['tumors'], cases[i]['libraries'] = normals, tumors, libraries        
-        
     # get the date of the last sequencing data
     seq_date = get_last_sequencing(project['project_id'])
     
-    return render_template('project.html', routes=routes, project=project, pipelines=pipelines, cases=cases, seq_date=seq_date)
+    return render_template('project.html', routes=routes, project=project, pipelines=pipelines, cases=cases, counts=counts, seq_date=seq_date)
 
 @app.route('/<project_name>/sequencing')
 def sequencing(project_name):
