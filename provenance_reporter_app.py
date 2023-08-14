@@ -34,7 +34,7 @@ from networks import get_node_labels, make_adjacency_matrix, plot_workflow_netwo
 from whole_transcriptome import get_WT_call_ready_cases, get_star_case, get_WT_case_call_ready_samples, \
     map_workflows_to_samples, find_WT_analysis_blocks, name_WT_blocks
 from project import get_project_info, get_cases, get_sample_counts, add_missing_donors, get_last_sequencing
-from sequencing import get_sequences
+from sequencing import get_sequences, collect_sequence_info
 
 
    
@@ -396,33 +396,21 @@ def project_page(project_name):
     counts = get_sample_counts(project_name)
     # add missing donors to counts (ie, when counts are 0)
     counts = add_missing_donors(cases, counts)
-    
     # get the date of the last sequencing data
     seq_date = get_last_sequencing(project['project_id'])
     
     return render_template('project.html', routes=routes, project=project, pipelines=pipelines, cases=cases, counts=counts, seq_date=seq_date)
+
 
 @app.route('/<project_name>/sequencing')
 def sequencing(project_name):
     
     # get the project info for project_name from db
     project = get_project_info(project_name)
-    
     # get the pipelines from the library definitions in db
     pipelines = get_pipelines(project_name)
-    
-    # get sequences    
-    conn = connect_to_db()
-    files = conn.execute("SELECT Files.file, Files.workflow, Files.version, Files.wfrun_id, Files.attributes, \
-                         FilesQC.status, FilesQC.ticket, Workflow_Inputs.run, Workflow_Inputs.lane, Workflow_Inputs.platform, \
-                         Libraries.library, Libraries.sample, Libraries.ext_id, Libraries.group_id, \
-                         Libraries.library_type, Libraries.tissue_origin, Libraries.tissue_type \
-                         from Files JOIN FilesQC JOIN Workflow_Inputs JOIN Libraries WHERE Files.project_id = '{0}' \
-                         AND FilesQC.project_id = '{0}' AND FilesQC.file_swid = Files.file_swid \
-                         AND Workflow_Inputs.project_id = '{0}' AND Libraries.project_id = '{0}' \
-                         AND Files.wfrun_id = Workflow_Inputs.wfrun_id AND Workflow_Inputs.library = Libraries.library \
-                         AND LOWER(Files.workflow) in ('casava', 'bcl2fastq', 'fileimportforanalysis', 'fileimport', 'import_fastq');".format(project_name)).fetchall()
-    conn.close()
+    # get sequence file information
+    files = collect_sequence_info(project_name)
     # re-organize sequence information
     sequences = get_sequences(files)
 
