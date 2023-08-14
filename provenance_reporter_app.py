@@ -33,7 +33,7 @@ from whole_genome import get_bmpp_case, get_case_call_ready_samples, group_norma
 from networks import get_node_labels, make_adjacency_matrix, plot_workflow_network
 from whole_transcriptome import get_WT_call_ready_cases, get_star_case, get_WT_case_call_ready_samples, \
     map_workflows_to_samples, find_WT_analysis_blocks, name_WT_blocks
-from project import get_project_info, get_cases, get_sample_counts, add_missing_donors
+from project import get_project_info, get_cases, get_sample_counts, add_missing_donors, get_last_sequencing
 from sequencing import get_sequences
 
 
@@ -300,41 +300,6 @@ def get_samples(project_name):
 
 
 
-def get_last_sequencing(project_name):
-    '''
-    (str) -> str
-    
-    Returns the date of the last sequencing for the project of interest
-    
-    Paramaters
-    ----------
-    - project_name (str): Project of interest
-    '''
-    
-    conn = connect_to_db()
-    sequencing = conn.execute("SELECT DISTINCT Workflow_Inputs.run FROM Workflow_Inputs JOIN Files \
-                              WHERE Workflow_Inputs.project_id = '{0}' AND Files.project_id = '{0}' \
-                              AND Files.wfrun_id = Workflow_Inputs.wfrun_id \
-                              AND LOWER(Files.workflow) in ('casava', 'bcl2fastq', 'fileimportforanalysis', 'fileimport', 'import_fastq');".format(project_name)).fetchall()
-    conn.close()
-    
-    # get the most recent creation date of fastq generating workflows
-    
-    if sequencing:
-        sequencing = list(set(sequencing))
-        sequencing = [i['run'] for i in sequencing]
-        sequencing = map(lambda x: x.split('_'), sequencing)
-        seq_dates = [i for i in sequencing if any(list(map(lambda x: x.isdigit(), i)))]
-        
-        F = lambda y: list(map(lambda x: x.isdigit(), y)).index(True)
-        date_index = list(map(lambda x: F(x), seq_dates))
-        seq_dates = [seq_dates[i][date_index[i]] for i in range(len(date_index))]
-        seq_date = sorted(list(set(seq_dates)))[-1]
-        seq_date = '20' + str(seq_date)[:2] + '-' + str(seq_date)[2:4] + '-' + str(seq_date)[4:]
-        
-    else:
-        seq_date = 'NA'
-    return seq_date
     
     
 
