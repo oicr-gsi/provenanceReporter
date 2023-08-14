@@ -37,71 +37,7 @@ from project import get_project_info, get_cases, get_sample_counts, add_missing_
 from sequencing import get_sequences
 
 
-
-def group_sequences(L):
-    '''
-    (list) -> list
-
-    Returns a list sequence file information by grouping paired fastqs    
-    Pre-condition: all fastqs are paired-fastqs. Non-paired-fastqs are discarded.
-    
-    Parameters
-    ----------
-    - L (list): List of sqlite3.Row extracted from the database and containing sequence file information
-    '''
-    
-    # sort list according to files
-    L.sort(key = lambda x: x['file'])
-    
-    F = []
-    
-    for i in range(len(L) -1):
-        # check if adjacent files are paired
-        case1, case2 = L[i]['sample'], L[i+1]['sample']
-        sample1, sample2 = case1 + '_' + L[i]['ext_id'], case2 + '_' + L[i+1]['ext_id']
-        library1, library2 = L[i]['library'] + '_' + L[i]['group_id'], L[i+1]['library'] + '_' + L[i+1]['group_id']
-        workflow1, workflow2 = L[i]['workflow'] + '_' + L[i]['version'], L[i+1]['workflow'] + '_' + L[i+1]['version']
-        wfrun1, wfrun2 = L[i]['wfrun_id'], L[i+1]['wfrun_id']      
-        file1, file2 = L[i]['file'], L[i+1]['file']
-        run1, run2 = L[i]['run'] + '_' + str(L[i]['lane']), L[i+1]['run'] + '_' + str(L[i+1]['lane'])
-        platform1, platform2 = L[i]['platform'], L[i+1]['platform']
-        status1, status2 = L[i]['status'], L[i+1]['status']
-        ticket1, ticket2 = L[i]['ticket'], L[i+1]['ticket'] 
-        read_count1 = json.loads(L[i]['attributes'])['read_count'] if 'read_count' in json.loads(L[i]['attributes']) else 'NA' 
-        read_count2 = json.loads(L[i+1]['attributes'])['read_count'] if 'read_count' in json.loads(L[i+1]['attributes']) else 'NA' 
-
-        if case1 == case2 and run1 == run2 and platform1 == platform2 \
-        and library1 == library2 and sample1 == sample2 and wfrun1 == wfrun2:
-            assert read_count1 == read_count2 
-            assert workflow1 == workflow2
-            assert json.loads(L[i]['attributes'])['read_number'] == '1' and json.loads(L[i+1]['attributes'])['read_number'] == '2'            
-            if 'GDR' in ticket1:
-                ticket1 = os.path.join('https://jira.oicr.on.ca/browse/', os.path.basename(ticket1))    
-            else:
-                ticket1 = ''
-            readcount = '{:,}'.format(int(read_count1)) if read_count1 != 'NA' else 'NA'
-            fileprefix = os.path.basename(file1)
-            fileprefix = '_'.join(fileprefix.split('_')[:-1])
-            d = {'case': case1, 'sample': sample1, 'library': library1, 'run': run1,
-                  'files': [file1, file2], 'read_count': readcount, 'workflow': workflow1,
-                  'release_status': status1, 'ticket': ticket1, 'prefix':fileprefix}
-            F.append(d)
-       
-    F.sort(key = lambda x: x['case'])
-     
-    return F
-
-
-
-
-
-
-
-    
-    
-    
-    
-    
+   
 
 
 def get_call_ready_cases(project_name, platform, library_type):
