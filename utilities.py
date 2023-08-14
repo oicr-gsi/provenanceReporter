@@ -97,13 +97,6 @@ def remove_non_analysis_workflows(data):
     return data
         
 
-
-
-
-
-
-
-
 def convert_epoch_time(epoch):
     '''
     (str) -> str
@@ -157,3 +150,51 @@ def get_miso_sample_link(project_name, case):
     
     return miso_link
 
+
+
+def get_library_design(library_source):
+    '''
+    (str) -> str
+    
+    Returns the description of library_source as defined in MISO
+    
+    Parameters
+    ----------
+    - library_source (str): Code of the library source as defined in MISO
+    '''
+
+    library_design = {'WT': 'Whole Transcriptome', 'WG': 'Whole Genome', 'TS': 'Targeted Sequencing',
+                      'TR': 'Total RNA', 'SW': 'Shallow Whole Genome', 'SM': 'smRNA', 'SC': 'Single Cell',
+                      'NN': 'Unknown', 'MR': 'mRNA', 'EX': 'Exome', 'CT': 'ctDNA', 'CM': 'cfMEDIP',
+                      'CH': 'ChIP-Seq', 'BS': 'Bisulphite Sequencing', 'AS': 'ATAC-Seq'}
+
+    if library_source in library_design:
+        return library_design[library_source]
+    else:
+        return None
+
+
+
+
+
+def get_pipelines(project_name):
+    '''
+    (str) -> list
+    
+    Returns a list of pipeline names based on the library codes extracted from database for project_name
+    
+    Parameters
+    ----------
+    - project_name (str) Name of the project of interest
+    '''    
+    
+    # connect to db
+    conn = connect_to_db()
+    # extract library source
+    library_source = conn.execute("SELECT DISTINCT library_type FROM Files WHERE project_id = '{0}';".format(project_name)).fetchall()
+    library_source = list(set([i['library_type'] for i in  list(set(library_source))]))
+    # get the library definitions
+    pipelines = [get_library_design(j) for j in library_source if get_library_design(j)]
+    conn.close()
+    
+    return pipelines
