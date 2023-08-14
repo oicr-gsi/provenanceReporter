@@ -866,15 +866,13 @@ def get_call_ready_cases(project_name, platform, library_type):
     for i in data:
         # select bmpp data sequenced on novaseq
         if platform in i['platform'].lower():
-            if i['sample'] not in cases:
-                cases[i['sample']] = {'project': i['project_id'], 'samples': set(), 'libraries': set(), 'bmpp': set()}
-            
-            sample = '_'.join([i['sample'], i['tissue_type'], i['tissue_origin'], i['library_type'], i['group_id']]) 
-            cases[i['sample']]['samples'].add(sample)
-                       
-            cases[i['sample']]['libraries'].add(i['library'])
             if 'bammergepreprocessing' in i['wf'].lower():
+                if i['sample'] not in cases:
+                    cases[i['sample']] = {'project': i['project_id'], 'samples': set(), 'libraries': set(), 'bmpp': set()}
                 cases[i['sample']]['bmpp'].add(i['wfrun_id'])
+                sample = '_'.join([i['sample'], i['tissue_type'], i['tissue_origin'], i['library_type'], i['group_id']]) 
+                cases[i['sample']]['samples'].add(sample)
+                cases[i['sample']]['libraries'].add(i['library'])
             
     for i in cases:
         cases[i]['samples'] = list(set(cases[i]['samples']))
