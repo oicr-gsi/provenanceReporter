@@ -866,14 +866,20 @@ def download_cases_table(project_name):
     # get case information
     cases = get_cases(project_name)
     
+    # get library and sample counts
+    counts = get_sample_counts(project_name)
+    # add missing donors to counts (ie, when counts are 0)
+    counts = add_missing_donors(cases, counts)
+    
     D = {}
     for i in cases:
-        i = dict(i)
-        assert i['case_id'] not in D
-        normals, tumors, libraries = get_sample_counts(project_name, i['case_id'])
-        i['normals'], i['tumors'], i['libraries'] = normals, tumors, libraries        
-        D[i['case_id']] = i
-    
+        donor = i['case_id']
+        assert donor in counts
+        D[donor] = i
+        D[donor]['library'] = counts[donor]['library']
+        D[donor]['normal'] = counts[donor]['normal']
+        D[donor]['tumor'] = counts[donor]['tumor']
+        
     data = pd.DataFrame(D.values())
     data.to_excel('{0}_cases.xlsx'.format(project_name), index=False)
    
