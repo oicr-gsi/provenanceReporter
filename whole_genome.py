@@ -7,8 +7,7 @@ Created on Fri Jun  9 10:42:36 2023
 
 
 from utilities import connect_to_db, convert_epoch_time, get_workflow_name, \
-    remove_non_analysis_workflows, get_children_workflows, filter_out_QC_workflows, \
-    get_workflow_names
+    remove_non_analysis_workflows, get_children_workflows, get_workflow_names
 
 
 

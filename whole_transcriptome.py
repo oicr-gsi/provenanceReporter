@@ -5,7 +5,7 @@ Created on Tue Jun  6 13:35:40 2023
 @author: rjovelin
 """
 
-from utilities import connect_to_db, get_children_workflows, filter_out_QC_workflows
+from utilities import connect_to_db, get_children_workflows
 from whole_genome import map_analysis_workflows_to_sample, get_parent_workflows
 
 

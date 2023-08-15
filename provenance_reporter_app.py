@@ -24,7 +24,7 @@ import numpy as np
 import io
 import base64
 
-from utilities import connect_to_db, get_children_workflows, filter_out_QC_workflows, \
+from utilities import connect_to_db, get_children_workflows, \
     get_miso_sample_link, get_pipelines
 from whole_genome import get_call_ready_cases, get_bmpp_case, get_case_call_ready_samples, group_normal_tumor_pairs, \
     find_analysis_blocks, map_workflows_to_sample_pairs, map_workflows_to_parent, list_block_workflows, \
