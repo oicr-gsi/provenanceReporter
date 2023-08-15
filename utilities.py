@@ -23,36 +23,36 @@ def connect_to_db(database='merged.db'):
     return conn
 
 
-def get_children_workflows(project_name, workflow_id):
-    '''
-    (str, str) -> list
+# def get_children_workflows(project_name, workflow_id):
+#     '''
+#     (str, str) -> list
     
-    Returns a dictionary with workflow name, list of workflow_ids that are all children of 
-    workflow_id (i.e immediate downstream workflow) for a given project_name
+#     Returns a dictionary with workflow name, list of workflow_ids that are all children of 
+#     workflow_id (i.e immediate downstream workflow) for a given project_name
     
-    Parameters
-    ----------
-    - project_name (str): Name of project of interest
-    - bmpp_id (str): bamMergePreprocessing workflow id 
-    '''
+#     Parameters
+#     ----------
+#     - project_name (str): Name of project of interest
+#     - bmpp_id (str): bamMergePreprocessing workflow id 
+#     '''
     
-    conn = connect_to_db()
+#     conn = connect_to_db()
     
-    data = conn.execute("SELECT Workflows.wf, Parents.children_id FROM Parents JOIN Workflows \
-                        WHERE Parents.project_id = '{0}' AND Workflows.project_id = '{0}' \
-                        AND Parents.parents_id = '{1}' AND Workflows.wfrun_id = Parents.children_id;".format(project_name, workflow_id)).fetchall()
-    data= list(set(data))
+#     data = conn.execute("SELECT Workflows.wf, Parents.children_id FROM Parents JOIN Workflows \
+#                         WHERE Parents.project_id = '{0}' AND Workflows.project_id = '{0}' \
+#                         AND Parents.parents_id = '{1}' AND Workflows.wfrun_id = Parents.children_id;".format(project_name, workflow_id)).fetchall()
+#     data= list(set(data))
     
-    D = {}
-    for i in data:
-        if i['wf'] in D:
-            D[i['wf']].append(i['children_id'])
-            D[i['wf']] = list(set(D[i['wf']]))
-        else:
-            D[i['wf']] = [i['children_id']]
-    conn.close()
+#     D = {}
+#     for i in data:
+#         if i['wf'] in D:
+#             D[i['wf']].append(i['children_id'])
+#             D[i['wf']] = list(set(D[i['wf']]))
+#         else:
+#             D[i['wf']] = [i['children_id']]
+#     conn.close()
     
-    return D
+#     return D
 
 
 def filter_out_QC_workflows(project_name, workflows):
@@ -73,29 +73,134 @@ def filter_out_QC_workflows(project_name, workflows):
         del workflows[i]
     return workflows
 
-def remove_non_analysis_workflows(data):
+
+
+
+
+def get_children_workflows(project_name):
+    '''
+    (str) -> list
+    
+    Returns a dictionary with workflow name, list of workflow_ids that are all children of 
+    workflow_id (i.e immediate downstream workflow) for a given project_name
+    
+    Parameters
+    ----------
+    - project_name (str): Name of project of interest
+    - bmpp_id (str): bamMergePreprocessing workflow id 
+    '''
+    
+    conn = connect_to_db()
+    data = conn.execute("SELECT DISTINCT Workflows.wf, Parents.parents_id, \
+                        Parents.children_id FROM Parents JOIN Workflows \
+                        WHERE Parents.project_id = '{0}' \
+                        AND Workflows.project_id = '{0}' AND \
+                        Workflows.wfrun_id = Parents.children_id;".format(project_name)).fetchall()
+    data= list(set(data))
+    conn.close()
+    
+    D = {}
+    for i in data:
+        if i['parents_id'] not in D:
+            D[i['parents_id']] = []
+        D[i['parents_id']].append({'wf': i['wf'], 'children_id': i['children_id']})
+    
+    return D
+
+
+def get_workflow_names(project_name):
+    '''
+    (str) -> dict
+    
+    Returns a dictionary with workflow_id and workflow name key, value pairs
+    
+    Parameters
+    ----------
+    - project_name (str): Name of project of interest
+    '''
+
+    conn = connect_to_db()
+    data = conn.execute("SELECT DISTINCT Workflows.wfrun_id, Workflows.wf FROM \
+                        Workflows WHERE Workflows.project_id = '{0}';".format(project_name)).fetchall()
+    data= list(set(data))
+    conn.close()
+    
+    D = {}
+    for i in data:
+        D[i['wfrun_id']] = i['wf']
+       
+    return D
+
+
+
+
+
+
+
+
+
+
+
+
+# def remove_non_analysis_workflows(data):
+#     '''
+#     (list) -> list
+    
+    
+#     '''
+    
+    
+#     non_analysis_workflows = ('wgsmetrics', 'insertsizemetrics', 'bamqc', 'calculatecontamination',
+#                     'calculatecontamination_lane_level', 'callability', 'fastqc',
+#                     'crosscheckfingerprintscollector_bam', 'crosscheckfingerprintscollector',
+#                     'fingerprintcollector', 'bamqc_lane_level', 'bamqc_call_ready', 'bwamem', 
+#                     'bammergepreprocessing', 'ichorcna_lane_level', 'ichorcna', 'tmbanalysis', 
+#                     'casava', 'bcl2fastq', 'fileimportforanalysis', 'fileimport', 
+#                     'import_fastq', 'dnaseqqc', 'hotspotfingerprintcollector', 
+#                     'wgsmetrics_call_ready', 'rnaseqqc_lane_level', 'rnaseqqc_call_ready')
+    
+#     to_remove = [i for i in data if i['wf'].lower() in non_analysis_workflows]
+#     for i in to_remove:
+#         data.remove(i)
+    
+#     return data
+        
+
+
+
+def remove_non_analysis_workflows(L):
     '''
     (list) -> list
     
+    Returns a list L of dictionaries with workflows, removing any non-analysis workflows
     
+    Parameters
+    ----------
+    - L (list): List of dictionaries with workflow name and workflow ids
     '''
     
-    
     non_analysis_workflows = ('wgsmetrics', 'insertsizemetrics', 'bamqc', 'calculatecontamination',
-                    'calculatecontamination_lane_level', 'callability', 'fastqc',
-                    'crosscheckfingerprintscollector_bam', 'crosscheckfingerprintscollector',
-                    'fingerprintcollector', 'bamqc_lane_level', 'bamqc_call_ready', 'bwamem', 
-                    'bammergepreprocessing', 'ichorcna_lane_level', 'ichorcna', 'tmbanalysis', 
-                    'casava', 'bcl2fastq', 'fileimportforanalysis', 'fileimport', 
-                    'import_fastq', 'dnaseqqc', 'hotspotfingerprintcollector', 
-                    'wgsmetrics_call_ready', 'rnaseqqc_lane_level', 'rnaseqqc_call_ready')
+                              'callability', 'fastqc', 'crosscheckfingerprintscollector',
+                              'fingerprintcollector', 'bwamem', 'bammergepreprocessing',
+                              'ichorcna', 'tmbanalysis', 'casava', 'bcl2fastq',
+                              'fileimportforanalysis', 'fileimport', 'import_fastq',
+                              'dnaseqqc', 'hotspotfingerprintcollector', 'rnaseqqc')
     
-    to_remove = [i for i in data if i['wf'].lower() in non_analysis_workflows]
+    to_remove = [i for i in L if i['wf'].split('_')[0].lower() in non_analysis_workflows]
     for i in to_remove:
-        data.remove(i)
+        L.remove(i)
     
-    return data
-        
+    return L
+
+
+
+
+
+
+
+
+
+
 
 def convert_epoch_time(epoch):
     '''

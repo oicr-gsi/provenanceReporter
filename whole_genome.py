@@ -7,7 +7,8 @@ Created on Fri Jun  9 10:42:36 2023
 
 
 from utilities import connect_to_db, convert_epoch_time, get_workflow_name, \
-    remove_non_analysis_workflows, get_children_workflows, filter_out_QC_workflows
+    remove_non_analysis_workflows, get_children_workflows, filter_out_QC_workflows, \
+    get_workflow_names
 
 
 
@@ -874,29 +875,34 @@ def get_call_ready_cases(project_name, platform, library_type):
                 cases[i['sample']]['samples'].add(sample)
                 cases[i['sample']]['libraries'].add(i['library'])
             
-    for i in cases:
-        cases[i]['samples'] = list(set(cases[i]['samples']))
-        cases[i]['libraries'] = list(set(cases[i]['libraries']))
-        cases[i]['bmpp'] = list(set(cases[i]['bmpp']))
+    # for i in cases:
+    #     cases[i]['samples'] = list(set(cases[i]['samples']))
+    #     cases[i]['libraries'] = list(set(cases[i]['libraries']))
+    #     cases[i]['bmpp'] = list(set(cases[i]['bmpp']))
+
+
+    # get parent-children workflow relationships
+    parents = get_children_workflows(project_name)
+    # get the workflow names
+    #workflows = get_workflow_names(project_name)
 
     # find the bmpp downstream workflows
-    for i in cases:
+    for sample in cases:
         downstream = []
-        for j in cases[i]['bmpp']:
-            d = get_children_workflows(cases[i]['project'], j)
-            # filter out QC workflows
-            d = filter_out_QC_workflows(cases[i]['project'], d)
-            # list all downstream workflows
-            downstream_wf = [k for m in d.values() for k in m]
-            downstream.extend(downstream_wf)
-            # get downstream workflows of dowmstream workflows
-            for k in downstream_wf:
-                d = get_children_workflows(cases[i]['project'], k)
-                # filter out QC workflows
-                d = filter_out_QC_workflows(cases[i]['project'], d)
-                df = [n for m in d.values() for n in m]
-                downstream.extend(df)
-        cases[i]['downstream'] = list(set(downstream)) 
+        for bmpp in cases[sample]['bmpp']:
+            # get the bmpp downstream workflows
+            children = parents[bmpp]
+            # removed any non-analysis workflow
+            children = remove_non_analysis_workflows(children)
+            # list all downtream workflows
+            downstream.extend([i['children_id'] for i in children])
+            # get the downstream workflows of downstream workflows
+            # remove non-analysis workflows
+            for workflow in downstream:
+                if workflow in parents:
+                    L = remove_non_analysis_workflows(parents[workflow])
+                    downstream.extend([i['children_id'] for i in L])
+        cases[sample]['downstream'] = list(set(downstream)) 
     
     
     return cases
