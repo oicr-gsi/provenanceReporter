@@ -125,24 +125,6 @@ def map_analysis_workflows_to_sample(project_name, sample, platform):
     
     
     conn = connect_to_db()    
-    # data = conn.execute("SELECT Workflow_Inputs.wfrun_id, Workflow_Inputs.platform, Workflows.wf FROM \
-    #                      Workflow_Inputs JOIN Workflows JOIN Libraries WHERE Workflow_Inputs.library = Libraries.library \
-    #                      AND Workflow_Inputs.wfrun_id = Workflows.wfrun_id AND \
-    #                      Workflow_Inputs.project_id = '{0}' AND Libraries.project_id = '{0}' \
-    #                      AND Workflows.project_id = '{0}' AND Libraries.sample = '{1}' AND \
-    #                      Libraries.library_type = '{2}' AND Libraries.tissue_origin = '{3}' AND \
-    #                      Libraries.tissue_type = '{4}' AND Libraries.group_id = '{5}' \
-    #                      AND LOWER(Workflows.wf) NOT IN \
-    #                      ('wgsmetrics', 'insertsizemetrics', 'bamqc', 'calculatecontamination', \
-    #                      'calculatecontamination_lane_level', 'callability', 'fastqc', \
-    #                      'crosscheckfingerprintscollector_bam', 'crosscheckfingerprintscollector', \
-    #                      'fingerprintcollector', 'bamqc_lane_level', 'bamqc_call_ready', 'bwamem', \
-    #                      'bammergepreprocessing', 'ichorcna_lane_level', 'ichorcna', 'tmbanalysis', \
-    #                      'casava', 'bcl2fastq', 'fileimportforanalysis', 'fileimport', \
-    #                      'import_fastq', 'dnaseqqc', 'hotspotfingerprintcollector', \
-    #                      'wgsmetrics_call_ready')".format(project_name, case, library_type, tissue_origin, tissue_type, group_id)).fetchall()
-        
-    
     data = conn.execute("SELECT Workflow_Inputs.wfrun_id, Workflow_Inputs.platform, Workflows.wf FROM \
                          Workflow_Inputs JOIN Workflows JOIN Libraries WHERE Workflow_Inputs.library = Libraries.library \
                          AND Workflow_Inputs.wfrun_id = Workflows.wfrun_id AND \
@@ -150,8 +132,6 @@ def map_analysis_workflows_to_sample(project_name, sample, platform):
                          AND Workflows.project_id = '{0}' AND Libraries.sample = '{1}' AND \
                          Libraries.library_type = '{2}' AND Libraries.tissue_origin = '{3}' AND \
                          Libraries.tissue_type = '{4}' AND Libraries.group_id = '{5}'".format(project_name, case, library_type, tissue_origin, tissue_type, group_id)).fetchall()
-    
-    
     conn.close()   
     data = list(set(data))
     
@@ -177,11 +157,8 @@ def find_common_workflows(project_name, platform, samples):
     L1 = map_analysis_workflows_to_sample(project_name, samples[0], platform)
     L2 = map_analysis_workflows_to_sample(project_name, samples[1], platform)
     
-    merged = []
-    for i in L1:
-        for j in L2:
-            if i == j:
-                merged.append(i)
+    merged = list(set(L1).intersection(L2))
+    
     return merged
     
 
@@ -199,11 +176,8 @@ def map_workflows_to_sample_pairs(project_name, platform, pairs):
         j = ' | '.join(sorted(i))
         L = find_common_workflows(project_name, platform, i)
         #D[j] = list(map(lambda x: dict(x), L))
-        D[j] = L 
-    to_remove = [i for i in D if len(D[i]) == 0]    
-    for i in to_remove:
-        del D[i]
-    
+        if len(L) != 0:
+            D[j] = L 
     return D
 
 
