@@ -14,19 +14,28 @@ from utilities import connect_to_db, convert_epoch_time, get_workflow_name, \
 
 def get_bmpp_case(project_name, case, platform, library_type):
     '''
+    (str, str, str, str) -> list
     
+    Returns a list of bmpp workflow Ids corresponding to the specific case from project 
+    with input sequences from platform and library_type
     
-    
+    Parameters
+    ----------
+    - project_name (str): Bane of project of interest
+    - case (str): Donor id 
+    - platform (str): Sequencing platfor.
+                      Values are novaseq, miseq, nextseq and hiseq
+    - library_type (str): 2-letters code describing the type of the library (eg, WG, WT,..)
     '''
+    
     conn = connect_to_db()
-    data = conn.execute("SELECT Libraries.sample, Libraries.library, Libraries.library_type, Workflow_Inputs.lane, \
-                         Workflow_Inputs.platform, Workflow_Inputs.wfrun_id, Workflows.wf, \
-                         Workflows.wfrun_id FROM Libraries JOIN Workflow_Inputs JOIN Workflows \
-                         WHERE Libraries.project_id = '{0}' AND Workflow_Inputs.project_id = '{0}' \
-                         AND Workflows.project_id = '{0}' AND Workflows.wfrun_id = Workflow_Inputs.wfrun_id \
-                         AND Workflow_Inputs.library = Libraries.library \
-                         AND LOWER(SUBSTR(Workflows.wf, 1, 21)) = 'bammergepreprocessing' \
-                         AND Libraries.sample ='{1}'".format(project_name, case)).fetchall()
+    data = conn.execute("SELECT Libraries.library_type, Workflow_Inputs.platform, \
+                        Workflow_Inputs.wfrun_id FROM Libraries JOIN Workflow_Inputs JOIN Workflows \
+                        WHERE Libraries.project_id = '{0}' AND Workflow_Inputs.project_id = '{0}' \
+                        AND Workflows.project_id = '{0}' AND Workflows.wfrun_id = Workflow_Inputs.wfrun_id \
+                        AND Workflow_Inputs.library = Libraries.library \
+                        AND LOWER(SUBSTR(Workflows.wf, 1, 21)) = 'bammergepreprocessing' \
+                        AND Libraries.sample ='{1}'".format(project_name, case)).fetchall()
     conn.close()
 
     bmpps = list(set([i['wfrun_id'] for i in data if platform in i['platform'].lower() and library_type == i['library_type']]))
