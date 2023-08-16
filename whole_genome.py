@@ -6,8 +6,8 @@ Created on Fri Jun  9 10:42:36 2023
 """
 
 
-from utilities import connect_to_db, convert_epoch_time, get_workflow_name, \
-    remove_non_analysis_workflows, get_children_workflows, get_workflow_names
+from utilities import connect_to_db, convert_epoch_time, remove_non_analysis_workflows,\
+    get_children_workflows
 
 
 
@@ -80,9 +80,30 @@ def get_call_ready_samples(project_name, bmpp_run_id):
     return samples
 
 
-def get_case_call_ready_samples(project_name, bmpp_ids):
+def map_samples_to_bmpp_runs(project_name, bmpp_ids):
     '''
-    (str, list)
+    (str, list) -> dict
+    
+    Returns a dictionary with normal, tumor samples for each bmpp run id
+      
+    Parameters
+    ----------
+    - project_name (str): Name of the project of interest
+    - bmpp_ids (list): List of BamMergePreprocessing workflow run identifiers for a single case
+    '''
+
+    D = {}
+    for i in bmpp_ids:
+        # initiate dictionary
+        samples = get_call_ready_samples(project_name, i)
+        D[i] = samples
+    return D
+
+
+
+def get_case_call_ready_samples(project_name, bmpp_samples):
+    '''
+    (str, dict)
     
     Returns a dictionary with all normal and tumor samples for project_name
     processed for all bamMergePreprocessing workflow run ids for a specific case
@@ -90,31 +111,30 @@ def get_case_call_ready_samples(project_name, bmpp_ids):
     Parameters
     ----------
     - project_name (str): Name of the project of interest
-    - bmpp_ids (list): List of BamMergePreprocessing workflow run identifiers for a single case
-    '''
+    - bmpp_samples (dict): Dictionary with normal, tumor samples for each bmpp run id   '''
     
-    L = []
-    for i in bmpp_ids:
-        # initiate dictionary
-        samples = get_call_ready_samples(project_name, i)
-        if samples not in L:
-            L.append(samples)    
-    D = {'normal': [], 'tumour': []}
-    for d in L:
-        D['normal'].extend(d['normal'])
-        D['tumour'].extend(d['tumour'])
+    
+    D = {'normal': [], 'tumour': []} 
+    
+    for i in bmpp_samples:
+        D['normal'].extend(bmpp_samples[i]['normal'])
+        D['tumour'].extend(bmpp_samples[i]['tumour'])
     return D
-
-
+    
 
 def map_analysis_workflows_to_sample(project_name, sample, platform):
     '''
-    (list)
+    (str, str, str) -> list
     
+    Returns a list with workflow information for a sample from project_name with input 
+    sequences sequenced on a given platform
     
-    
+    Parameters
+    ----------
+    - project_name (str): Name of project of interest
+    - sample (str): Specific sample from project
+    - platform (str): Sequencing platform: novaseq, miseq, nextseq or hiseq
     '''
-
         
     sample = sample.split('_')
     case = '_'.join(sample[0:2])
@@ -122,7 +142,6 @@ def map_analysis_workflows_to_sample(project_name, sample, platform):
     tissue_origin = sample[3]
     library_type = sample[4]
     group_id = '_'.join(sample[5:])
-    
     
     conn = connect_to_db()    
     data = conn.execute("SELECT Workflow_Inputs.wfrun_id, Workflow_Inputs.platform, Workflows.wf FROM \
@@ -148,15 +167,22 @@ def map_analysis_workflows_to_sample(project_name, sample, platform):
 
 def find_common_workflows(project_name, platform, samples):
     '''
+    (str, str, list) -> list
     
+    Returns a list of workflows processed with the normal and tumor sample pair in samples
+    for data from a given sequencing platform and project of interest
     
+    Parameters
+    ----------
+    - project_name (str): Name of project of interest
+    - platform (str): Sequencing platform: novaseq, miseq, hiseq or nextseq
+    - samples (list): list with a normal and a tumor sample
     '''
-
     
-    
+    # get the analysis workflows for the normal and tumor sample    
     L1 = map_analysis_workflows_to_sample(project_name, samples[0], platform)
     L2 = map_analysis_workflows_to_sample(project_name, samples[1], platform)
-    
+    # get workflows in common, processed with the tumor, normal sample pair
     merged = list(set(L1).intersection(L2))
     
     return merged
@@ -165,17 +191,22 @@ def find_common_workflows(project_name, platform, samples):
 
 def map_workflows_to_sample_pairs(project_name, platform, pairs):
     '''
-    -> dict
+    (str, str, list) -> dict
     
+    Returns a dictionary with workflow information for each normal, tumor sample pair
+    in pairs for a given project and for sequences done on a given platform
     
-    
+    Parameters
+    ----------
+    - project_name (str): Project of interest
+    - platform (str): Sequencing platform: novaseq, miseq, hiseq or nextseq
+    - pairs (list): List of normal, tumor sample pairs
     '''
     
     D = {}
     for i in pairs:
         j = ' | '.join(sorted(i))
         L = find_common_workflows(project_name, platform, i)
-        #D[j] = list(map(lambda x: dict(x), L))
         if len(L) != 0:
             D[j] = L 
     return D
@@ -212,8 +243,14 @@ def get_case_samples(project_name, case, library_type):
 
 def group_normal_tumor_pairs(samples):
     '''
+    (dict) -> list
     
+    Returns a list with all possible normal, tumor pairs from the dictionary
+    of normal and tumor samples for a given case
     
+    Parameters
+    ----------
+    - samples (dict): Dictionary with normal and tumour samples for a given case
     '''
     
     pairs = []
@@ -286,17 +323,26 @@ def map_sample_pairs_to_bmpp_runs(project_name, platform, pairs):
 
 
 
-def map_workflows_to_parent(project_name, D):
+
+
+def map_workflows_to_parent(D, parents):
     '''
+    (dict, dict) -> dict
     
+    Returns a dictionary with parent workflows of each workflow 
+    of the sample pairs in D
     
+    Parameters
+    ----------
+    - D (dict): Dictionary with workflows of each normal, tumour sample pair
+    - parents (dict): Dictionary with parent workflows of each workflow in a given project
     '''
     
     parent_workflows = {}
     
     for samples in D:
         for j in D[samples]:
-            parent = get_parent_workflows(project_name, j['wfrun_id'])
+            parent = parents[j['wfrun_id']]
             if j['wfrun_id'] not in parent_workflows:
                 parent_workflows[j['wfrun_id']] = []
             for k in parent:
@@ -305,42 +351,51 @@ def map_workflows_to_parent(project_name, D):
     return parent_workflows
 
 
-def get_parent_workflows(project_name, workflow_id):
+
+def get_parent_workflows(project_name):
     '''
-    (str, str) -> dict
+    (str) -> dict
     
-    Returns a dictionary with workflow name, list of workflow_ids that are all parent of 
-    workflow_id (i.e immediate upstream workflow) for a given project_name
-    
+    Returns a dictionary with workflow name, list of workflow_ids that are parent
+    to all each workflow (i.e immediate upstream workflow) for a given project
+        
     Parameters
     ----------
     - project_name (str): Name of project of interest
-    - bmpp_id (str): bamMergePreprocessing workflow id 
     '''
     
     conn = connect_to_db()
-    data = conn.execute("SELECT Workflows.wf, Parents.parents_id FROM Parents JOIN Workflows \
-                        WHERE Parents.project_id = '{0}' AND Workflows.project_id = '{0}' \
-                        AND Parents.children_id = '{1}' AND Workflows.wfrun_id = Parents.parents_id;".format(project_name, workflow_id)).fetchall()
+    data = conn.execute("SELECT Workflows.wf, Parents.parents_id, Parents.children_id \
+                        FROM Parents JOIN Workflows WHERE Parents.project_id = '{0}' \
+                        AND Workflows.project_id = '{0}' AND Workflows.wfrun_id = Parents.parents_id;".format(project_name)).fetchall()
     data= list(set(data))
+    conn.close()
     
     D = {}
     for i in data:
-        if i['wf'] in D:
-            D[i['wf']].append(i['parents_id'])
-            D[i['wf']] = sorted(list(set(D[i['wf']])))
-        else:
-            D[i['wf']] = [i['parents_id']]
-    conn.close()
-    
+        if i['children_id'] not in D:
+            D[i['children_id']] = {}
+        if i['wf'] not in D[i['children_id']]:
+            D[i['children_id']][i['wf']] = []
+        D[i['children_id']][i['wf']].append(i['parents_id'])
     return D
+      
 
 
 
-def find_analysis_blocks(project_name, D, parent_workflows, bmpp):
+def find_analysis_blocks(D, parents, parent_workflows, bmpp):
     '''
+    (dict, dict, dict, list) -> list
     
+    Returns a dictionary with analysis workflows grouped by sample pairs and blocks 
+    (ie, originating from common call-ready workflows)
     
+    Parameters
+    ----------
+    - D (dict): Dictionary with workflows of each normal, tumour sample pair
+    - parents (dict): Dictionary with parent workflows of each workflow in a given project
+    - parent_worfklows (dict): Dictionary with parent workflows of each workflow for the normal, tumour sample pairs
+    - bmpp (list): List of bmpp workflow run id for a given case                           
     '''
     
     # track blocks
@@ -352,17 +407,16 @@ def find_analysis_blocks(project_name, D, parent_workflows, bmpp):
     # get the bmpp sort bmpp-dowsntream workflows by block and sample     
     for samples in D:
         for j in D[samples]:
-            parents = get_parent_workflows(project_name, j['wfrun_id'])
-            if len(parents.keys()) == 1 and parents[list(parents.keys())[0]][0] in bmpp:
-                assert 'bamMergePreprocessing' in list(parents.keys())[0]
-                parent_workflow = '.'.join(sorted(parents[list(parents.keys())[0]]))
+            parent = parents[j['wfrun_id']]
+            if len(parent.keys()) == 1 and parent[list(parent.keys())[0]][0] in bmpp:
+                assert 'bamMergePreprocessing' in list(parent.keys())[0]
+                parent_workflow = '.'.join(sorted(parent[list(parent.keys())[0]]))
                 if samples not in blocks:
                     blocks[samples] = {}
                 if parent_workflow not in blocks[samples]:
                     blocks[samples][parent_workflow] = []
                 wfrunid = j['wfrun_id']
                 d = {wfrunid: {'parent': j, 'children': []}}
-                #blocks[parent_workflow][samples].append(j)
                 blocks[samples][parent_workflow].append(d)
                 L.append(wfrunid)
     
@@ -382,8 +436,17 @@ def find_analysis_blocks(project_name, D, parent_workflows, bmpp):
 
 
 def list_block_workflows(blocks):
+    '''
+    (dict) -> dict
     
+    Returns a dictionary with list of workflow ids grouped by sample pair and analysis block
     
+    Parameters
+    ----------
+    - blocks (dict): Dictionary with analysis workflows grouped by sample pairs and blocks 
+    (ie, originating from common call-ready workflows)
+    '''
+        
     # list all workflows downstream of each bmpp anchors
     W = {}
     for block in blocks:
@@ -403,39 +466,35 @@ def list_block_workflows(blocks):
 
 
 
-
-def get_workflow_analysis_date(workflow_run_id):
+def get_workflows_analysis_date(project_name):
     '''
-    (str) -> int
+    (str) -> dict
     
-    Returns the creation date of any file for workflow with workflow_run_id
-    
+    Returns the creation date of any file for each workflow id for the project of interest
+       
     Parameters
     ----------
-    - workflow_run_id (str): Workflow run identifier
+    - project_name (str): Name of project of interest
     '''
     
     
     # connect to db
     conn = connect_to_db()
     # extract project info
-    data = conn.execute("SELECT creation_date FROM Files WHERE wfrun_id='{0}'".format(workflow_run_id)).fetchall()
+    data = conn.execute("SELECT DISTINCT creation_date, wfrun_id FROM Files WHERE project_id='{0}'".format(project_name)).fetchall()
     conn.close()
     
-    data = list(set(data))
-    
-    if data:
-        # select creation date of any file
-        most_recent = data[0]['creation_date']
-    else:
-        most_recent = 'NA'
+    D = {}
+    for i in data:
+        D[i['wfrun_id']] = i['creation_date']
         
-    return most_recent
+    return D
 
 
-def get_block_analysis_date(block_workflows):
+
+def get_block_analysis_date(block_workflows, creation_dates):
     '''
-    (dict) -> dict, dict
+    (dict, dict) -> dict, dict
     
     Returns a dictionary with the most recent analysis date of any workflow downstream
     of bmpp parent workflows for each sample pair, and a dictionary with the analysis date 
@@ -444,11 +503,11 @@ def get_block_analysis_date(block_workflows):
     Parameters
     ----------
     - block_workflows (dict): Dictionary of workflow run ids organized by sample pair and bmpp parent workflows
+    - creation_dates (dict): Dictionary with creation date of each worklow in project
     '''
 
     block_date = {}
     workflow_dates = {}
-
 
     for block in block_workflows:
         block_date[block] = {}
@@ -458,7 +517,10 @@ def get_block_analysis_date(block_workflows):
             most_recent = 0
             # get the analysis date for each workflow
             for wf in block_workflows[block][bmpp]:
-                wf_date = get_workflow_analysis_date(wf)
+                if wf in creation_dates:
+                    wf_date = creation_dates[wf]
+                else:
+                    wf_date = 'NA'
                 if wf_date != 'NA':
                     workflow_dates[block][bmpp][wf] = convert_epoch_time(wf_date)
                     if wf_date  > most_recent:
@@ -474,9 +536,9 @@ def get_block_analysis_date(block_workflows):
 
 
 
-def sort_call_ready_samples(project_name, blocks):
+def sort_call_ready_samples(project_name, blocks, bmpp_samples, workflow_names):
     '''
-    (str, dict) -> dict
+    (str, dict, dict, dict) -> dict
     
     Returns a dictionary with samples sorted by block and bmpp parent workflow
     
@@ -484,6 +546,8 @@ def sort_call_ready_samples(project_name, blocks):
     ----------
     - project_name (str): Project of interest
     - blocks (dict): Dictionary with workflows sorted by block and bmpp parent workflows
+    - bmpp_samples (dict): Dictionary with normal and tumor samples for each bmpp run id
+    - workflow_names (dict): Dictionary with workflow name for each workflow run id in project
     '''
     
     D = {}
@@ -494,38 +558,40 @@ def sort_call_ready_samples(project_name, blocks):
             D[block][bmpp] = {}
             bmpp_ids = bmpp.split('.')
             for i in bmpp_ids:
-                D[block][bmpp][i] = {'samples': get_call_ready_samples(project_name, i), 'name': get_workflow_name(i)}
+                D[block][bmpp][i] = {'samples': bmpp_samples[i], 'name': workflow_names[(i)]}
        
     return D
 
 
 
-
-def get_workflow_file_count(workflow_id):
+def get_workflow_file_count(project_name):
     '''
-    (str) -> int
+    (str) -> dict
     
-    Returns the number of files for workflow with workflow run id
+    Returns a dictionary with the number of files for each workflow in project
     
     Parameters
     ----------
-    - workflow_id (str): Workflow run identifier
+    - project_name (str): Name of project of interest
     '''
     
     conn = connect_to_db()
-    data = conn.execute("SELECT Files.file FROM Files WHERE Files.wfrun_id = '{0}'".format(workflow_id)).fetchall()
+    data = conn.execute("SELECT DISTINCT Files.file, Files.wfrun_id FROM Files WHERE Files.project_id = '{0}'".format(project_name)).fetchall()
     conn.close()
 
-    data = list(set(data))
-    
-    return len(data)
+    counts = {}
+    for i in data:
+        counts[i['wfrun_id']] = counts.get(i['wfrun_id'], 0) + 1
+       
+    return counts
 
 
 
 
-def get_block_workflow_file_count(block_workflows):
+
+def get_block_workflow_file_count(block_workflows, file_counts):
     '''
-    (dict) -> dict
+    (dict, dict) -> dict
     
     Returns a dictionary with the file count for each workflow of each block
     and bmpp parent_workflow
@@ -533,13 +599,14 @@ def get_block_workflow_file_count(block_workflows):
     Parameters
     ----------
     - block_workflows (dict): Dictionary of workflow run ids organized by sample pair and bmpp parent workflows
+    - file_counts (dict): Dictionary with file count for each workflow in project
     '''
         
     D = {}
     for block in block_workflows:
         for bmpp in block_workflows[block]:
             for workflow in block_workflows[block][bmpp]:
-                D[workflow] = get_workflow_file_count(workflow)
+                D[workflow] = file_counts[workflow]
     return D
 
 

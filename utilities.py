@@ -162,26 +162,6 @@ def convert_epoch_time(epoch):
     return time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(int(epoch)))
 
 
-
-def get_workflow_name(wfrun_id):
-    '''
-    (str) -> str
-
-    Returns the name of the workflow defined by workflow run id    
-    
-    Parameters
-    ----------
-    - wfrun_id (str): Workflow run identifier
-    '''
-        
-    conn = connect_to_db()    
-    data = conn.execute("SELECT Workflows.wf FROM Workflows WHERE Workflows.wfrun_id='{0}'".format(wfrun_id)).fetchall()
-    conn.close()   
-    data = list(set(data))
-
-    return data[0]['wf']
-
-
 def get_miso_sample_link(project_name, case):
     '''
     (str, str) -> str

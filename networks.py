@@ -6,7 +6,6 @@ Created on Wed Jun 14 16:29:36 2023
 """
 
 
-from utilities import get_workflow_name
 import matplotlib
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
@@ -18,9 +17,9 @@ import base64
 
 
 
-def get_node_labels(block_workflows):
+def get_node_labels(block_workflows, workflow_names):
     '''
-    (dict) -> dict
+    (dict, dict) -> dict
     
     Returns a dictionary with node labels (workflows) for each block (sample pair)
     and bmpp parent workflows
@@ -28,6 +27,7 @@ def get_node_labels(block_workflows):
     Parameters
     ----------
     - block_workflows (dict): Dictionary of workflow run ids organized by sample pair and bmpp parent workflows
+    - workflow_names (dict): Dictionary with workflow name for each workflow run id in project
     '''
     
     labels = {}
@@ -36,7 +36,7 @@ def get_node_labels(block_workflows):
         for bmpp in block_workflows[block]:
             labels[block][bmpp] = []
             for workflow in block_workflows[block][bmpp]:
-                workflow_name = get_workflow_name(workflow)
+                workflow_name = workflow_names[workflow]
                 workflow_name = workflow_name.split('_')[0]
                 if workflow_name.lower() == 'varianteffectpredictor':
                     workflow_name = 'VEP'
