@@ -610,33 +610,6 @@ def get_block_workflow_file_count(block_workflows, file_counts):
     return D
 
 
-
-
-# def get_workflow_limskeys(workflow_id):
-#     '''
-#     (str) -> list
-    
-#     Returns a list of input limskeys to workflow run id 
-    
-#     Parameters
-#     ----------
-#     - workflow_id (str): Workflow run identifier
-#     '''
-    
-    
-#     conn = connect_to_db()
-#     data = conn.execute("SELECT Workflow_Inputs.limskey FROM Workflow_Inputs WHERE Workflow_Inputs.wfrun_id = '{0}'".format(workflow_id)).fetchall()
-#     conn.close()
-
-#     data = list(set(data))
-
-#     limskeys = [i['limskey'] for i in data]
-#     #limskeys = list(set(limskeys()))                    
-        
-#     return limskeys
-
-
-
 def get_workflow_limskeys(project_name):
     '''
     (str) -> dict
@@ -740,10 +713,9 @@ def get_block_release_status(block_workflows, limskeys, release_status):
     return D
 
 
-
-def get_amount_data(block_workflows):
+def get_amount_data(block_workflows, limskeys):
     '''
-    (dict) -> dict
+    (dict, dict) -> dict
     
     Returns a dictionary with the amount of lane data for each workflow 
     of each sample plair and parent bmpp workflow
@@ -751,6 +723,7 @@ def get_amount_data(block_workflows):
     Parameters
     ----------
     - block_workflows (dict): Dictionary of workflow run ids organized by sample pair and bmpp parent workflows
+    - limskeys (dict): Dictionary with workflow run id, list of limskeys
     '''
     
     D = {}
@@ -759,8 +732,11 @@ def get_amount_data(block_workflows):
         for bmpp in block_workflows[block]:
             D[block][bmpp] = {}
             for workflow_id in block_workflows[block][bmpp]:
-                D[block][bmpp][workflow_id] = len(get_workflow_limskeys(workflow_id))
+                D[block][bmpp][workflow_id] = len(limskeys[workflow_id])
     return D
+
+
+
 
 
 

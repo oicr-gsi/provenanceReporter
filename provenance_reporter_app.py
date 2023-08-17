@@ -419,20 +419,8 @@ def wgs_case(project_name, case):
     # excluding fastq-import workflows
     status = get_file_release_status(project_name)
     release_status = get_block_release_status(block_workflows, limskeys, status)
-        
-    print('release status', time.time() -  start)
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     # get the amount of data for each workflow
-    amount_data = get_amount_data(block_workflows)
+    amount_data = get_amount_data(block_workflows, limskeys)
     
     print('amount data', time.time() -  start)
     
