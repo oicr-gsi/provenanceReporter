@@ -612,91 +612,113 @@ def get_block_workflow_file_count(block_workflows, file_counts):
 
 
 
-def get_workflow_limskeys(workflow_id):
+# def get_workflow_limskeys(workflow_id):
+#     '''
+#     (str) -> list
+    
+#     Returns a list of input limskeys to workflow run id 
+    
+#     Parameters
+#     ----------
+#     - workflow_id (str): Workflow run identifier
+#     '''
+    
+    
+#     conn = connect_to_db()
+#     data = conn.execute("SELECT Workflow_Inputs.limskey FROM Workflow_Inputs WHERE Workflow_Inputs.wfrun_id = '{0}'".format(workflow_id)).fetchall()
+#     conn.close()
+
+#     data = list(set(data))
+
+#     limskeys = [i['limskey'] for i in data]
+#     #limskeys = list(set(limskeys()))                    
+        
+#     return limskeys
+
+
+
+def get_workflow_limskeys(project_name):
     '''
-    (str) -> list
+    (str) -> dict
     
-    Returns a list of input limskeys to workflow run id 
-    
+    Returns a dictionary with list of limskeys for each workflow id in project
+        
     Parameters
     ----------
-    - workflow_id (str): Workflow run identifier
+    - project_name (str): Name of project of interest
     '''
-    
-    
+        
     conn = connect_to_db()
-    data = conn.execute("SELECT Workflow_Inputs.limskey FROM Workflow_Inputs WHERE Workflow_Inputs.wfrun_id = '{0}'".format(workflow_id)).fetchall()
+    data = conn.execute("SELECT Workflow_Inputs.limskey, Workflow_Inputs.wfrun_id FROM Workflow_Inputs WHERE Workflow_Inputs.project_id = '{0}'".format(project_name)).fetchall()
     conn.close()
 
-    data = list(set(data))
+    D = {}
+    for i in data:
+        if i['wfrun_id'] not in D:
+            D[i['wfrun_id']] = []
+        D[i['wfrun_id']].append(i['limskey'])
+            
+    return D
 
-    limskeys = [i['limskey'] for i in data]
-    #limskeys = list(set(limskeys()))                    
-        
-    return limskeys
 
-
-
-def get_file_release_status(file_swid):
+def get_file_release_status(project_name):
     '''
-    (str) -> str
+    (str) -> dict
     
-    Returns the Nabu release status (PASS, PENDING, FAIL) of a file defined by its file swid  
-    
+    Returns a dictionary with file swid and file QC status from Nabu for each limskey
+    corresponding to fastq-generating workflows casava and bcl2fastq for the project of interest
+       
     Parameters
     ----------
-    - file_swid (str): File unique identifier
+    - project_name (str): Name of project of interest
     '''
-        
-    conn = connect_to_db()
     
-    data = conn.execute("SELECT FilesQC.status FROM FilesQC WHERE FilesQC.file_swid = '{0}';".format(file_swid)).fetchall()
+    # ignore fastq-import workflows because files from these workflows are not released    
+    conn = connect_to_db()
+    data = conn.execute("SELECT Files.file_swid, Files.limskey, FilesQC.status FROM Files JOIN \
+                        FilesQC WHERE FilesQC.file_swid = Files.file_swid AND Files.project_id = '{0}' \
+                        AND FilesQC.project_id = '{0}' AND LOWER(Files.workflow) IN ('casava', 'bcl2fastq');".format(project_name)).fetchall()
     conn.close()
 
-    status = data[0]['status']    
-    
-    return status
+    D = {}
+    for i in data:
+        if i['limskey'] not in D:
+            D[i['limskey']] = []
+        D[i['limskey']].append([i['file_swid'], i['status']])
+    return D    
 
 
 
-def get_workflow_release_status(workflow_id):
+def get_workflow_release_status(workflow_id, limskeys, release_status):
     '''
-    (str) -> bool
+    (str, dict, dict) -> bool
     
     Returns True if ALL input files of workflow with workflow_id have been released
     
     Parameters
     ----------
     - workflow_id (str): Workflow run identifier
+    - limskeys (dict): Dictionary with workflow run id, list of limskeys
+    - release_status (dict): Dictionary with file, swid, file release status for each limskey
     '''
 
     # get workflow limskeys
-    limskeys = get_workflow_limskeys(workflow_id)
-    
-    limskeys = list(set(limskeys))
-    
-    # get file_swid
-    file_swids = []
-    conn = connect_to_db()
-    
-    for i in limskeys:
-        # ignore fastq-import workflows
-        data = conn.execute("SELECT Files.file_swid FROM Files WHERE Files.limskey = '{0}' \
-                            AND LOWER(Files.workflow) IN ('casava', 'bcl2fastq');".format(i)).fetchall()
-        file_swids.extend([j['file_swid'] for j in data])
-    conn.close()
+    workflow_limskeys = limskeys[workflow_id]
 
-    file_swids = list(set(file_swids))
-
-    status = all(map(lambda x: x.lower() == 'pass', [get_file_release_status(i) for i in file_swids])) 
+    # get release status of all files for the given workflow
+    status = []
+    for i in workflow_limskeys:
+        for j in release_status[i]:
+            status.append(j[1])
+    status = all(map(lambda x: x.lower() == 'pass', status))
     
     return status
+    
+    
 
-
-
-def get_block_release_status(block_workflows):
+def get_block_release_status(block_workflows, limskeys, release_status):
     '''
-    (dict) -> dict
+    (dict, dict, dict) -> dict
     
     Returns a dictionary with the release status of the input fastqs to each bmpp parent workflow
     of each sample pair
@@ -704,6 +726,8 @@ def get_block_release_status(block_workflows):
     Parameters
     ----------
     - block_workflows (dict): Dictionary of workflow run ids organized by sample pair and bmpp parent workflows
+    - limskeys (dict): Dictionary with workflow run id, list of limskeys
+    - release_status (dict): Dictionary with file, swid, file release status for each limskey
     '''
         
     D = {}
@@ -711,8 +735,7 @@ def get_block_release_status(block_workflows):
         D[block] = {}
         for bmpp in block_workflows[block]:
             workflows = bmpp.split('.')
-            #status = all([get_workflow_release_status(j) for j in block_workflows[block]])
-            status = all([get_workflow_release_status(j) for j in workflows])
+            status = all([get_workflow_release_status(j, limskeys, release_status) for j in workflows])
             D[block][bmpp] = status
     return D
 

@@ -30,7 +30,8 @@ from whole_genome import get_call_ready_cases, get_bmpp_case, get_case_call_read
     find_analysis_blocks, map_workflows_to_sample_pairs, map_workflows_to_parent, list_block_workflows, \
     get_block_analysis_date, sort_call_ready_samples, get_block_workflow_file_count, get_block_release_status, \
     get_amount_data, is_block_complete, order_blocks, name_WGS_blocks, create_block_json, map_samples_to_bmpp_runs, \
-    get_parent_workflows, get_workflows_analysis_date, get_workflow_file_count    
+    get_parent_workflows, get_workflows_analysis_date, get_workflow_file_count, \
+    get_workflow_limskeys, get_file_release_status    
 from networks import get_node_labels, make_adjacency_matrix, plot_workflow_network
 from whole_transcriptome import get_WT_call_ready_cases, get_star_case, get_WT_case_call_ready_samples, \
     map_workflows_to_samples, find_WT_analysis_blocks, name_WT_blocks
@@ -407,27 +408,33 @@ def wgs_case(project_name, case):
     figures = plot_workflow_network(matrix, block_workflow_names)
     # get the samples for each bmpp id
     samples_bmpp = sort_call_ready_samples(project_name, blocks, bmpp_samples, workflow_names)
-    print('sorted block', time.time() -  start)
-    
     # get the file count of each workflow in project
     file_counts = get_workflow_file_count(project_name)
     # get the workflow file counts
     file_counts = get_block_workflow_file_count(block_workflows, file_counts)
-    
-    print('counted files', time.time() -  start)
-    
-    
-    
-    
     # get release status of input sequences for each block
-    release_status = get_block_release_status(block_workflows)
-    
+    # get the input limskeys for each workflow in project
+    limskeys = get_workflow_limskeys(project_name)
+    # get the file swid and release status for each limskey for fastq-generating workflows
+    # excluding fastq-import workflows
+    status = get_file_release_status(project_name)
+    release_status = get_block_release_status(block_workflows, limskeys, status)
+        
     print('release status', time.time() -  start)
+    
+    
+    
+    
+    
+    
+    
+    
+    
     
     # get the amount of data for each workflow
     amount_data = get_amount_data(block_workflows)
     
-    print(time.time() -  start)
+    print('amount data', time.time() -  start)
     
     
     
