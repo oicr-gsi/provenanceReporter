@@ -66,52 +66,16 @@ def get_workflow_names(project_name):
     '''
 
     conn = connect_to_db()
-    data = conn.execute("SELECT DISTINCT Workflows.wfrun_id, Workflows.wf FROM \
+    data = conn.execute("SELECT DISTINCT Workflows.wfrun_id, Workflows.wf, Workflows.wfv FROM \
                         Workflows WHERE Workflows.project_id = '{0}';".format(project_name)).fetchall()
     data= list(set(data))
     conn.close()
     
     D = {}
     for i in data:
-        D[i['wfrun_id']] = i['wf']
+        D[i['wfrun_id']] = [i['wf'], i['wfv']]
        
     return D
-
-
-
-
-
-
-
-
-
-
-
-
-# def remove_non_analysis_workflows(data):
-#     '''
-#     (list) -> list
-    
-    
-#     '''
-    
-    
-#     non_analysis_workflows = ('wgsmetrics', 'insertsizemetrics', 'bamqc', 'calculatecontamination',
-#                     'calculatecontamination_lane_level', 'callability', 'fastqc',
-#                     'crosscheckfingerprintscollector_bam', 'crosscheckfingerprintscollector',
-#                     'fingerprintcollector', 'bamqc_lane_level', 'bamqc_call_ready', 'bwamem', 
-#                     'bammergepreprocessing', 'ichorcna_lane_level', 'ichorcna', 'tmbanalysis', 
-#                     'casava', 'bcl2fastq', 'fileimportforanalysis', 'fileimport', 
-#                     'import_fastq', 'dnaseqqc', 'hotspotfingerprintcollector', 
-#                     'wgsmetrics_call_ready', 'rnaseqqc_lane_level', 'rnaseqqc_call_ready')
-    
-#     to_remove = [i for i in data if i['wf'].lower() in non_analysis_workflows]
-#     for i in to_remove:
-#         data.remove(i)
-    
-#     return data
-        
-
 
 
 def remove_non_analysis_workflows(L):
@@ -137,14 +101,6 @@ def remove_non_analysis_workflows(L):
         L.remove(i)
     
     return L
-
-
-
-
-
-
-
-
 
 
 
