@@ -605,7 +605,10 @@ def get_block_workflow_file_count(block_workflows, file_counts):
     for block in block_workflows:
         for bmpp in block_workflows[block]:
             for workflow in block_workflows[block][bmpp]:
-                D[workflow] = file_counts[workflow]
+                if workflow in file_counts:
+                    D[workflow] = file_counts[workflow]
+                else:
+                    D[workflow] = 0
     return D
 
 
@@ -680,6 +683,8 @@ def get_workflow_release_status(workflow_id, limskeys, release_status):
     # get release status of all files for the given workflow
     status = []
     for i in workflow_limskeys:
+        if i not in release_status:
+            return False
         for j in release_status[i]:
             status.append(j[1])
     status = all(map(lambda x: x.lower() == 'pass', status))
