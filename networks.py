@@ -36,7 +36,7 @@ def get_node_labels(block_workflows, workflow_names):
         for bmpp in block_workflows[block]:
             labels[block][bmpp] = []
             for workflow in block_workflows[block][bmpp]:
-                workflow_name = workflow_names[workflow]
+                workflow_name = workflow_names[workflow][0]
                 workflow_name = workflow_name.split('_')[0]
                 if workflow_name.lower() == 'varianteffectpredictor':
                     workflow_name = 'VEP'

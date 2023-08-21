@@ -368,95 +368,183 @@ def whole_genome_sequencing(project_name):
 @app.route('/<project_name>/whole_genome_sequencing/<case>')
 def wgs_case(project_name, case):
     
+    tasks = []
+    
     start = time.time()
     
     # get the project info for project_name from db
     project = get_project_info(project_name)
+    end1 = time.time()
+    print('project', end1 - start)
+    
     # get the pipelines from the library definitions in db
     pipelines = get_pipelines(project_name)
+    end2 = time.time()
+    print('pipeline', end2 - end1)
+    
     # get all the bmpp runs for WG library type and Novaseq platform
     bmpp = get_bmpp_case(project_name, case, 'novaseq', 'WG')
+    end3 = time.time()
+    print('bmpp', end3 - end2)
+       
+    
     # get the normal and tumor samples for each bmpp id
     bmpp_samples = map_samples_to_bmpp_runs(project_name, bmpp)
+    end4 = time.time()
+    print('bmpp_samples', end4 - end3)
+    
     # identify all the samples processed
     samples = get_case_call_ready_samples(project_name, bmpp_samples)
+    end5 = time.time()
+    print('samples', end5 - end4)
+    
     # get all pairs N/T samples
     pairs = group_normal_tumor_pairs(samples)
+    end6 = time.time()
+    print('pairs', end6 - end5)
+    
+    
     # find analysis workflows for each N/T pairs
     # remove sample pairs without analysis workflows
     D = map_workflows_to_sample_pairs(project_name, 'novaseq', pairs)
+    end7 = time.time()
+    print('analysis workflows', end7 - end6)
+    
+       
     # find the parents of each workflow
     parents = get_parent_workflows(project_name)
+    end8 = time.time()
+    print('parents', end8 - end7)
+    
     # get the parent workflows for each block
     parent_workflows = map_workflows_to_parent(D, parents)
+    end9 = time.time()
+    print('parent workflows', end9 - end8)
+    
     # find the blocks by mapping the analysis workflows to their parent workflows    
     blocks = find_analysis_blocks(D, parents, parent_workflows, bmpp)
+    end10 = time.time()
+    print('blocks', end10 - end9)
+    
     # list all workflows for each block
     block_workflows = list_block_workflows(blocks)
+    end11 = time.time()
+    print('block workflows', end11 - end10)
+    
     # get the workflow creation date for all the workflows in project
     creation_dates = get_workflows_analysis_date(project_name)
     # assign date to each block. most recent file creation date from all workflows within block 
     # get the date of each workflow within block
     block_date, workflow_date = get_block_analysis_date(block_workflows, creation_dates)
+    end12 = time.time()
+    print('workflow date', end12 - end11)
+    
     # map each workflow run id to its workflow name
     workflow_names = get_workflow_names(project_name)
     # get the workflow names
     block_workflow_names = get_node_labels(block_workflows, workflow_names)
+    end13 = time.time()
+    print('workflow names', end13 - end12)
+    
     # convert workflow relationships to adjacency matrix for each block
     matrix = make_adjacency_matrix(block_workflows, parent_workflows)
+    end14 = time.time()
+    print('matrix', end14 - end13)
+    
     # create figures
     figures = plot_workflow_network(matrix, block_workflow_names)
+    end15 = time.time()
+    print('figures', end15 - end14)
+    
+     
     # get the samples for each bmpp id
     samples_bmpp = sort_call_ready_samples(project_name, blocks, bmpp_samples, workflow_names)
+    end16 = time.time()
+    print('samples bmpp', end16 - end15)
+    
+    
     # get the file count of each workflow in project
     file_counts = get_workflow_file_count(project_name)
     # get the workflow file counts
     file_counts = get_block_workflow_file_count(block_workflows, file_counts)
+    end17 = time.time()
+    print('file counts', end17 - end16)
+    
     # get release status of input sequences for each block
     # get the input limskeys for each workflow in project
     limskeys = get_workflow_limskeys(project_name)
+    end18 = time.time()
+    print('limskeys', end18 - end17)
+    
+      
     # get the file swid and release status for each limskey for fastq-generating workflows
     # excluding fastq-import workflows
     status = get_file_release_status(project_name)
     release_status = get_block_release_status(block_workflows, limskeys, status)
+    end19 = time.time()
+    print('release status', end19 - end18)
+    
     # get the amount of data for each workflow
     amount_data = get_amount_data(block_workflows, limskeys)
-    
-    print('amount data', time.time() -  start)
+    end20 = time.time()
+    print('amount data', end20 - end19)
     
     
     
     # check if blocks are complete
     expected_workflows = sorted(['mutect2', 'variantEffectPredictor', 'delly', 'varscan', 'sequenza', 'mavis'])           
     complete = is_block_complete(blocks, expected_workflows)
+    end21 = time.time()
+    print('complete', end21 - end20)
     
-    print(time.time() -  start)
     
     
     # order blocks based on the amount of data
     ordered_blocks = order_blocks(blocks, amount_data)
-
-    print(time.time() -  start)
+    end22 = time.time()
+    print('order blocks', end22 - end21)
 
 
     # name each block according to the selected block order
     names = name_WGS_blocks(ordered_blocks)
-    
-    print(time.time() -  start)
-    
-    
+    end23 = time.time()
+    print('name blocks', end23 - end22)    
     
     # get miso link
     miso_link = get_miso_sample_link(project_name, case)
-    
-    
-    print(time.time() -  start)
+    end24 = time.time()
+    print('miso link', end24 - end23)
     
     
     # sort sample pairs names
     sample_pairs_names = sorted(list(blocks.keys()))
+    end25 = time.time()
+    print('sort sample pairs', end25 - end24)
     
-    print(time.time() -  start)
+    
+    print('all tasks', end25 -  start)
+    
+    tasks.extend([('project', end1 - start), ('pipeline', end2 - end1),
+                 ('bmpp', end3 - end2), ('bmpp_samples', end4 - end3),
+                 ('samples', end5 - end4), ('pairs', end6 - end5),
+                 ('analysis workflows', end7 - end6), ('parents', end8 - end7),
+                 ('parent workflows', end9 - end8), ('blocks', end10 - end9),
+                 ('block workflows', end11 - end10), ('workflow date', end12 - end11),
+                 ('workflow names', end13 - end12), ('matrix', end14 - end13),
+                 ('figures', end15 - end14), ('samples bmpp', end16 - end15),
+                 ('file counts', end17 - end16), ('limskeys', end18 - end17),
+                 ('release status', end19 - end18), ('amount data', end20 - end19),
+                 ('complete', end21 - end20), ('order blocks', end22 - end21),
+                 ('name blocks', end23 - end22), ('miso link', end24 - end23),
+                 ('sort sample pairs', end25 - end24)])
+    tasks.sort(key=lambda x: x[1])
+    print(tasks)
+    
+    
+    
+    
+    
+    
     
     return render_template('WGS_case.html', project=project, routes = routes,
                            case=case, pipelines=pipelines, sample_pairs_names=sample_pairs_names,
@@ -572,41 +660,34 @@ def download_block_data(project_name, case, block, bmpp_parent):
     
     '''
     
-    
-    
-    # build the somatic calling block
-
     # get all the bmpp runs for WG library type and Novaseq platform
     bmpp = get_bmpp_case(project_name, case, 'novaseq', 'WG')
-
+    # get the normal and tumor samples for each bmpp id
+    bmpp_samples = map_samples_to_bmpp_runs(project_name, bmpp)
     # identify all the samples processed
-    samples = get_case_call_ready_samples(project_name, bmpp)
-
+    samples = get_case_call_ready_samples(project_name, bmpp_samples)
     # get all pairs N/T samples
     pairs = group_normal_tumor_pairs(samples)
-
     # find analysis workflows for each N/T pairs
     # remove sample pairs without analysis workflows
     D = map_workflows_to_sample_pairs(project_name, 'novaseq', pairs)
-
+    # get the parents of each workflow
+    parents = get_parent_workflows(project_name)
     # get the parent workflows for each block
-    parent_workflows = map_workflows_to_parent(project_name, D)
-
-    # find the blocks by mapping the analysis workflows to ttheir parent workflows    
-    blocks = find_analysis_blocks(project_name, D, parent_workflows, bmpp)
-    
+    parent_workflows = map_workflows_to_parent(D, parents)
+    # find the blocks by mapping the analysis workflows to their parent workflows    
+    blocks = find_analysis_blocks(D, parents, parent_workflows, bmpp)
+    # map each workflow run id to its workflow name
+    workflow_names = get_workflow_names(project_name)
     # create json with workflow information for block for DARE
-    block_data = create_block_json(project_name, blocks, block, bmpp_parent)
-
+    block_data = create_block_json(project_name, blocks, block, bmpp_parent, workflow_names)
+    
     # send the json to outoutfile                    
     return Response(
         response=json.dumps(block_data),
         mimetype="application/json",
         status=200,
         headers={"Content-disposition": "attachment; filename={0}_WGS_{1}_{2}.json".format(project_name, case, block)})
-
-
-
 
 
 @app.route('/download_wt_block/<project_name>/<case>/<block>/<star_parent>')

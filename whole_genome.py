@@ -145,12 +145,12 @@ def map_analysis_workflows_to_sample(project_name, sample, platform):
     
     conn = connect_to_db()    
     data = conn.execute("SELECT Workflow_Inputs.wfrun_id, Workflow_Inputs.platform, Workflows.wf FROM \
-                         Workflow_Inputs JOIN Workflows JOIN Libraries WHERE Workflow_Inputs.library = Libraries.library \
-                         AND Workflow_Inputs.wfrun_id = Workflows.wfrun_id AND \
-                         Workflow_Inputs.project_id = '{0}' AND Libraries.project_id = '{0}' \
-                         AND Workflows.project_id = '{0}' AND Libraries.sample = '{1}' AND \
-                         Libraries.library_type = '{2}' AND Libraries.tissue_origin = '{3}' AND \
-                         Libraries.tissue_type = '{4}' AND Libraries.group_id = '{5}'".format(project_name, case, library_type, tissue_origin, tissue_type, group_id)).fetchall()
+                          Workflow_Inputs JOIN Workflows JOIN Libraries WHERE Workflow_Inputs.library = Libraries.library \
+                          AND Workflow_Inputs.wfrun_id = Workflows.wfrun_id AND \
+                          Workflow_Inputs.project_id = '{0}' AND Libraries.project_id = '{0}' \
+                          AND Workflows.project_id = '{0}' AND Libraries.sample = '{1}' AND \
+                          Libraries.library_type = '{2}' AND Libraries.tissue_origin = '{3}' AND \
+                          Libraries.tissue_type = '{4}' AND Libraries.group_id = '{5}'".format(project_name, case, library_type, tissue_origin, tissue_type, group_id)).fetchall()
     conn.close()   
     data = list(set(data))
     
@@ -161,7 +161,6 @@ def map_analysis_workflows_to_sample(project_name, sample, platform):
     for i in to_remove:
         data.remove(i)
     return data
-
 
 
 
@@ -845,39 +844,40 @@ def name_WGS_blocks(ordered_blocks):
 
 
 
-def create_block_json(project_name, blocks, block, bmpp_parent):
+def create_block_json(project_name, blocks, block, bmpp_parent, workflow_names):
+    '''
+    (str, dict, str, str, dict)
+    
+    Returns a dictionary with workflow information for a given block (ie, sample pair)
+    and bmpp parent workflow
+    
+    Parameters
+    ----------
+    - project_name (str): Name of project of interest
+    - blocks (dict): Dictionary with block information
+    - block (str): Sample pair in blocks
+    - bmpp_parent (str): bamMergePreprocessing parent workflow(s)
+    - workflow_names (dict): Dictionaru with workflow name and version for each workflow in project
+    '''
     
     # organize the workflows by block and samples
     D = {}
-    
+    # re-organize the sample pair
     sample_id = '.'.join(list(map(lambda x: x.strip(), block.split('|'))))
-    D[sample_id] = []
-    D[sample_id].extend(bmpp_parent.split('.'))
-    for d in blocks[block][bmpp_parent]:
-        for workflow in d:
-            D[sample_id].append(d[workflow]['parent']['wfrun_id'])
-            if d[workflow]['children']:
-                for k in d[workflow]['children']:
-                    D[sample_id].append(k['wfrun_id'])
-                    
+    # get the workflow ids for that block
+    D[sample_id] = list_block_workflows(blocks)[block][bmpp_parent]
+    
     block_data = {}
-            
-    conn = connect_to_db()
-        
+    
     for sample in D:
         if sample not in block_data:
             block_data[sample] = {}
+            
         for workflow_id in D[sample]:
-            data = conn.execute("SELECT Workflows.wfrun_id, Workflows.wf, Workflows.wfv FROM Workflows \
-                                WHERE Workflows.project_id = '{0}' AND Workflows.wfrun_id = '{1}';".format(project_name, workflow_id)).fetchall()
-            for i in data:
-                workflow_name = i['wf']
-                wfrun_id = i['wfrun_id']
-                workflow_version = i['wfv']
-                block_data[sample][workflow_name] = {'workflow_id': wfrun_id, 'workflow_version': workflow_version}
-                                            
-    conn.close()                
-                    
+            workflow_name = workflow_names[workflow_id][0]
+            workflow_version = workflow_names[workflow_id][1]
+            block_data[sample][workflow_name] = {'workflow_id': workflow_id, 'workflow_version': workflow_version}
+    
     return block_data                
 
 
