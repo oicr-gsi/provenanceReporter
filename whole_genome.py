@@ -21,10 +21,9 @@ def get_bmpp_case(project_name, case, platform, library_type):
     
     Parameters
     ----------
-    - project_name (str): Bane of project of interest
+    - project_name (str): Name of project of interest
     - case (str): Donor id 
-    - platform (str): Sequencing platfor.
-                      Values are novaseq, miseq, nextseq and hiseq
+    - platform (str): Sequencing platform. Values are novaseq, miseq, nextseq and hiseq
     - library_type (str): 2-letters code describing the type of the library (eg, WG, WT,..)
     '''
     
