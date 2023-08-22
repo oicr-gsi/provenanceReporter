@@ -358,18 +358,14 @@ def whole_transcriptome(project_name):
     
     # get the project info for project_name from db
     project = get_project_info(project_name)
-    
     # get the pipelines from the library definitions in db
     pipelines = get_pipelines(project_name)
-        
     # get samples and libraries and workflow ids for each case
     cases = get_WT_call_ready_cases(project_name, 'novaseq', 'WT')
     samples = sorted(list(cases.keys()))
 
     return render_template('Whole_transcriptome.html', routes = routes, project=project,
                            samples=samples, cases=cases, pipelines=pipelines)
-
-
 
 @app.route('/<project_name>/whole_transcriptome/<case>')
 def wt_case(project_name, case):
