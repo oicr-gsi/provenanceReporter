@@ -145,55 +145,104 @@ def get_WT_call_ready_samples(project_name, star_id):
 
 
 
-def get_WT_case_call_ready_samples(project_name, star_ids):
+def get_WT_case_call_ready_samples(project_name, star_samples):
     '''
-    (str, list) -> list
+    (str, dict) -> dict
     
-    Returns a list of tumour samples processed for all star_call_ready workflow
-    run ids for a specific case
+    Returns a dictionary with tumor samples processed for all star_call_ready
+    workflow run ids for a specific case and project
+        
+    Parameters
+    ----------
+    - project_name (str): Name of the project of interest
+    - star_samples (dict): Dictionary with tumor samples for each star run id
+    '''
+     
+    D = {'tumour': []}
+    for i in star_samples:
+        D['tumour'].extend(star_samples[i]['tumour'])
+    return D    
+ 
+
+
+def map_samples_to_star_runs(project_name, star_ids):
+    '''
+    (str, list) -> dict
     
+    Returns a dictionary with normal, tumor samples for each bmpp run id
+      
     Parameters
     ----------
     - project_name (str): Name of the project of interest
     - star_ids (list): List of star_call_ready workflow run identifiers for a single case
     '''
-    
-    L = []
+
+    D = {}
     for i in star_ids:
         # initiate dictionary
         samples = get_WT_call_ready_samples(project_name, i)
-        if samples not in L:
-            L.append(samples)    
-    samples = []
-    for d in L:
-        samples.extend(d['tumour'])
-    return samples
+        D[i] = samples
+    return D
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 def map_workflows_to_samples(project_name, platform, samples):
     '''
-    -> dict
+    (str, str, dict) -> dict
     
+    Returns a dictionary with workflows processed by the WT pipeline for tumor samples
     
-    
+    Parameters
+    ----------
+    - project_name (str): Name of project of interest
+    - platform (str): Sequencing platform. Values are: novaseq, miseq, hiseq and nextseq
+    - samples (dict): Dictionary with tumor samples
     '''
     
     D = {}
-    for i in samples:
+    for i in samples['tumour']:
         L =  map_analysis_workflows_to_sample(project_name, i, platform)
-        D[i] = L 
-    to_remove = [i for i in D if len(D[i]) == 0]    
-    for i in to_remove:
-        del D[i]
+        if L:
+            D[i] = L 
     
     return D
 
 
 
-def find_WT_analysis_blocks(project_name, D, parent_workflows, star):
+def find_WT_analysis_blocks(D, parents, parent_workflows, star):
     '''
-    
-    
+    Returns a dictionary with analysis workflows grouped by sample and blocks 
+    (ie, originating from common call-ready workflows)
+   
+    Parameters
+    ----------
+    - D (dict): Dictionary with workflows for tumor samples
+    - parents (dict): Dictionary with parent workflows of each workflow in a given project
+    - parent_worfklows (dict): Dictionary with parent workflows of each workflow for the tumour samples
+    - star (list): List of star workflow run id for a given case     
     '''
     
     # track blocks
@@ -205,17 +254,16 @@ def find_WT_analysis_blocks(project_name, D, parent_workflows, star):
     # get the bmpp sort bmpp-dowsntream workflows by block and sample     
     for samples in D:
         for j in D[samples]:
-            parents = get_parent_workflows(project_name, j['wfrun_id'])
-            if len(parents.keys()) == 1 and parents[list(parents.keys())[0]][0] in star:
-                assert 'star_call_ready' in list(parents.keys())[0]
-                parent_workflow = '.'.join(sorted(parents[list(parents.keys())[0]]))
+            parent = parents[j['wfrun_id']]
+            if len(parent.keys()) == 1 and parent[list(parent.keys())[0]][0] in star:
+                assert 'star_call_ready' in list(parent.keys())[0]
+                parent_workflow = '.'.join(sorted(parent[list(parent.keys())[0]]))
                 if samples not in blocks:
                     blocks[samples] = {}
                 if parent_workflow not in blocks[samples]:
                     blocks[samples][parent_workflow] = []
                 wfrunid = j['wfrun_id']
                 d = {wfrunid: {'parent': j, 'children': []}}
-                #blocks[parent_workflow][samples].append(j)
                 blocks[samples][parent_workflow].append(d)
                 L.append(wfrunid)
     

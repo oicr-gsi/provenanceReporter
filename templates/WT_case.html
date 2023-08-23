@@ -68,7 +68,7 @@
         {% for star_run in samples_star[pair][block] %}
           <tr>
             <td>{{star_run | shorten_workflow_id}}</td>
-            <td>{{samples_star[pair][block][star_run]['name']}}</td>
+            <td>{{samples_star[pair][block][star_run]['name'].0}}</td>
             <td>{{file_counts[star_run]}}</td>
             <td>{{amount_data[pair][block][star_run]}}</td>
             <td>{{workflow_date[pair][block][star_run]}}</td>
