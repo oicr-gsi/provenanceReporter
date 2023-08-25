@@ -566,27 +566,26 @@ def download_block_data(project_name, case, block, bmpp_parent):
 @app.route('/download_wt_block/<project_name>/<case>/<block>/<star_parent>')
 def download_WT_block_data(project_name, case, block, star_parent):
 
-    
-
     # build the somatic calling block
 
     # identify all call ready star runs for novaseq
     star = get_star_case(project_name, case, 'novaseq', 'WT')
-    
-    # identify the samples processed
-    samples = get_WT_case_call_ready_samples(project_name, star)
-    
+    # get the tumor samples for each star id
+    star_samples = map_samples_to_star_runs(project_name, star)
+    samples = get_WT_case_call_ready_samples(project_name, star_samples)
     # remove samples without analysis workflows
     D = map_workflows_to_samples(project_name, 'novaseq', samples)
-
+    # find the parents of each workflow
+    parents = get_parent_workflows(project_name)
     # get the parent workflows for each block
-    parent_workflows = map_workflows_to_parent(project_name, D)
-    
-    # find the blocks
-    blocks = find_WT_analysis_blocks(project_name, D, parent_workflows, star)
-    
+    parent_workflows = map_workflows_to_parent(D, parents)
+    # find the blocks by mapping the analysis workflows to their parent workflows    
+    blocks = find_WT_analysis_blocks(D, parents, parent_workflows, star)
+    # map each workflow run id to its workflow name
+    workflow_names = get_workflow_names(project_name)
     # create json with workflow information for block for DARE
-    block_data = create_block_json(project_name, blocks, block, star_parent)
+    block_data = create_block_json(project_name, blocks, block, star_parent, workflow_names)
+
 
     # send the json to outoutfile                    
     return Response(
@@ -596,6 +595,7 @@ def download_WT_block_data(project_name, case, block, star_parent):
         headers={"Content-disposition": "attachment; filename={0}_WT_{1}_{2}.json".format(project_name, case, block)})
 
     
+       
 
 @app.route('/download_cases/<project_name>')
 def download_cases_table(project_name):
