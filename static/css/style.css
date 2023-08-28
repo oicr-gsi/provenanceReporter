@@ -23,8 +23,8 @@ img {
   padding: 8px;
 }
 #project_table tr:nth-child(even){background-color: #f2f2f2;}
-#project_table tr:hover {background-color: #cc99ff;color: white}
-#project_table tr:hover a {background-color: #cc99ff;color: white}
+#project_table tr:hover {background-color: #196719;color: white}
+#project_table tr:hover a {background-color: #196719;color: white}
 #project_table th {
   padding-top: 12px;
   padding-bottom: 12px;
