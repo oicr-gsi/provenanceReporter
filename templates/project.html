@@ -29,7 +29,7 @@
   </tr>
   <tr>
     <th>MISO:</th>
-    <td><a class="miso_link" href="https://miso.oicr.on.ca/miso/project/shortname/{{project['project_id']}}" target="_blank">{{ project['project_id'] }}</a></td>
+    <td><button id="miso_button"><a href="https://miso.oicr.on.ca/miso/project/shortname/{{project['project_id']}}" target="_blank">MISO</a></button>
   </tr>
   <tr>
     <th>Project description:</th>
@@ -86,6 +86,7 @@
    <tr>
      <th>Case Id</th>
      <th>Donor Id</th>
+     <th>MISO</th>
      <th>Parent project</>
      <th>Created</th>
      <th>Normals</th>
@@ -94,8 +95,9 @@
    </tr>     
    {% for i in cases %}
      <tr>
-        <td><a class="miso_link" href="{{ i['miso'] }}" target="_blank">{{ i['case_id'] }}</a></td>
+        <td>{{ i['case_id'] }}</td>
         <td>{{ i['donor_id'] }}</td>        
+        <td><button id="miso_button"><a href="{{ i['miso'] }}" target="_blank">MISO</a></button>
         <td>{{ i['parent_project'] }}</td>        
         <td>{{ i['created_date'] | format_created_time}}</td>
         <td>{{ counts[i['case_id']]['normal'] }}</td>
