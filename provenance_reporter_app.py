@@ -94,6 +94,21 @@ def shorten_workflow_id(workflow_run_id):
     '''
     
     return workflow_run_id[:8] + '...'
+
+
+@app.template_filter()
+def format_created_time(created_time):
+    '''
+    (str) -> str
+    
+    Remove time in created time and keep only the date
+                 
+    Parameters
+    ----------
+    - created_time (str): Time a sample is created in the format Year-Month-DayTHour:Mn:SecZ
+    '''
+    
+    return created_time[:created_time.index('T')]
     
     
 @app.route('/')

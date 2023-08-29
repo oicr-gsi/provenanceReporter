@@ -97,7 +97,7 @@
         <td><a class="miso_link" href="{{ i['miso'] }}" target="_blank">{{ i['case_id'] }}</a></td>
         <td>{{ i['donor_id'] }}</td>        
         <td>{{ i['parent_project'] }}</td>        
-        <td>{{ i['created_date'] }}</td>
+        <td>{{ i['created_date'] | format_created_time}}</td>
         <td>{{ counts[i['case_id']]['normal'] }}</td>
         <td>{{ counts[i['case_id']]['tumor'] }}</td>
         <td>{{ counts[i['case_id']]['library'] }}</td>
