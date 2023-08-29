@@ -40,7 +40,6 @@
    <thead>
      <th>Cases</th>
      <th>Samples</th>
-     <th>Libraries</th>     
      <th>Count of call-ready workflows</th>
      <th>Count of downstream workflows</th>
    </thead>     
@@ -55,12 +54,6 @@
            <a class="project_links" href="{{ url_for('wgs_case', project_name=project['project_id'], case=i)}}">{{item}}</a>
            <br>
          {% endfor %}       
-       </td>
-       <td>
-         {% for item in cases[i]['libraries'] %}
-           <a class="project_links" href="{{ url_for('wgs_case', project_name=project['project_id'], case=i)}}">{{item}}</a>
-           <br>
-         {% endfor %}
        </td>
        <td>
          <a class="project_links" href="{{ url_for('wgs_case', project_name=project['project_id'], case=i)}}">{{cases[i]['bmpp'] | length}}</a>
