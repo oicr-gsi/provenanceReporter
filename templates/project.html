@@ -91,7 +91,9 @@
      <th>Created</th>
      <th>Normals</th>
      <th>Tumours</th>
-     <th>Libraries</th>
+     {% for library_type in library_types %}
+         <th>{{library_type}}</th>
+     {% endfor %} 
    </tr>     
    {% for i in cases %}
      <tr>
@@ -102,7 +104,9 @@
         <td>{{ i['created_date'] | format_created_time}}</td>
         <td>{{ counts[i['case_id']]['normal'] }}</td>
         <td>{{ counts[i['case_id']]['tumor'] }}</td>
-        <td>{{ counts[i['case_id']]['library'] }}</td>
+        {% for library_type in library_types %}
+          <td>{{libraries[i['case_id']][library_type] | length}}</td>
+        {% endfor %} 
      </tr>
    {% endfor %}
 </table>

@@ -35,7 +35,8 @@ from whole_genome import get_call_ready_cases, get_bmpp_case, get_case_call_read
 from networks import get_node_labels, make_adjacency_matrix, plot_workflow_network
 from whole_transcriptome import get_WT_call_ready_cases, get_star_case, get_WT_case_call_ready_samples, \
     map_workflows_to_samples, find_WT_analysis_blocks, name_WT_blocks, map_samples_to_star_runs
-from project import get_project_info, get_cases, get_sample_counts, add_missing_donors, get_last_sequencing
+from project import get_project_info, get_cases, get_sample_counts, count_libraries, \
+     get_library_types, add_missing_donors, get_last_sequencing
 from sequencing import get_sequences, collect_sequence_info
 
 
@@ -140,12 +141,17 @@ def project_page(project_name):
     counts = get_sample_counts(project_name)
     # add missing donors to counts (ie, when counts are 0)
     counts = add_missing_donors(cases, counts)
+    # count libraries for each library type
+    # get the library types
+    library_types =  get_library_types(project_name)
+    libraries = count_libraries(project_name, library_types, cases)
     # get the date of the last sequencing data
     seq_date = get_last_sequencing(project['project_id'])
     
     return render_template('project.html', routes=routes, project=project,
                            pipelines=pipelines, cases=cases, counts=counts,
-                           seq_date=seq_date, species=species)
+                           seq_date=seq_date, species=species, libraries=libraries,
+                           library_types = library_types)
 
 
 @app.route('/<project_name>/sequencing')

@@ -51,7 +51,7 @@ def get_sample_counts(project_name):
     '''
     (str) - > dict
     
-    Returns a dictionary with library and sample counts for each donor of a project of interest
+    Returns a dictionary with sample counts for each donor of a project of interest
     
     Parameters
     ----------
@@ -60,13 +60,12 @@ def get_sample_counts(project_name):
     
     conn = connect_to_db()
     
-    data = conn.execute("SELECT DISTINCT library, sample, tissue_type, group_id FROM Libraries WHERE project_id = '{0}';".format(project_name)).fetchall()
+    data = conn.execute("SELECT DISTINCT sample, tissue_type, group_id FROM Libraries WHERE project_id = '{0}';".format(project_name)).fetchall()
     conn.close()
 
     counts = {}
     for i in data:
         donor = i['sample']
-        library = i['library']
         if i['tissue_type'] == 'R':
             normal = i['sample'] + '_' + i['group_id']      
             tumor = ''
@@ -75,13 +74,10 @@ def get_sample_counts(project_name):
             tumor = i['sample'] + '_' + i['group_id']
         if donor not in counts:
             counts[donor] = {}
-        if 'library' not in counts[donor]:
-            counts[donor]['library'] = set()
         if 'normal' not in counts[donor]:
             counts[donor]['normal'] = set()
         if 'tumor' not in counts[donor]:
             counts[donor]['tumor'] = set()
-        counts[donor]['library'].add(library)
         if normal:
             counts[donor]['normal'].add(normal)
         elif tumor:
@@ -89,7 +85,6 @@ def get_sample_counts(project_name):
 
 
     for i in counts:
-        counts[i]['library'] = len(counts[i]['library'])
         counts[i]['normal'] = len(counts[i]['normal'])
         counts[i]['tumor'] = len(counts[i]['tumor'])
                
@@ -111,8 +106,65 @@ def add_missing_donors(cases, counts):
         
     for i in cases:
         if i['case_id'] not in counts:
-            counts[i['case_id']] = {'library': 0, 'normal': 0, 'tumor': 0}
+            counts[i['case_id']] = {'normal': 0, 'tumor': 0}
     return counts    
+
+
+def get_library_types(project_name):
+    '''
+    (str) -> list
+    
+    Returns a list of different library types for a given project
+    
+    Parameters
+    ----------
+    - project_name (str): Name of project of interest
+    '''
+    
+    # connect to db
+    conn = connect_to_db()
+    # extract library types
+    data = conn.execute("SELECT DISTINCT library_types FROM Projects WHERE project_id = '{0}';".format(project_name)).fetchall()
+    conn.close()
+    
+    library_types = sorted(list(map(lambda x: x.strip(), data[0]['library_types'].split(','))))
+   
+    return library_types
+
+
+def count_libraries(project_name, library_types, cases):
+    '''
+    (str, list, list) -> dict
+    
+    Returns a dictionary with libraries for each library type and sample for a given project
+       
+    Parameters
+    ----------
+    - project_name (str) Name of the project of interest
+    - library_types (list): List of library types recorded for project
+    - cases (list): List of dictionary with case information  
+    '''
+    
+    # connect to db
+    conn = connect_to_db()
+    # extract library source
+    data = conn.execute("SELECT DISTINCT sample, library_type, library FROM Libraries WHERE project_id = '{0}';".format(project_name)).fetchall()
+    conn.close()
+    
+    libraries= {}
+    
+    # initiate the libraries dict
+    for i in cases:
+        libraries[i['case_id']] = {}
+        for j in library_types:
+            libraries[i['case_id']][j] = set()
+    
+    # record libraries for each library type
+    for i in data:
+        libraries[i['sample']][i['library_type']].add(i['library'])
+    
+    return libraries
+
 
 
 def get_last_sequencing(project_name):
