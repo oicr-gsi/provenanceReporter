@@ -119,6 +119,8 @@ def project_page(project_name):
     pipelines = get_pipelines(project_name)
     # get case information
     cases = get_cases(project_name)
+    # get the species
+    species = ', '.join(sorted(list(set([i['species'] for i in cases]))))
     # get library and sample counts
     counts = get_sample_counts(project_name)
     # add missing donors to counts (ie, when counts are 0)
@@ -126,7 +128,9 @@ def project_page(project_name):
     # get the date of the last sequencing data
     seq_date = get_last_sequencing(project['project_id'])
     
-    return render_template('project.html', routes=routes, project=project, pipelines=pipelines, cases=cases, counts=counts, seq_date=seq_date)
+    return render_template('project.html', routes=routes, project=project,
+                           pipelines=pipelines, cases=cases, counts=counts,
+                           seq_date=seq_date, species=species)
 
 
 @app.route('/<project_name>/sequencing')

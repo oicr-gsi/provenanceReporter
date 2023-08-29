@@ -74,6 +74,10 @@
     <th>Library types:</th>
     <td>{{ project['library_types'] }}</td>
   </tr>
+  <tr>
+    <th>Species:</th>
+    <td>{{ species }}</td>
+  </tr>
 </table>
 
  <button id="download_button" style="margin-top:20px;margin-left:100px"><a href="{{url_for('download_cases_table', project_name=project['project_id'])}}">Download Case table</a></button>
@@ -83,7 +87,6 @@
      <th>Case Id</th>
      <th>Donor Id</th>
      <th>Parent project</>
-     <th>Species</th>     
      <th>Created</th>
      <th>Normals</th>
      <th>Tumours</th>
@@ -94,14 +97,10 @@
         <td><a class="miso_link" href="{{ i['miso'] }}" target="_blank">{{ i['case_id'] }}</a></td>
         <td>{{ i['donor_id'] }}</td>        
         <td>{{ i['parent_project'] }}</td>        
-        <td>{{ i['species'] }}</td>
         <td>{{ i['created_date'] }}</td>
         <td>{{ counts[i['case_id']]['normal'] }}</td>
         <td>{{ counts[i['case_id']]['tumor'] }}</td>
         <td>{{ counts[i['case_id']]['library'] }}</td>
-
-
-
      </tr>
    {% endfor %}
 </table>
