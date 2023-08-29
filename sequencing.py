@@ -74,7 +74,8 @@ def get_sequences(L):
             status = L[i]['status']
             ticket = L[i]['ticket']
             read_count = json.loads(L[i]['attributes'])['read_count'] if 'read_count' in json.loads(L[i]['attributes']) else 'NA' 
-            
+            sample_id = '_'.join([case, tissue_origin, tissue_type, group_id]) 
+                       
             if 'GDR' in ticket:
                 ticket = os.path.join('https://jira.oicr.on.ca/browse/', os.path.basename(ticket))    
             else:
@@ -82,7 +83,7 @@ def get_sequences(L):
             readcount = '{:,}'.format(int(read_count)) if read_count != 'NA' else 'NA'
             fileprefix = os.path.basename(file)
             fileprefix = '_'.join(fileprefix.split('_')[:-1])
-            d = {'case': case, 'sample': sample, 'library': library, 'run': run,
+            d = {'case': case, 'sample': sample, 'sample_id': sample_id, 'library': library, 'run': run,
                  'read_count': readcount, 'workflow': workflow, 'release_status': status,
                  'ticket': ticket, 'prefix':fileprefix, 'platform': platform,
                  'group_id': group_id, 'tissue_type': tissue_type, 'library_type': library_type,
