@@ -19,7 +19,7 @@
     <p>{% block title %}{{ project['project_id'] }} {% endblock %}
       {% if sequences %}
         <span style="font-size:30px; font-style:normal;"> Displaying sequence information for <span id ="count"> {{ sequences|length }} </span> records</span>
-        <button id="download_button" style="margin-top:20px;margin-left:100px"><a href="{{url_for('download_identifiers_table', project_name=project['project_id'])}}">Download identifiers</a></button>
+        <button id="download_button" style="margin-top:20px;margin-left:100px"><a href="{{url_for('download_identifiers_table', project_name=project['project_id'])}}">Download library information</a></button>
       {% else %}
         <span style="font-size:30px; font-style:normal;"> No sequence information to display</span>
       {% endif %}  
