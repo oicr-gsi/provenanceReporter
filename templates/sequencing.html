@@ -64,21 +64,23 @@
 
   <table id="project_table">
    <thead>
-     <th>Case</th>
-     <th>Donor</th>
-     <th>Sample ID</th>
-     <th>Sample</th>
-     <th>Description</th>
-     <th>Library</th>     
+     <th><div class="tooltip">Case<span class="tooltiptext">OICR-generated case identifier</span></th>
+     <th><div class="tooltip">Donor<span class="tooltiptext">User-supplied donor identifier</span></th>
+     <th><div class="tooltip">Sample ID<span class="tooltiptext">User-supplied sample, this distinguishes distinct samples of the same type from the same donor</span></th>
+     <th><div class="tooltip">Sample<span class="tooltiptext">OICR-generated sample identifier. Formed from: 1. case, 2. tissue origin, 3. tissue type, 4. sample ID</span></th>
+     <th><div class="tooltip">Description<span class="tooltiptext">a description of the Sample ID</span></th>
+     <th><div class="tooltip">Library<span class="tooltiptext">OICR-generated library identifier</span></th>     
      <th>Library Type</th>     
      <th>Tissue Origin</th>     
      <th>Tissue Type</th>     
-     <th>Platform</th>
-     <th>File Prefix</th>
+     <th><div class="tooltip">Platform<span class="tooltiptext">Sequencing instrument</span></th>
+     <th><div class="tooltip">File Prefix<span class="tooltiptext">The common prefix, followed by the sequencing read (R1, R2) and the file suffix .fastq.gz. The file prefix is formed is formed from: 1. Library Id, 2. Run date, 3. Instrument Id, 4. Sequencing Instrument Run, 5.
+Flow cell identifier, 6. Lane number, 7. Demultiplex barcodes</span></th>
      <th>Read Counts</th>
      <th>Workflow</th> 
      <th>Release status</th>
    </thead>     
+
 
    {% for i in sequences %}
      <tr>
