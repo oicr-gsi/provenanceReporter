@@ -636,19 +636,23 @@ def download_cases_table(project_name):
     
     # get case information
     cases = get_cases(project_name)
-    
     # get library and sample counts
     counts = get_sample_counts(project_name)
     # add missing donors to counts (ie, when counts are 0)
     counts = add_missing_donors(cases, counts)
+    # count libraries for each library type
+    # get the library types
+    library_types =  get_library_types(project_name)
+    libraries = count_libraries(project_name, library_types, cases)
     
     D = {}
     for i in cases:
         donor = i['case_id']
         D[donor] = i
-        D[donor]['library'] = counts[donor]['library']
         D[donor]['normal'] = counts[donor]['normal']
         D[donor]['tumor'] = counts[donor]['tumor']
+        for library_type in library_types:
+            D[donor][library_type] = len(libraries[donor][library_type])
         
     data = pd.DataFrame(D.values())
     data.to_excel('{0}_cases.xlsx'.format(project_name), index=False)
