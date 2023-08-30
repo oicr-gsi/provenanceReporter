@@ -76,11 +76,10 @@
      <th><div class="tooltip">Platform<span class="tooltiptext">Sequencing instrument</span></th>
      <th><div class="tooltip">File Prefix<span class="tooltiptext">The common prefix, followed by the sequencing read (R1, R2) and the file suffix .fastq.gz. The file prefix is formed is formed from: 1. Library Id, 2. Run date, 3. Instrument Id, 4. Sequencing Instrument Run, 5.
 Flow cell identifier, 6. Lane number, 7. Demultiplex barcodes</span></th>
-     <th>Read Counts</th>
+     <th><div class="tooltip">Read Pairs<span class="tooltiptext">Number of read pairs. The number of reads is twice the number of read pairs</span></th>
      <th>Workflow</th> 
      <th>Release status</th>
    </thead>     
-
 
    {% for i in sequences %}
      <tr>
