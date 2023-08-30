@@ -681,7 +681,7 @@ def download_identifiers_table(project_name):
              'Donor': i['sample'],
              'SampleID': i['group_id'],
              'Sample': i['sample_id'],
-             # 'Description': 'NA',
+             'Description': i['group_description'],
              'Library': i['library'],
              'Library Type': i['library_type'],
              'Tissue Origin': i['tissue_origin'],

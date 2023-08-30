@@ -26,7 +26,7 @@ def collect_sequence_info(project_name):
     conn = connect_to_db()
     files = conn.execute("SELECT Files.file, Files.workflow, Files.version, Files.wfrun_id, Files.attributes, \
                          FilesQC.status, FilesQC.ticket, Workflow_Inputs.run, Workflow_Inputs.lane, Workflow_Inputs.platform, \
-                         Libraries.library, Libraries.sample, Libraries.ext_id, Libraries.group_id, \
+                         Libraries.library, Libraries.sample, Libraries.ext_id, Libraries.group_id, Libraries.group_id_description, \
                          Libraries.library_type, Libraries.tissue_origin, Libraries.tissue_type \
                          from Files JOIN FilesQC JOIN Workflow_Inputs JOIN Libraries WHERE Files.project_id = '{0}' \
                          AND FilesQC.project_id = '{0}' AND FilesQC.file_swid = Files.file_swid \
@@ -66,6 +66,7 @@ def get_sequences(L):
             tissue_origin =  L[i]['tissue_origin']
             tissue_type =  L[i]['tissue_type']
             group_id = L[i]['group_id']
+            group_description = L[i]['group_id_description']
             workflow = L[i]['workflow'] + '_' + L[i]['version']
             wfrun = L[i]['wfrun_id']
             file = L[i]['file']
@@ -86,7 +87,8 @@ def get_sequences(L):
             d = {'case': case, 'sample': sample, 'sample_id': sample_id, 'library': library, 'run': run,
                  'read_count': readcount, 'workflow': workflow, 'release_status': status,
                  'ticket': ticket, 'prefix':fileprefix, 'platform': platform,
-                 'group_id': group_id, 'tissue_type': tissue_type, 'library_type': library_type,
+                 'group_id': group_id, 'group_description': group_description,
+                 'tissue_type': tissue_type, 'library_type': library_type,
                  'tissue_origin': tissue_origin}
             F.append(d)
        
