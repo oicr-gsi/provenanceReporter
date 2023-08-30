@@ -668,22 +668,32 @@ def download_identifiers_table(project_name):
     
     '''
     
-    conn = connect_to_db()
-    identifiers = conn.execute("SELECT library, sample, ext_id, group_id, group_id_description, \
-                               library_type, tissue_origin, tissue_type FROM Libraries \
-                               WHERE Libraries.project_id = '{0}';".format(project_name)).fetchall()
-    conn.close()
+    #####
     
-    identifiers = list(set(identifiers))
+    # get sequence file information
+    files = collect_sequence_info(project_name)
+    # re-organize sequence information
+    sequences = get_sequences(files)
     
-    D ={}
-    for i in range(len(identifiers)):
-        D[i] = dict(identifiers[i])
+    D = {}
+    for i in sequences:
+        d = {'Case': i['case'],
+             'Donor': i['sample'],
+             'SampleID': i['group_id'],
+             'Sample': i['sample_id'],
+             # 'Description': 'NA',
+             'Library': i['library'],
+             'Library Type': i['library_type'],
+             'Tissue Origin': i['tissue_origin'],
+             'Tissue Type': i['tissue_type'],
+             'File Prefix': i['prefix']}
+        D[i['case']] = d     
+             
     data = pd.DataFrame(D.values())
-    
+     
     outputfile = '{0}_libraries.xlsx'.format(project_name)
     data.to_excel(outputfile, index=False)
-   
+    
     return send_file(outputfile, as_attachment=True)
 
 
