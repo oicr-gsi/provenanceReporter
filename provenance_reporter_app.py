@@ -25,7 +25,7 @@ import io
 import base64
 
 from utilities import connect_to_db, get_children_workflows, get_miso_sample_link,\
-    get_pipelines, get_workflow_names
+    get_pipelines, get_workflow_names, get_library_design
 from whole_genome import get_call_ready_cases, get_bmpp_case, get_case_call_ready_samples, group_normal_tumor_pairs, \
     find_analysis_blocks, map_workflows_to_sample_pairs, map_workflows_to_parent, list_block_workflows, \
     get_block_analysis_date, sort_call_ready_samples, get_block_workflow_file_count, get_block_release_status, \
@@ -144,6 +144,8 @@ def project_page(project_name):
     # count libraries for each library type
     # get the library types
     library_types =  get_library_types(project_name)
+    # get the library names
+    library_names = {i: get_library_design(i) for i in library_types}
     libraries = count_libraries(project_name, library_types, cases)
     # get the date of the last sequencing data
     seq_date = get_last_sequencing(project['project_id'])
@@ -151,7 +153,7 @@ def project_page(project_name):
     return render_template('project.html', routes=routes, project=project,
                            pipelines=pipelines, cases=cases, counts=counts,
                            seq_date=seq_date, species=species, libraries=libraries,
-                           library_types = library_types)
+                           library_types = library_types, library_names=library_names)
 
 
 @app.route('/<project_name>/sequencing')
@@ -667,8 +669,6 @@ def download_identifiers_table(project_name):
     
     
     '''
-    
-    #####
     
     # get sequence file information
     files = collect_sequence_info(project_name)
