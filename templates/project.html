@@ -29,7 +29,7 @@
   </tr>
   <tr>
     <th>MISO:</th>
-    <td><a class="miso_link" href="https://miso.oicr.on.ca/miso/project/shortname/{{project['project_id']}}" target="_blank">{{ project['project_id'] }}</a></td>
+    <td><button id="miso_button"><a href="https://miso.oicr.on.ca/miso/project/shortname/{{project['project_id']}}" target="_blank">MISO</a></button>
   </tr>
   <tr>
     <th>Project description:</th>
@@ -74,37 +74,39 @@
     <th>Library types:</th>
     <td>{{ project['library_types'] }}</td>
   </tr>
+  <tr>
+    <th>Species:</th>
+    <td>{{ species }}</td>
+  </tr>
 </table>
 
  <button id="download_button" style="margin-top:20px;margin-left:100px"><a href="{{url_for('download_cases_table', project_name=project['project_id'])}}">Download Case table</a></button>
 
 <table id="project_table" style="margin-top:35px;">
    <tr>
-     <th>Case Id</th>
-     <th>Donor Id</th>
-     <th>Species</th>     
-     <th>Sex</th>
-     <th>Created</th>
-     <th>Modified</th>
-     <th>Normals</th>
-     <th>Tumours</th>
-     <th>Libraries</th>
+     <th><div class="tooltip">Case Id<span class="tooltiptext">OICR-generated case identifier</span></th>
+     <th><div class="tooltip">Donor Id<span class="tooltiptext">User-supplied donor identifier</span></th>
+     <th><div class="tooltip">MISO<span class="tooltiptext">Link to the MISO sample page</span></th>
+     <th><div class="tooltip">Parent project<span class="tooltiptext">Project to which the samples are assigned</span></>
+     <th><div class="tooltip">Created<span class="tooltiptext">Date the sample was registered in MISO</span></th>
+     <th><div class="tooltip">Normals<span class="tooltiptext">Count of normal samples</span></th>
+     <th><div class="tooltip">Tumours<span class="tooltiptext">Count of tumour samples</span></th>
+     {% for library_type in library_types %}
+         <th><div class="tooltip">{{library_type}}<span class="tooltiptext">Count of {{library_names[library_type]}} libraries</span></th>
+     {% endfor %} 
    </tr>     
    {% for i in cases %}
      <tr>
-        <td><a class="miso_link" href="{{ i['miso'] }}" target="_blank">{{ i['case_id'] }}</a></td>
+        <td>{{ i['case_id'] }}</td>
         <td>{{ i['donor_id'] }}</td>        
-        <td>{{ i['species'] }}</td>
-        <td>{{ i['sex'] }}</td>
-        <td>{{ i['created_date'] }}</td>
-        <td>{{ i['modified_date'] }}</td>
-
-        <td>{{ i['normals'] }}</td>
-        <td>{{ i['tumors'] }}</td>
-        <td>{{ i['libraries'] }}</td>
-
-
-
+        <td><button id="miso_button"><a href="{{ i['miso'] }}" target="_blank">MISO</a></button>
+        <td>{{ i['parent_project'] }}</td>        
+        <td>{{ i['created_date'] | format_created_time}}</td>
+        <td>{{ counts[i['case_id']]['normal'] }}</td>
+        <td>{{ counts[i['case_id']]['tumor'] }}</td>
+        {% for library_type in library_types %}
+          <td>{{libraries[i['case_id']][library_type] | length}}</td>
+        {% endfor %} 
      </tr>
    {% endfor %}
 </table>

@@ -233,6 +233,10 @@ def collect_file_info_from_fpr(fpr, project_name):
                 continue             
             if project not in D:
                 D[project] = {}
+            # check if file is skipped
+            if line[51].lower() == 'true':
+                continue
+                   
             # get creation date
             creation_date = line[0]
             # convert creation date into epoch time
@@ -273,11 +277,17 @@ def collect_file_info_from_fpr(fpr, project_name):
             version = line[31]        
             # get workflow run accession
             workflow_run = line[36]
+            # get limskey
+            limskey = line[56]
             # collect file info
-            D[project][file_swid] = {'creation_date': creation_date, 'md5sum': md5sum,
-                                     'workflow': workflow, 'version': version,
-                                     'wfrun_id': workflow_run, 'file': file,
-                                     'library_type': library_type, 'attributes': attributes}
+            if file_swid not in D[project]:
+                D[project][file_swid] = {'creation_date': creation_date, 'md5sum': md5sum,
+                                         'workflow': workflow, 'version': version,
+                                         'wfrun_id': workflow_run, 'file': file,
+                                         'library_type': library_type, 'attributes': attributes,
+                                         'limskey': [limskey]}
+            else:
+                D[project][file_swid]['limskey'].append(limskey)
     infile.close()
     return D
 
@@ -496,11 +506,11 @@ def identify_parent_children_workflows(P, F):
                 parent_workflows = ['NA']
             if project not in parents:
                 parents[project] = {}
-            if workflow in parents[project]:
-                assert parents[project][workflow] == parent_workflows
-            else:
+            if workflow not in parents[project]:
                 parents[project][workflow] = parent_workflows
-        
+            else:
+                assert parents[project][workflow] == parent_workflows
+                                
     return parents
 
     
@@ -525,12 +535,9 @@ def get_provenance_data(provenance):
 
 
 
-
-
-
 def get_sample_info(pinery, project):
     '''
-    (str, str) -> dict
+    (str, str, str) -> dict
     
     Return a dictionary with sample information, including samples not sequenced
     for each project
@@ -543,21 +550,44 @@ def get_sample_info(pinery, project):
     
     provenance = pinery + '/samples'
     
-    #L = get_provenance_data(provenance)
-    
     headers = {'accept': 'application/json',}
     params = {'project': project,}
     response = requests.get(provenance, params=params, headers=headers)
 
-    L = []
-       
+    cases = []
     if response.ok:
         L = response.json()
-        # only keep cases
-        L = [i for i in L if i['name'].count('_') == 1]
+        cases = list(set(map(lambda x: '_'.join(x.split('_')[:2]), [i['name'] for i in L])))     
+                
+    return cases   
     
-    return L    
+
+def get_parent_sample_info(pinery, project, sample_info):
+    '''
+    (str, str, str) -> dict
     
+    Return a dictionary with sample information, including samples not sequenced
+    for each project
+    
+    Parameters
+    ----------
+    - pinery (str): Pinery API
+    - project (str): Name of project
+    - sample_info (str): Path to the json file with sample information
+    '''
+    
+    cases = get_sample_info(pinery, project)
+    
+    infile = open(sample_info)
+    samples = json.load(infile)
+    infile.close()
+    
+    L = [samples[i] for i in cases if i in samples]
+        
+    return L   
+
+
+
 
 
     
@@ -631,12 +661,12 @@ def define_column_names():
     column_names = {'Workflows': ['wfrun_id', 'wf', 'wfv', 'project_id', 'attributes'],
                     'Parents': ['parents_id', 'children_id', 'project_id'],
                     'Projects': ['project_id', 'pipeline', 'description', 'active', 'contact_name', 'contact_email', 'last_updated', 'expected_samples', 'sequenced_samples', 'library_types'],
-                    'Files': ['file_swid', 'project_id', 'md5sum', 'workflow', 'version', 'wfrun_id', 'file', 'library_type', 'attributes', 'creation_date'],
+                    'Files': ['file_swid', 'project_id', 'md5sum', 'workflow', 'version', 'wfrun_id', 'file', 'library_type', 'attributes', 'creation_date', 'limskey'],
                     'FilesQC': ['file_swid', 'project_id', 'skip', 'user', 'date', 'status', 'reference', 'fresh', 'ticket'],
                     'Libraries': ['library', 'sample', 'tissue_type', 'ext_id', 'tissue_origin',
                                   'library_type', 'prep', 'tissue_prep', 'sample_received_date', 'group_id', 'group_id_description', 'project_id'],
                     'Workflow_Inputs': ['library', 'run', 'lane', 'wfrun_id', 'limskey', 'barcode', 'platform', 'project_id'],
-                    'Samples': ['case_id', 'donor_id', 'species', 'sex', 'miso', 'created_date', 'modified_date', 'project_id']}
+                    'Samples': ['case_id', 'donor_id', 'species', 'sex', 'miso', 'created_date', 'modified_date', 'project_id', 'parent_project']}
         
     return column_names
 
@@ -655,7 +685,7 @@ def define_column_types():
                                   'TEXT', 'VARCHAR(128)', 'VARCHAR(256)', 'VARCHAR(256)', 'VARCHAR(256)', 'INT', 'INT', 'VARCHAR(256)'],
                     'Files': ['VARCHAR(572) PRIMARY KEY NOT NULL UNIQUE', 'VARCHAR(128)',
                               'VARCHAR(256)', 'VARCHAR(128)', 'VARCHAR(128)',
-                              'VARCHAR(572)', 'TEXT', 'VARCHAR(128)', 'TEXT', 'INT'],
+                              'VARCHAR(572)', 'TEXT', 'VARCHAR(128)', 'TEXT', 'INT', 'VARCHAR(256)'],
                     'FilesQC': ['VARCHAR(572) PRIMARY KEY NOT NULL UNIQUE', 'VARCHAR(128)',
                                 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)',
                                 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)'],
@@ -665,7 +695,7 @@ def define_column_types():
                                   'VARCHAR(256)', 'VARCHAR(128)', 'VARCHAR(256)', 'VARCHAR(128)'],
                     'Workflow_Inputs': ['VARCHAR(128)', 'VARCHAR(256)', 'INTEGER', 'VARCHAR(572)', 
                                         'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)'],
-                    'Samples': ['VARCHAR(128) PRIMARY KEY NOT NULL', 'VARCHAR(256)', 'VARCHAR(256)', 'VARCHAR(128)', 'VARCHAR(572)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)']}
+                    'Samples': ['VARCHAR(128) PRIMARY KEY NOT NULL', 'VARCHAR(256)', 'VARCHAR(256)', 'VARCHAR(128)', 'VARCHAR(572)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)']}
     
     return column_types
 
@@ -794,7 +824,7 @@ def remove_table(database, table):
 
 def add_project_info_to_db(database, pinery, project, lims_info, table = 'Projects'):
     '''
-    (str, str, str, str) -> None
+    (str, str, str, str, str) -> None
     
     Add project information into Projects table of database
        
@@ -819,7 +849,6 @@ def add_project_info_to_db(database, pinery, project, lims_info, table = 'Projec
     
     # add number of expected cases for project
     samples = get_sample_info(pinery, project)
-    samples = [i['name'] for i in samples]
     projects[project]['expected_samples'] = len(set(samples))
     
     # add number of sequenced cases for project
@@ -1013,6 +1042,7 @@ def add_file_info_to_db(database, project, fpr, nabu_api, table = 'Files'):
         
         # add data
         for file_swid in D[project]:
+            D[project][file_swid]['limskey'] = ';'.join(list(set(D[project][file_swid]['limskey'])))
             L = [D[project][file_swid][i] for i in column_names if i in D[project][file_swid]]
             L.insert(0, project)
             L.insert(0, file_swid)
@@ -1115,9 +1145,9 @@ def add_workflow_inputs_to_db(database, fpr, project, table = 'Workflow_Inputs')
 
 
 
-def add_samples_info_to_db(database, project, pinery, table):
+def add_samples_info_to_db(database, project, pinery, table, sample_info):
     '''
-    (str, str, str) -> None
+    (str, str, str, str) -> None
     
     Inserts samples data into Samples table of database    
     
@@ -1127,11 +1157,12 @@ def add_samples_info_to_db(database, project, pinery, table):
     - project (str): Name of project of interest
     - pinery (str): Pinery API
     - table (str): Name of table in database
+    - sample_info (str): Path to the json file with sample information
     '''
     
     # collect information about samples
-    samples = get_sample_info(pinery, project)
-
+    samples = get_parent_sample_info(pinery, project, sample_info)
+    
     if samples:
         # connect to db
         conn = sqlite3.connect(database)
@@ -1143,24 +1174,15 @@ def add_samples_info_to_db(database, project, pinery, table):
 
         # add data into table
         for i in samples:
-            sex, species, donor_id = '', '', ''
-            for j in i['attributes']:
-                if j['name'] == 'Sex':
-                    sex = j['value']
-                if j['name'] == 'Organism':
-                    species= j['value']
-                if j['name'] == 'External Name':
-                    donor_id = j['value']
-            sample_id = i['id']
-            miso = 'https://miso.oicr.on.ca/miso/sample/{0}'.format(sample_id.replace('SAM', ''))    
-            assert project == i['project_name']
-            L = [i['name'], donor_id, species, sex, miso, i['created_date'], i['modified_date'], i['project_name']]          
+            
+            L = [i['case'], i['donor_id'], i['species'], i['sex'], i['miso'],
+                 i['created_date'], i['modified_date'], project, i['project']]          
             
             # insert project info
             cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
             conn.commit()
  
-    conn.close()
+        conn.close()
 
 
 def collect_lims_info(args):
@@ -1214,7 +1236,50 @@ def collect_lims_info(args):
 
 
 
+def collect_parent_sample_info(args):
+    '''
+    (str, str) -> str
+    
+    Parse sample-provenance in Pinery and writes information as json
+    
+    Parameters
+    ----------
+    - pinery (str): Pinery API
+    - samples_info (str): Path to the output json file with sample information
+    ''' 
 
+    provenance = args.pinery + '/samples'
+    # get sample info from pinery
+    L = get_provenance_data(provenance)
+    
+    D = {}
+
+    for i in L:
+        if i['name'].count('_') == 1:
+            case = i['name']
+            sex, species, donor_id = '', '', ''
+            for j in i['attributes']:
+                if j['name'] == 'Sex':
+                    sex = j['value']
+                if j['name'] == 'Organism':
+                    species= j['value']
+                if j['name'] == 'External Name':
+                    donor_id = j['value']
+            sample_id = i['id']
+            miso = 'https://miso.oicr.on.ca/miso/sample/{0}'.format(sample_id.replace('SAM', ''))    
+            project = i['project_name']
+            modified_date = i['modified_date']
+            created_date = i['created_date']
+            D[case] = {'project': project, 'sex': sex, 'species': species,
+                       'miso': miso, 'donor_id': donor_id, 'case': case, 'modified_date': modified_date,
+                       'created_date': created_date}
+        
+    newfile = open(args.samples_info, 'w')
+    json.dump(D, newfile)
+    newfile.close()    
+    
+    
+    
 def add_info(args):
     '''
     (list) -> None
@@ -1241,7 +1306,7 @@ def add_info(args):
     # add project information    
     add_project_info_to_db(args.database, args.pinery, args.project, args.lims_info, 'Projects')
     # add sample information
-    add_samples_info_to_db(args.database, args.project, args.pinery, 'Samples')
+    add_samples_info_to_db(args.database, args.project, args.pinery, 'Samples', args.samples_info)
     # add workflow information
     add_workflows_info_to_db(args.fpr, args.database, args.project, 'Workflows', 'Parents', 'Children')
     # add file QC info
@@ -1303,7 +1368,16 @@ def launch_jobs(args):
     qsubCmd = "qsub -b y -P gsi -l h_vmem={0}g -N {1}  -e {2} -o {2} \"bash {3}\"".format(args.mem, 'provdb.lims', logdir, bashScript)
     subprocess.call(qsubCmd, shell=True)
 
-    cmd2 = '/u/rjovelin/SOFT/anaconda3/bin/python3.6 {0} add_project -f {1} -n {2} -p {3} -d {4} -pr {5} -l {6}'
+
+    cmd2 = '/u/rjovelin/SOFT/anaconda3/bin/python3.6 {0} collect_samples -p {1} -s {2}'
+    bashScript = os.path.join(qsubdir, 'collect_samples.sh')
+    samples_info_file = os.path.join(args.workingdir, 'samples_info.json')
+    with open(bashScript, 'w') as newfile:
+        newfile.write(cmd2.format(dbfiller, args.pinery, samples_info_file))
+    qsubCmd = "qsub -b y -P gsi -l h_vmem={0}g -N {1}  -e {2} -o {2} \"bash {3}\"".format(args.mem, 'provdb.samples', logdir, bashScript)
+    subprocess.call(qsubCmd, shell=True)
+
+    cmd3 = '/u/rjovelin/SOFT/anaconda3/bin/python3.6 {0} add_project -f {1} -n {2} -p {3} -d {4} -pr {5} -l {6} -s {7}'
     
     # record job names and job exit codes    
     job_names = []
@@ -1313,19 +1387,19 @@ def launch_jobs(args):
         # get name of output file
         bashScript = os.path.join(qsubdir, '{0}_add_project_info.sh'.format(project))
         with open(bashScript, 'w') as newfile:
-            newfile.write(cmd2.format(dbfiller, args.fpr, args.nabu, args.pinery, database, project, lims_info_file))
+            newfile.write(cmd3.format(dbfiller, args.fpr, args.nabu, args.pinery, database, project, lims_info_file, samples_info_file))
         # launch qsub directly, collect job names and exit codes
         jobName = '{0}.provdb'.format(project)
-        qsubCmd = 'qsub -b y -P gsi -l h_vmem={0}g,h_rt={1}:0:0 -N {2} -hold_jid "{3}" -e {4} -o {4} "bash {5}"'.format(args.mem, args.run_time, jobName, 'provdb.lims', logdir, bashScript)
+        qsubCmd = 'qsub -b y -P gsi -l h_vmem={0}g,h_rt={1}:0:0 -N {2} -hold_jid "{3}" -e {4} -o {4} "bash {5}"'.format(args.mem, args.run_time, jobName, 'provdb.lims,provdb.samples', logdir, bashScript)
         subprocess.call(qsubCmd, shell=True)
         # store job names
         job_names.append(jobName)
     
     # launch job to copy database to server
-    cmd3 = '/u/rjovelin/SOFT/anaconda3/bin/python3.6 {0} migrate -md {1} -jn "{2}" -wd {3} -pf {4} -s {5}'
+    cmd4 = '/u/rjovelin/SOFT/anaconda3/bin/python3.6 {0} migrate -md {1} -jn "{2}" -wd {3} -pf {4} -s {5}'
     bashScript = os.path.join(qsubdir, 'migrate_db.sh')
     with open(bashScript, 'w') as newfile:
-        newfile.write(cmd3.format(dbfiller, args.merged_database, ','.join(job_names), args.workingdir, args.pemfile, args.server))
+        newfile.write(cmd4.format(dbfiller, args.merged_database, ','.join(job_names), args.workingdir, args.pemfile, args.server))
     qsubCmd = "qsub -b y -P gsi -l h_vmem={0}g,h_rt={1}:0:0 -N {2}  -hold_jid \"{3}\" -e {4} -o {4} \"bash {5}\"".format(args.mem, args.run_time, 'provdb.migration', ','.join(job_names), logdir, bashScript)
     subprocess.call(qsubCmd, shell=True)
 
@@ -1554,6 +1628,7 @@ if __name__ == '__main__':
     project_parser.add_argument('-pr', '--project', dest='project', help='Name of the project of interest', required = True)
     project_parser.add_argument('-d', '--database', dest='database', help='Path to the database file', required=True)
     project_parser.add_argument('-l', '--lims', dest='lims_info', help='Path to json file with lims info', required=True)
+    project_parser.add_argument('-s', '--samples', dest='samples_info', help='Path to json file with samples info', required=True)
     project_parser.set_defaults(func=add_info)
  
     # launch jobs to fill db with all projects info
@@ -1571,6 +1646,11 @@ if __name__ == '__main__':
     fill_parser = subparsers.add_parser('collect_lims', help="Collect lims information from Pinery.", parents = [parent_parser])
     fill_parser.add_argument('-l', '--lims', dest='lims_info', help='Path to json file with lims info', required = True)
     fill_parser.set_defaults(func=collect_lims_info)
+
+    # collect sample information from pinery
+    fill_parser = subparsers.add_parser('collect_samples', help="Collect sample information from Pinery.", parents = [parent_parser])
+    fill_parser.add_argument('-s', '--samples', dest='samples_info', help='Path to json file with sample info', required = True)
+    fill_parser.set_defaults(func=collect_parent_sample_info)
 
     # launch jobs to fill db with all projects info
     migrate_parser = subparsers.add_parser('migrate', help="Run job to copy the database to the server", parents=[parent_parser])

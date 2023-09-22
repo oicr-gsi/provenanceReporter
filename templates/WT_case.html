@@ -45,7 +45,7 @@
                  <td>Release Status: <span style="font-size:32px;color:#ff3300;">&#10006;</span></td>
                {% endif %}
                  <td>
-                   <button id="download_button"><a href="{{url_for('download_block_data', project_name=project['project_id'], case=case, block=pair, bmpp_parent=block)}}">Download json</a></button>
+                   <button id="download_button"><a href="{{url_for('download_WT_block_data', project_name=project['project_id'], case=case, block=pair, star_parent=block)}}">Download json</a></button>
                  </td>
              </tr>
            </table>
@@ -65,19 +65,19 @@
           <th>samples</th>
         </thead>     
         
-        {% for bmpp_run in samples_bmpp[pair][block] %}
+        {% for star_run in samples_star[pair][block] %}
           <tr>
-            <td>{{bmpp_run | shorten_workflow_id}}</td>
-            <td>{{samples_bmpp[pair][block][bmpp_run]['name'].0}}</td>
-            <td>{{file_counts[bmpp_run]}}</td>
-            <td>{{amount_data[pair][block][bmpp_run]}}</td>
-            <td>{{workflow_date[pair][block][bmpp_run]}}</td>
+            <td>{{star_run | shorten_workflow_id}}</td>
+            <td>{{samples_star[pair][block][star_run]['name'].0}}</td>
+            <td>{{file_counts[star_run]}}</td>
+            <td>{{amount_data[pair][block][star_run]}}</td>
+            <td>{{workflow_date[pair][block][star_run]}}</td>
             <td>
               <dl>
-              {% for i in samples_bmpp[pair][block][bmpp_run]['samples']['normal'] %}
+              {% for i in samples_star[pair][block][star_run]['samples']['normal'] %}
                 <dt>{{i}}</dt>
               {% endfor %}
-              {% for i in samples_bmpp[pair][block][bmpp_run]['samples']['tumour'] %}
+              {% for i in samples_star[pair][block][star_run]['samples']['tumour'] %}
                 <dt>{{i}}</dt> 
               {% endfor %}
             </dl>

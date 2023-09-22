@@ -6,13 +6,13 @@
  <a href="{{ url_for('sequencing', project_name=project['project_id']) }}">Sequencing</a>
  {% for i in pipelines %}
    {% if i in routes %}
-     {% if i == 'Whole Genome' %} 
-       <a class="selected" href="{{ url_for(routes[i], project_name=project['project_id']) }}">{{i}}</a>
-     {% elif i == 'Whole Transcriptome' %}
-       <a href="{{ url_for(routes[i], project_name=project['project_id']) }}">{{i}}</a> 
-     {% endif %}
+     {% if i == 'Whole Transcriptome' %}
+         <a class="selected" href="{{ url_for(routes[i], project_name=project['project_id']) }}">{{i}}</a>
+     {% elif i == 'Whole Genome' %}
+         <a href="{{ url_for(routes[i], project_name=project['project_id']) }}">{{i}}</a>   
+     {% endif %}  
    {% else %}
-       <a href="#{{i}}">{{i}}</a>
+     <a href="#{{i}}">{{i}}</a>
    {% endif %}  
  {% endfor %}   
 {% endblock %}
@@ -22,7 +22,7 @@
   <div class="project_title">
     <p>{% block title %}{{ project['project_id'] }} {% endblock %}
       {% if cases %}
-        <span style="font-size:30px; font-style:normal;"> WGS workflow data for <span id ="count"> {{ cases|length }} </span> cases</span>
+        <span style="font-size:30px; font-style:normal;"> WT workflow data for <span id ="count"> {{ cases|length }} </span> cases</span>
       {% else %}
         <span style="font-size:30px; font-style:normal;"> No cases to display</span>
       {% endif %}  
@@ -40,6 +40,7 @@
    <thead>
      <th>Cases</th>
      <th>Samples</th>
+     <th>Libraries</th>     
      <th>Count of call-ready workflows</th>
      <th>Count of downstream workflows</th>
    </thead>     
@@ -47,19 +48,25 @@
    {% for i in samples %}
      <tr>
        <td>
-         <a class="project_links" href="{{ url_for('wgs_case', project_name=project['project_id'], case=i)}}">{{i}}</a>
+         <a class="project_links" href="{{ url_for('wt_case', project_name=project['project_id'], case=i)}}">{{i}}</a>
        </td>
        <td>
          {% for item in cases[i]['samples'] %}
-           <a class="project_links" href="{{ url_for('wgs_case', project_name=project['project_id'], case=i)}}">{{item}}</a>
+           <a class="project_links" href="{{ url_for('wt_case', project_name=project['project_id'], case=i)}}">{{item}}</a>
            <br>
          {% endfor %}       
        </td>
        <td>
-         <a class="project_links" href="{{ url_for('wgs_case', project_name=project['project_id'], case=i)}}">{{cases[i]['bmpp'] | length}}</a>
+         {% for item in cases[i]['libraries'] %}
+           <a class="project_links" href="{{ url_for('wt_case', project_name=project['project_id'], case=i)}}">{{item}}</a>
+           <br>
+         {% endfor %}
        </td>
        <td>
-         <a class="project_links" href="{{ url_for('wgs_case', project_name=project['project_id'], case=i)}}">{{cases[i]['downstream'] | length}}</a>
+         <a class="project_links" href="{{ url_for('wt_case', project_name=project['project_id'], case=i)}}">{{cases[i]['star'] | length}}</a>
+       </td>
+       <td>
+         <a class="project_links" href="{{ url_for('wt_case', project_name=project['project_id'], case=i)}}">{{cases[i]['downstream'] | length}}</a>
        </td>
      </tr>
    {% endfor %}               

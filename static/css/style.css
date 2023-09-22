@@ -10,6 +10,11 @@ img {
 }
 
 
+.alnright {
+  text-align: right;
+}
+
+
 #project_table {
   margin-left: auto;
   margin-right: auto;
@@ -23,8 +28,8 @@ img {
   padding: 8px;
 }
 #project_table tr:nth-child(even){background-color: #f2f2f2;}
-#project_table tr:hover {background-color: #cc99ff;color: white}
-#project_table tr:hover a {background-color: #cc99ff;color: white}
+#project_table tr:hover {background-color: #196719;color: white}
+#project_table tr:hover a {background-color: #196719;color: white}
 #project_table th {
   padding-top: 12px;
   padding-bottom: 12px;
@@ -55,6 +60,47 @@ img {
   color: white;
 }
 
+
+#block_header_table {
+  margin-left: auto;
+  margin-right: auto;
+  margin-top: 10px;
+  font-family: Arial, Helvetica, sans-serif;
+  border-collapse: collapse;
+  width: 100%;
+}
+#block_header_table td, #block_header_table th {
+  border: 1px solid #404040;
+  padding: 8px;
+}
+#block_header_table th {
+  padding-top: 12px;
+  padding-bottom: 12px;
+  text-align: left;
+  background-color: #00b300;
+  color: white;
+}
+
+
+#block_table {
+  margin-left: auto;
+  margin-right: auto;
+  margin-top: 60px;
+  font-family: Arial, Helvetica, sans-serif;
+  border-collapse: collapse;
+  width: 100%;
+}
+#block_table td, #block_table th {
+  border: 1px solid #ddd;
+  padding: 8px;
+}
+#block_table th {
+  padding-top: 12px;
+  padding-bottom: 12px;
+  text-align: left;
+  background-color: #00b300;
+  color: white;
+}
 
 
 
@@ -132,8 +178,16 @@ img {
 .topnav a.selected {
   background-color: #ddd;
   color: black;
-  
 }
+.topnav a.split {
+  float: right;
+  background-color: #196719;
+  color: white;
+}
+
+
+
+
 
 
 .project_title {
@@ -193,6 +247,28 @@ img {
 }
 
 
+#miso_button {
+  background-color: #145214;
+  border: none;
+  color: white;
+  padding: 10px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  font-size: 16px;
+  margin: 4px 2px;
+  cursor: pointer;
+  border-radius: 8px;
+   
+}
+
+#miso_button a {
+    color: white;
+    text-decoration: none;
+}
+
+
+
 .miso_link {
   color: #b35900;
   font-family: Arial, Helvetica, sans-serif;
@@ -206,3 +282,139 @@ img {
 }
 
 
+
+.dropbtn {
+  background-color: #04AA6D;
+  color: white;
+  padding: 16px;
+  font-size: 16px;
+  border: none;
+  border-radius: 8px;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.dropdown {
+  position: relative;
+  display: inline-block;
+  font-family: Arial, Helvetica, sans-serif; 
+}
+
+.dropdown-content {
+  display: none;
+  position: absolute;
+  background-color: #f1f1f1;
+  min-width: 160px;
+  box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+  z-index: 1;
+  padding: 12px 16px;
+}
+
+.dropdown-content a {
+  color: black;
+  padding: 12px 16px;
+  text-decoration: none;
+  display: block;
+}
+
+.dropdown-content a:hover {background-color: #ddd;}
+
+.dropdown:hover .dropdown-content {display: block;}
+
+.dropdown:hover .dropbtn {background-color: #3e8e41;}
+
+
+
+
+
+
+
+
+
+
+
+.dropdown-check-list {
+  display: inline-block;
+}
+
+.dropdown-check-list .anchor {
+  position: relative;
+  cursor: pointer;
+  display: inline-block;
+  padding: 5px 50px 5px 10px;
+  border: 1px solid #ccc;
+}
+
+.dropdown-check-list .anchor:after {
+  position: absolute;
+  content: "";
+  border-left: 2px solid black;
+  border-top: 2px solid black;
+  padding: 5px;
+  right: 10px;
+  top: 20%;
+  -moz-transform: rotate(-135deg);
+  -ms-transform: rotate(-135deg);
+  -o-transform: rotate(-135deg);
+  -webkit-transform: rotate(-135deg);
+  transform: rotate(-135deg);
+}
+
+.dropdown-check-list .anchor:active:after {
+  right: 8px;
+  top: 21%;
+}
+
+.dropdown-check-list ul.items {
+  padding: 2px;
+  display: none;
+  margin: 0;
+  border: 1px solid #ccc;
+  border-top: none;
+}
+
+.dropdown-check-list ul.items li {
+  list-style: none;
+}
+
+.dropdown-check-list.visible .anchor {
+  color: #0094ff;
+}
+
+.dropdown-check-list.visible .items {
+  display: block;
+}
+
+.somatic_block {
+  padding: 20px;
+  font-size: 17px;
+  border: 2px solid black;
+  background: #f1f1f1;
+  box-sizing: border-box;
+  position:relative;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+
+
+
+.tooltip {
+  position: relative;
+  display: inline-block;
+}
+
+.tooltip .tooltiptext {
+  visibility: hidden;
+  width: 120px;
+  background-color: black;
+  color: #fff;
+  text-align: center;
+  padding: 5px 0;
+  border-radius: 6px;
+ 
+  position: absolute;
+  z-index: 1;
+}
+
+.tooltip:hover .tooltiptext {
+  visibility: visible;
+}
