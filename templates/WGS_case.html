@@ -70,7 +70,7 @@
             <td>{{bmpp_run | shorten_workflow_id}}</td>
             <td>{{samples_bmpp[pair][block][bmpp_run]['name'].0}}</td>
             <td>{{file_counts[bmpp_run]}}</td>
-            <td>{{amount_data[pair][block][bmpp_run]}}</td>
+            <td>{{amount_data[bmpp_run]}}</td>
             <td>{{workflow_date[pair][block][bmpp_run]}}</td>
             <td>
               <dl>
@@ -108,7 +108,7 @@
              <td>{{d[workflow]['parent']['wfrun_id'] | shorten_workflow_id}}</td>
              <td>{{d[workflow]['parent']['wf']}}</td>
              <td>{{file_counts[d[workflow]['parent']['wfrun_id']]}}</td>              
-             <td>{{amount_data[pair][block][d[workflow]['parent']['wfrun_id']]}}</td>             
+             <td>{{amount_data[d[workflow]['parent']['wfrun_id']]}}</td>             
              <td>{{workflow_date[pair][block][d[workflow]['parent']['wfrun_id']]}}</td>
              <td>{{d[workflow]['parent']['platform']}}</td>     
            </tr>
@@ -118,7 +118,7 @@
                  <td>{{k['wfrun_id'] | shorten_workflow_id}}</td>
                  <td>{{k['wf']}}</td>
                  <td>{{file_counts[k['wfrun_id']]}}</td>
-                 <td>{{amount_data[pair][block][k['wfrun_id']]}}</td>
+                 <td>{{amount_data[k['wfrun_id']]}}</td>
                  <td>{{workflow_date[pair][block][k['wfrun_id']]}}</td>          
                  <td>{{k['platform']}}</td>
                </tr>     

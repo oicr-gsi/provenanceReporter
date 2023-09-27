@@ -15,6 +15,8 @@ import time
 import traceback
 import os
 import subprocess
+from utilities import connect_to_db
+from whole_genome import get_workflow_limskeys
 
 
 def extract_project_info(pinery):
@@ -658,7 +660,7 @@ def define_column_names():
     '''
 
     # create dict to store column names for each table {table: [column names]}
-    column_names = {'Workflows': ['wfrun_id', 'wf', 'wfv', 'project_id', 'attributes'],
+    column_names = {'Workflows': ['wfrun_id', 'wf', 'wfv', 'project_id', 'attributes', 'file_count', 'lane_count'],
                     'Parents': ['parents_id', 'children_id', 'project_id'],
                     'Projects': ['project_id', 'pipeline', 'description', 'active', 'contact_name', 'contact_email', 'last_updated', 'expected_samples', 'sequenced_samples', 'library_types'],
                     'Files': ['file_swid', 'project_id', 'md5sum', 'workflow', 'version', 'wfrun_id', 'file', 'library_type', 'attributes', 'creation_date', 'limskey'],
@@ -679,7 +681,7 @@ def define_column_types():
     '''
 
     # create dict to store column names for each table {table: [column names]}
-    column_types = {'Workflows': ['VARCHAR(572)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'TEXT'],
+    column_types = {'Workflows': ['VARCHAR(572)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'TEXT', 'INT', 'INT'],
                     'Parents': ['VARCHAR(572)', 'VARCHAR(572)', 'VARCHAR(128)'],
                     'Projects': ['VARCHAR(128) PRIMARY KEY NOT NULL UNIQUE', 'VARCHAR(128)',
                                   'TEXT', 'VARCHAR(128)', 'VARCHAR(256)', 'VARCHAR(256)', 'VARCHAR(256)', 'INT', 'INT', 'VARCHAR(256)'],
@@ -941,9 +943,56 @@ def add_workflow_relationships(parent_workflows, database, project, table = 'Par
     conn.close()
 
 
-def add_workflows_info_to_db(fpr, database, project_name, workflow_table = 'Workflows', parent_table = 'Parents', children_table = 'Children'):
+
+
+def count_files(project_name, file_table = 'Files'):
     '''
-    (str, str, str, str, str) -> None
+    (str, str) -> dict
+    
+    Returns a dictionary with the number of files for each workflow in project
+    
+    Parameters
+    ----------
+    - project_name (str): Name of project of interest
+    - file_table (str): Name of the table with File information
+    '''
+    
+    conn = connect_to_db()
+    data = conn.execute("SELECT DISTINCT {0}.file, {0}.wfrun_id FROM {0} WHERE {0}.project_id = '{1}'".format(file_table, project_name)).fetchall()
+    conn.close()
+
+    counts = {}
+    for i in data:
+        counts[i['wfrun_id']] = counts.get(i['wfrun_id'], 0) + 1
+       
+    return counts
+
+
+def update_workflow_information(project, workflows, D, key):
+    '''
+    (str, dict, dict, str) -> None
+    
+    Update in place the dictionary workflows for a given project using key to store information contains in dictionary D
+    
+    Parameters
+    ----------
+    - project (str): Project of interest
+    - workflows (dict): Dictionary containing workflow information for a given project
+    - D (dictionary): Dictionary containing file count or amount of input sequencing lanes for each workflow of project
+    - key (str): Key use to store the information from D in workflows.
+                 Valid keys are file_count or lane_count
+    '''
+    
+    for workflow_id in D:
+        workflows[project][workflow_id][key] = D[workflow_id]
+    
+    
+
+
+
+def add_workflows_info_to_db(fpr, database, project_name, workflow_table = 'Workflows', parent_table = 'Parents', children_table = 'Children', file_table = 'Files', workflow_input_table = 'Workflow_Inputs'):
+    '''
+    (str, str, str, str, str, str, str) -> None
     
     Inserts or updates workflow information and parent-children workflow relationships
  
@@ -955,10 +1004,25 @@ def add_workflows_info_to_db(fpr, database, project_name, workflow_table = 'Work
     - workflow_table (str): Name of the table storing workflow information. Default is Workflows
     - parent_table (str): Name of the table storing parents-children workflow relationships. Default is Parents
     - children_table (str): Name of the table storing children-parents workflow relationships. Default is Children
+    - file_table (str): Name of the table storing file information. Default is Files
+    - workflow_input_table (str): Name of the table storing the workflow input information. Default is Workflow_Inputs
     '''
 
     # get the workflow inputs and workflow info
     workflows, parents, files = get_workflow_relationships(fpr, project_name)
+    
+    # get the file count for each workflow
+    counts = count_files(project_name, file_table)
+    # update workflow information with file count
+    update_workflow_information(project_name, workflows, counts, 'file_count')
+    
+    # get the amount of data for each workflow
+    limskeys = get_workflow_limskeys(project_name, workflow_input_table)
+    for i in limskeys:
+        limskeys[i] = len(limskeys[i])
+    # update workflow information with lane count
+    update_workflow_information(project_name, workflows, limskeys, 'lane_count')
+        
     
     # check that project is defined in FPR (ie, may be defined in Pinery but no data recorded in FPR)
     if workflows and parents and files:
@@ -1296,9 +1360,6 @@ def add_info(args):
     - project (str): Name of the project
     '''
     
-    start = time.time()
-    
-    
     # create database if file doesn't exist
     if os.path.isfile(args.database) == False:
         initiate_db(args.database)
@@ -1307,20 +1368,21 @@ def add_info(args):
     add_project_info_to_db(args.database, args.pinery, args.project, args.lims_info, 'Projects')
     # add sample information
     add_samples_info_to_db(args.database, args.project, args.pinery, 'Samples', args.samples_info)
-    # add workflow information
-    add_workflows_info_to_db(args.fpr, args.database, args.project, 'Workflows', 'Parents', 'Children')
-    # add file QC info
-    add_fileQC_info_to_db(args.database, args.project, args.fpr, args.nabu, 'FilesQC')
     # add file info
     add_file_info_to_db(args.database, args.project, args.fpr, args.nabu, 'Files')
-    # add library information
-    add_library_info_to_db(args.database, args.project, args.pinery, args.lims_info, 'Libraries')
     # add workflow input
     add_workflow_inputs_to_db(args.database, args.fpr, args.project, 'Workflow_Inputs')
+    # add workflow information
+    add_workflows_info_to_db(args.fpr, args.database, args.project, 'Workflows', 'Parents', 'Children', 'Files', 'Workflow_Inputs')
+    # add file QC info
+    add_fileQC_info_to_db(args.database, args.project, args.fpr, args.nabu, 'FilesQC')
+    # add library information
+    add_library_info_to_db(args.database, args.project, args.pinery, args.lims_info, 'Libraries')
     
-    end = time.time()
-
-    print('{0}: {1}'.format(args.project, end -start))    
+    # add WGS analysis blocks
+    
+    
+      
 
 
 def launch_jobs(args):

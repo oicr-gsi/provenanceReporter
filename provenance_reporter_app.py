@@ -28,7 +28,7 @@ from utilities import connect_to_db, get_children_workflows, get_miso_sample_lin
     get_pipelines, get_workflow_names, get_library_design
 from whole_genome import get_call_ready_cases, get_bmpp_case, get_case_call_ready_samples, group_normal_tumor_pairs, \
     find_analysis_blocks, map_workflows_to_sample_pairs, map_workflows_to_parent, list_block_workflows, \
-    get_block_analysis_date, sort_call_ready_samples, get_block_workflow_file_count, get_block_release_status, \
+    get_block_analysis_date, sort_call_ready_samples, get_block_release_status, \
     get_amount_data, is_block_complete, order_blocks, name_WGS_blocks, create_block_json, map_samples_to_bmpp_runs, \
     get_parent_workflows, get_workflows_analysis_date, get_workflow_file_count, \
     get_workflow_limskeys, get_file_release_status    
@@ -192,7 +192,20 @@ def whole_genome_sequencing(project_name):
 @app.route('/<project_name>/whole_genome_sequencing/<case>')
 def wgs_case(project_name, case):
     
-    tasks = []
+    
+    
+    # get the file count of each workflow in project
+    file_counts = get_workflow_file_count(project_name)
+    #file_counts = get_block_workflow_file_count(block_workflows, file_counts)
+    
+    # get the amount of data for each workflow
+    amount_data = get_amount_data(project_name)
+        
+    
+    
+    
+    
+    
     
     start = time.time()
     
@@ -286,19 +299,12 @@ def wgs_case(project_name, case):
     end16 = time.time()
     print('samples bmpp', end16 - end15)
     
-    
-    # get the file count of each workflow in project
-    file_counts = get_workflow_file_count(project_name)
-    # get the workflow file counts
-    file_counts = get_block_workflow_file_count(block_workflows, file_counts)
-    end17 = time.time()
-    print('file counts', end17 - end16)
-    
+        
     # get release status of input sequences for each block
     # get the input limskeys for each workflow in project
     limskeys = get_workflow_limskeys(project_name)
     end18 = time.time()
-    print('limskeys', end18 - end17)
+    #print('limskeys', end18 - end17)
     
       
     # get the file swid and release status for each limskey for fastq-generating workflows
@@ -308,10 +314,6 @@ def wgs_case(project_name, case):
     end19 = time.time()
     print('release status', end19 - end18)
     
-    # get the amount of data for each workflow
-    amount_data = get_amount_data(block_workflows, limskeys)
-    end20 = time.time()
-    print('amount data', end20 - end19)
     
     
     
@@ -319,7 +321,7 @@ def wgs_case(project_name, case):
     expected_workflows = sorted(['mutect2', 'variantEffectPredictor', 'delly', 'varscan', 'sequenza', 'mavis'])           
     complete = is_block_complete(blocks, expected_workflows)
     end21 = time.time()
-    print('complete', end21 - end20)
+    #print('complete', end21 - end20)
     
     
     
@@ -348,35 +350,13 @@ def wgs_case(project_name, case):
     
     print('all tasks', end25 -  start)
     
-    tasks.extend([('project', end1 - start), ('pipeline', end2 - end1),
-                 ('bmpp', end3 - end2), ('bmpp_samples', end4 - end3),
-                 ('samples', end5 - end4), ('pairs', end6 - end5),
-                 ('analysis workflows', end7 - end6), ('parents', end8 - end7),
-                 ('parent workflows', end9 - end8), ('blocks', end10 - end9),
-                 ('block workflows', end11 - end10), ('workflow date', end12 - end11),
-                 ('workflow names', end13 - end12), ('matrix', end14 - end13),
-                 ('figures', end15 - end14), ('samples bmpp', end16 - end15),
-                 ('file counts', end17 - end16), ('limskeys', end18 - end17),
-                 ('release status', end19 - end18), ('amount data', end20 - end19),
-                 ('complete', end21 - end20), ('order blocks', end22 - end21),
-                 ('name blocks', end23 - end22), ('miso link', end24 - end23),
-                 ('sort sample pairs', end25 - end24)])
-    tasks.sort(key=lambda x: x[1])
-    print(tasks)
-    
-    
-    
-    
-    
-    
-    
     return render_template('WGS_case.html', project=project, routes = routes,
                            case=case, pipelines=pipelines, sample_pairs_names=sample_pairs_names,
                            blocks=blocks, names=names, ordered_blocks=ordered_blocks,
                            miso_link=miso_link, complete=complete, release_status=release_status,
                            block_date=block_date, workflow_date=workflow_date,
                            figures=figures, samples_bmpp=samples_bmpp, 
-                           file_counts=file_counts, amount_data=amount_data, )
+                           file_counts=file_counts, amount_data=amount_data)
 
 
 
@@ -549,7 +529,7 @@ def wt_case(project_name, case):
                            miso_link=miso_link, complete=complete, release_status=release_status,
                            block_date=block_date, workflow_date=workflow_date,
                            figures=figures, samples_star=samples_star, 
-                           file_counts=file_counts, amount_data=amount_data, )
+                           file_counts=file_counts, amount_data=amount_data)
 
 
 

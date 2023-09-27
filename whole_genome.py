@@ -562,68 +562,70 @@ def sort_call_ready_samples(project_name, blocks, bmpp_samples, workflow_names):
 
 
 
-def get_workflow_file_count(project_name):
+def get_workflow_file_count(project_name, workflow_table='Workflows'):
     '''
-    (str) -> dict
+    (str, str) -> dict
     
     Returns a dictionary with the number of files for each workflow in project
     
     Parameters
     ----------
     - project_name (str): Name of project of interest
+    - workflow_table (str): Name of the table containing the workflow information in database
     '''
     
     conn = connect_to_db()
-    data = conn.execute("SELECT DISTINCT Files.file, Files.wfrun_id FROM Files WHERE Files.project_id = '{0}'".format(project_name)).fetchall()
+    data = conn.execute("SELECT DISTINCT {0}.file_count, {0}.wfrun_id FROM {0} WHERE {0}.project_id = '{1}'".format(workflow_table, project_name)).fetchall()
     conn.close()
 
     counts = {}
     for i in data:
-        counts[i['wfrun_id']] = counts.get(i['wfrun_id'], 0) + 1
-       
+        counts[i['wfrun_id']] = i['file_count']
+    
     return counts
 
 
 
 
 
-def get_block_workflow_file_count(block_workflows, file_counts):
-    '''
-    (dict, dict) -> dict
+# def get_block_workflow_file_count(block_workflows, file_counts):
+#     '''
+#     (dict, dict) -> dict
     
-    Returns a dictionary with the file count for each workflow of each block
-    and bmpp parent_workflow
+#     Returns a dictionary with the file count for each workflow of each block
+#     and bmpp parent_workflow
     
-    Parameters
-    ----------
-    - block_workflows (dict): Dictionary of workflow run ids organized by sample pair and bmpp parent workflows
-    - file_counts (dict): Dictionary with file count for each workflow in project
-    '''
+#     Parameters
+#     ----------
+#     - block_workflows (dict): Dictionary of workflow run ids organized by sample pair and bmpp parent workflows
+#     - file_counts (dict): Dictionary with file count for each workflow in project
+#     '''
         
-    D = {}
-    for block in block_workflows:
-        for bmpp in block_workflows[block]:
-            for workflow in block_workflows[block][bmpp]:
-                if workflow in file_counts:
-                    D[workflow] = file_counts[workflow]
-                else:
-                    D[workflow] = 0
-    return D
+#     D = {}
+#     for block in block_workflows:
+#         for bmpp in block_workflows[block]:
+#             for workflow in block_workflows[block][bmpp]:
+#                 if workflow in file_counts:
+#                     D[workflow] = file_counts[workflow]
+#                 else:
+#                     D[workflow] = 0
+#     return D
 
 
-def get_workflow_limskeys(project_name):
+def get_workflow_limskeys(project_name, workflow_input_table='Workflow_Inputs'):
     '''
-    (str) -> dict
+    (str, str) -> dict
     
     Returns a dictionary with list of limskeys for each workflow id in project
         
     Parameters
     ----------
     - project_name (str): Name of project of interest
+    - workflow_input_table (str): Name of the table with worklow input information in the database
     '''
         
     conn = connect_to_db()
-    data = conn.execute("SELECT Workflow_Inputs.limskey, Workflow_Inputs.wfrun_id FROM Workflow_Inputs WHERE Workflow_Inputs.project_id = '{0}'".format(project_name)).fetchall()
+    data = conn.execute("SELECT {0}.limskey, {0}.wfrun_id FROM {0} WHERE {0}.project_id = '{1}'".format(workflow_input_table, project_name)).fetchall()
     conn.close()
 
     D = {}
@@ -716,32 +718,50 @@ def get_block_release_status(block_workflows, limskeys, release_status):
     return D
 
 
-def get_amount_data(block_workflows, limskeys):
-    '''
-    (dict, dict) -> dict
+# def get_amount_data(block_workflows, limskeys):
+#     '''
+#     (dict, dict) -> dict
     
-    Returns a dictionary with the amount of lane data for each workflow 
-    of each sample plair and parent bmpp workflow
+#     Returns a dictionary with the amount of lane data for each workflow 
+#     of each sample plair and parent bmpp workflow
+    
+#     Parameters
+#     ----------
+#     - block_workflows (dict): Dictionary of workflow run ids organized by sample pair and bmpp parent workflows
+#     - limskeys (dict): Dictionary with workflow run id, list of limskeys
+#     '''
+    
+#     D = {}
+#     for block in block_workflows:
+#         D[block] = {}
+#         for bmpp in block_workflows[block]:
+#             D[block][bmpp] = {}
+#             for workflow_id in block_workflows[block][bmpp]:
+#                 D[block][bmpp][workflow_id] = len(limskeys[workflow_id])
+#     return D
+
+
+def get_amount_data(project_name, workflow_table='Workflows'):
+    '''
+    (str, str) -> dict
+    
+    Returns a dictionary with the amount of data (ie, lane count) for each workflow in project
     
     Parameters
     ----------
-    - block_workflows (dict): Dictionary of workflow run ids organized by sample pair and bmpp parent workflows
-    - limskeys (dict): Dictionary with workflow run id, list of limskeys
+    - project_name (str): Name of project of interest
+    - workflow_table (str): Name of the table containing the workflow information in database
     '''
     
-    D = {}
-    for block in block_workflows:
-        D[block] = {}
-        for bmpp in block_workflows[block]:
-            D[block][bmpp] = {}
-            for workflow_id in block_workflows[block][bmpp]:
-                D[block][bmpp][workflow_id] = len(limskeys[workflow_id])
-    return D
+    conn = connect_to_db()
+    data = conn.execute("SELECT DISTINCT {0}.lane_count, {0}.wfrun_id FROM {0} WHERE {0}.project_id = '{1}'".format(workflow_table, project_name)).fetchall()
+    conn.close()
 
-
-
-
-
+    counts = {}
+    for i in data:
+        counts[i['wfrun_id']] = i['lane_count']
+    
+    return counts
 
 
 def is_block_complete(blocks, expected_workflows):
