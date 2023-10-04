@@ -188,4 +188,24 @@ def get_pipelines(project_name):
 
 
 
+def get_donors(project_name):
+    '''
+    (str) -> list
+    
+    Returns a list of donors for a given project
+    
+    Parameters
+    ----------
+    - project_name (str): Name of project of interest
+    '''
+    
+    # connect to db
+    conn = connect_to_db()
+    # extract library source
+    data = conn.execute("SELECT DISTINCT case_id FROM Samples WHERE project_id = '{0}';".format(project_name)).fetchall()
+    donors = list(set([i['case_id'] for i in  data]))
+    conn.close()
+    
+    return donors
 
+    
