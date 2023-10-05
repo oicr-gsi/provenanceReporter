@@ -116,7 +116,7 @@ def format_created_time(created_time):
 def index():
     
     # connect to db and extract project info
-    conn = connect_to_db()
+    conn = connect_to_db('merged.db')
     projects = conn.execute('SELECT * FROM Projects').fetchall()
     conn.close()
     
@@ -130,25 +130,25 @@ def project_page(project_name):
     
     
     # get the project info for project_name from db
-    project = get_project_info(project_name)
+    project = get_project_info(project_name, 'merged.db')
     # get the pipelines from the library definitions in db
-    pipelines = get_pipelines(project_name)
+    pipelines = get_pipelines(project_name, 'merged.db')
     # get case information
-    cases = get_cases(project_name)
+    cases = get_cases(project_name, 'merged.db')
     # get the species
     species = ', '.join(sorted(list(set([i['species'] for i in cases]))))
     # get library and sample counts
-    counts = get_sample_counts(project_name)
+    counts = get_sample_counts(project_name, 'merged.db')
     # add missing donors to counts (ie, when counts are 0)
     counts = add_missing_donors(cases, counts)
     # count libraries for each library type
     # get the library types
-    library_types =  get_library_types(project_name)
+    library_types =  get_library_types(project_name, 'merged.db')
     # get the library names
     library_names = {i: get_library_design(i) for i in library_types}
-    libraries = count_libraries(project_name, library_types, cases)
+    libraries = count_libraries(project_name, library_types, cases, 'merged.db')
     # get the date of the last sequencing data
-    seq_date = get_last_sequencing(project['project_id'])
+    seq_date = get_last_sequencing(project['project_id'], 'merged.db')
     
     return render_template('project.html', routes=routes, project=project,
                            pipelines=pipelines, cases=cases, counts=counts,
@@ -160,11 +160,11 @@ def project_page(project_name):
 def sequencing(project_name):
     
     # get the project info for project_name from db
-    project = get_project_info(project_name)
+    project = get_project_info(project_name, 'merged.db')
     # get the pipelines from the library definitions in db
-    pipelines = get_pipelines(project_name)
+    pipelines = get_pipelines(project_name, 'merged.db')
     # get sequence file information
-    files = collect_sequence_info(project_name)
+    files = collect_sequence_info(project_name, 'merged.db')
     # re-organize sequence information
     sequences = get_sequences(files)
 
@@ -176,13 +176,13 @@ def sequencing(project_name):
 def whole_genome_sequencing(project_name):
     
     # get the project info for project_name from db
-    project = get_project_info(project_name)
+    project = get_project_info(project_name, 'merged.db')
     
     # get the pipelines from the library definitions in db
-    pipelines = get_pipelines(project_name)
+    pipelines = get_pipelines(project_name, 'merged.db')
         
     # get samples and libraries and workflow ids for each case
-    cases = get_call_ready_cases(project_name, 'novaseq', 'WG')
+    cases = get_call_ready_cases(project_name, 'novaseq', 'WG', 'merged.db')
     samples = sorted(list(cases.keys()))
 
    
@@ -193,126 +193,100 @@ def whole_genome_sequencing(project_name):
 def wgs_case(project_name, case):
     
     
+    # get the project info for project_name from db
+    project = get_project_info(project_name, 'merged.db')
+    # get the pipelines from the library definitions in db
+    pipelines = get_pipelines(project_name, 'merged.db')
+    # get miso link
+    miso_link = get_miso_sample_link(project_name, case, 'merged.db')
+    
+    
+    
     
     # get the file count of each workflow in project
-    file_counts = get_workflow_file_count(project_name)
+    file_counts = get_workflow_file_count(project_name, 'merged.db')
     #file_counts = get_block_workflow_file_count(block_workflows, file_counts)
     
     # get the amount of data for each workflow
-    amount_data = get_amount_data(project_name)
+    amount_data = get_amount_data(project_name, 'merged.db')
         
     
+    # get the creation date of all workflows
+    creation_dates = get_workflows_analysis_date(project_name, 'merged.db')
     
     
     
     
     
-    start = time.time()
     
-    # get the project info for project_name from db
-    project = get_project_info(project_name)
-    end1 = time.time()
-    print('project', end1 - start)
     
-    # get the pipelines from the library definitions in db
-    pipelines = get_pipelines(project_name)
-    end2 = time.time()
-    print('pipeline', end2 - end1)
+    
     
     # get all the bmpp runs for WG library type and Novaseq platform
-    bmpp = get_bmpp_case(project_name, case, 'novaseq', 'WG')
-    end3 = time.time()
-    print('bmpp', end3 - end2)
-       
+    bmpp = get_bmpp_case(project_name, case, 'novaseq', 'WG', 'merged.db')
+           
     
     # get the normal and tumor samples for each bmpp id
-    bmpp_samples = map_samples_to_bmpp_runs(project_name, bmpp)
-    end4 = time.time()
-    print('bmpp_samples', end4 - end3)
+    bmpp_samples = map_samples_to_bmpp_runs(project_name, bmpp, 'merged.db')
+    
     
     # identify all the samples processed
     samples = get_case_call_ready_samples(project_name, bmpp_samples)
-    end5 = time.time()
-    print('samples', end5 - end4)
+    
     
     # get all pairs N/T samples
     pairs = group_normal_tumor_pairs(samples)
-    end6 = time.time()
-    print('pairs', end6 - end5)
     
     
     # find analysis workflows for each N/T pairs
     # remove sample pairs without analysis workflows
-    D = map_workflows_to_sample_pairs(project_name, 'novaseq', pairs)
-    end7 = time.time()
-    print('analysis workflows', end7 - end6)
+    D = map_workflows_to_sample_pairs(project_name, 'novaseq', pairs, 'merged.db')
     
        
     # find the parents of each workflow
-    parents = get_parent_workflows(project_name)
-    end8 = time.time()
-    print('parents', end8 - end7)
+    parents = get_parent_workflows(project_name, 'merged.db')
     
     # get the parent workflows for each block
     parent_workflows = map_workflows_to_parent(D, parents)
-    end9 = time.time()
-    print('parent workflows', end9 - end8)
     
     # find the blocks by mapping the analysis workflows to their parent workflows    
     blocks = find_analysis_blocks(D, parents, parent_workflows, bmpp)
-    end10 = time.time()
-    print('blocks', end10 - end9)
     
     # list all workflows for each block
     block_workflows = list_block_workflows(blocks)
-    end11 = time.time()
-    print('block workflows', end11 - end10)
     
     # get the workflow creation date for all the workflows in project
-    creation_dates = get_workflows_analysis_date(project_name)
+    creation_dates = get_workflows_analysis_date(project_name, 'merged.db')
     # assign date to each block. most recent file creation date from all workflows within block 
     # get the date of each workflow within block
     block_date, workflow_date = get_block_analysis_date(block_workflows, creation_dates)
-    end12 = time.time()
-    print('workflow date', end12 - end11)
     
     # map each workflow run id to its workflow name
-    workflow_names = get_workflow_names(project_name)
+    workflow_names = get_workflow_names(project_name, 'merged.db')
     # get the workflow names
     block_workflow_names = get_node_labels(block_workflows, workflow_names)
-    end13 = time.time()
-    print('workflow names', end13 - end12)
     
     # convert workflow relationships to adjacency matrix for each block
     matrix = make_adjacency_matrix(block_workflows, parent_workflows)
-    end14 = time.time()
-    print('matrix', end14 - end13)
     
     # create figures
     figures = plot_workflow_network(matrix, block_workflow_names)
-    end15 = time.time()
-    print('figures', end15 - end14)
     
      
     # get the samples for each bmpp id
     samples_bmpp = sort_call_ready_samples(project_name, blocks, bmpp_samples, workflow_names)
-    end16 = time.time()
-    print('samples bmpp', end16 - end15)
     
         
     # get release status of input sequences for each block
     # get the input limskeys for each workflow in project
-    limskeys = get_workflow_limskeys(project_name)
-    end18 = time.time()
-    #print('limskeys', end18 - end17)
+    limskeys = get_workflow_limskeys(project_name, 'merged.db')
+    
     
       
     # get the file swid and release status for each limskey for fastq-generating workflows
     # excluding fastq-import workflows
-    status = get_file_release_status(project_name)
+    status = get_file_release_status(project_name, 'merged.db')
     release_status = get_block_release_status(block_workflows, limskeys, status)
-    end19 = time.time()
-    print('release status', end19 - end18)
     
     
     
@@ -320,36 +294,23 @@ def wgs_case(project_name, case):
     # check if blocks are complete
     expected_workflows = sorted(['mutect2', 'variantEffectPredictor', 'delly', 'varscan', 'sequenza', 'mavis'])           
     complete = is_block_complete(blocks, expected_workflows)
-    end21 = time.time()
-    #print('complete', end21 - end20)
     
     
     
     # order blocks based on the amount of data
     ordered_blocks = order_blocks(blocks, amount_data)
-    end22 = time.time()
-    print('order blocks', end22 - end21)
-
+    
 
     # name each block according to the selected block order
     names = name_WGS_blocks(ordered_blocks)
-    end23 = time.time()
-    print('name blocks', end23 - end22)    
     
-    # get miso link
-    miso_link = get_miso_sample_link(project_name, case)
-    end24 = time.time()
-    print('miso link', end24 - end23)
-    
+        
     
     # sort sample pairs names
     sample_pairs_names = sorted(list(blocks.keys()))
-    end25 = time.time()
-    print('sort sample pairs', end25 - end24)
     
     
-    print('all tasks', end25 -  start)
-    
+        
     return render_template('WGS_case.html', project=project, routes = routes,
                            case=case, pipelines=pipelines, sample_pairs_names=sample_pairs_names,
                            blocks=blocks, names=names, ordered_blocks=ordered_blocks,
@@ -364,11 +325,11 @@ def wgs_case(project_name, case):
 def whole_transcriptome(project_name):
     
     # get the project info for project_name from db
-    project = get_project_info(project_name)
+    project = get_project_info(project_name, 'merged.db')
     # get the pipelines from the library definitions in db
-    pipelines = get_pipelines(project_name)
+    pipelines = get_pipelines(project_name, 'merged.db')
     # get samples and libraries and workflow ids for each case
-    cases = get_WT_call_ready_cases(project_name, 'novaseq', 'WT')
+    cases = get_WT_call_ready_cases(project_name, 'novaseq', 'merged.db', 'WT')
     samples = sorted(list(cases.keys()))
 
     return render_template('Whole_transcriptome.html', routes = routes, project=project,
@@ -384,24 +345,24 @@ def wt_case(project_name, case):
        
     
     # get the project info for project_name from db
-    project = get_project_info(project_name)
+    project = get_project_info(project_name, 'merged.db')
     end1 = time.time()
     print('project', end1 - start)
     
     # get the pipelines from the library definitions in db
-    pipelines = get_pipelines(project_name)
+    pipelines = get_pipelines(project_name, 'merged.db')
     end2 = time.time()
     print('pipeline', end2 - end1)
            
     # build the somatic calling block
 
     # identify all call ready star runs for novaseq
-    star = get_star_case(project_name, case, 'novaseq', 'WT')
+    star = get_star_case(project_name, case, 'novaseq', 'WT', 'merged.db')
     end3 = time.time()
     print('star', end3 - end2)
     
     # get the tumor samples for each star id
-    star_samples = map_samples_to_star_runs(project_name, star)
+    star_samples = map_samples_to_star_runs(project_name, star, 'merged.db')
     end4 = time.time()
     print('star_samples', end4 - end3)
     
@@ -411,12 +372,12 @@ def wt_case(project_name, case):
     print('samples', end5 - end4)
     
     # remove samples without analysis workflows
-    D = map_workflows_to_samples(project_name, 'novaseq', samples)
+    D = map_workflows_to_samples(project_name, 'novaseq', samples, 'merged.db')
     end6 = time.time()
     print('analysis workflows', end6 - end5)
 
     # find the parents of each workflow
-    parents = get_parent_workflows(project_name)
+    parents = get_parent_workflows(project_name, 'merged.db')
     end7 = time.time()
     print('parents', end7 - end6)
 
@@ -446,7 +407,7 @@ def wt_case(project_name, case):
     print('workflow date', end11 - end10)  
     
     # map each workflow run id to its workflow name
-    workflow_names = get_workflow_names(project_name)
+    workflow_names = get_workflow_names(project_name, 'merged.db')
     # get the workflow names
     block_workflow_names = get_node_labels(block_workflows, workflow_names)
     end12 = time.time()
@@ -468,27 +429,27 @@ def wt_case(project_name, case):
     print('samples bmpp', end15 - end14)
    
     # # get the file count of each workflow in project
-    file_counts = get_workflow_file_count(project_name)
+    file_counts = get_workflow_file_count(project_name, 'merged.db')
     # get the workflow file counts
-    file_counts = get_block_workflow_file_count(block_workflows, file_counts)
+    #file_counts = get_block_workflow_file_count(block_workflows, file_counts)
     end16 = time.time()
     print('file counts', end16 - end15)
 
     # get release status of input sequences for each block
     # get the input limskeys for each workflow in project
-    limskeys = get_workflow_limskeys(project_name)
+    limskeys = get_workflow_limskeys(project_name, 'merged.db')
     end17 = time.time()
     print('limskeys', end17 - end16)
 
     # get the file swid and release status for each limskey for fastq-generating workflows
     # excluding fastq-import workflows
-    status = get_file_release_status(project_name)
+    status = get_file_release_status(project_name, 'merged.db')
     release_status = get_block_release_status(block_workflows, limskeys, status)
     end18 = time.time()
     print('release status', end18 - end17)
 
     # get the amount of data for each workflow
-    amount_data = get_amount_data(block_workflows, limskeys)
+    amount_data = get_amount_data(project_name, 'merged.db')
     end19 = time.time()
     print('amount data', end19 - end18)
     
@@ -509,7 +470,7 @@ def wt_case(project_name, case):
     print('name blocks', end22 - end21)    
     
     # get miso link
-    miso_link = get_miso_sample_link(project_name, case)
+    miso_link = get_miso_sample_link(project_name, case, 'merged.db')
     end23 = time.time()
     print('miso link', end23 - end22)
     
@@ -541,24 +502,24 @@ def download_block_data(project_name, case, block, bmpp_parent):
     '''
     
     # get all the bmpp runs for WG library type and Novaseq platform
-    bmpp = get_bmpp_case(project_name, case, 'novaseq', 'WG')
+    bmpp = get_bmpp_case(project_name, case, 'novaseq', 'WG', 'merged.db')
     # get the normal and tumor samples for each bmpp id
-    bmpp_samples = map_samples_to_bmpp_runs(project_name, bmpp)
+    bmpp_samples = map_samples_to_bmpp_runs(project_name, bmpp, 'merged.db')
     # identify all the samples processed
     samples = get_case_call_ready_samples(project_name, bmpp_samples)
     # get all pairs N/T samples
     pairs = group_normal_tumor_pairs(samples)
     # find analysis workflows for each N/T pairs
     # remove sample pairs without analysis workflows
-    D = map_workflows_to_sample_pairs(project_name, 'novaseq', pairs)
+    D = map_workflows_to_sample_pairs(project_name, 'novaseq', pairs, 'merged.db')
     # get the parents of each workflow
-    parents = get_parent_workflows(project_name)
+    parents = get_parent_workflows(project_name, 'merged')
     # get the parent workflows for each block
     parent_workflows = map_workflows_to_parent(D, parents)
     # find the blocks by mapping the analysis workflows to their parent workflows    
     blocks = find_analysis_blocks(D, parents, parent_workflows, bmpp)
     # map each workflow run id to its workflow name
-    workflow_names = get_workflow_names(project_name)
+    workflow_names = get_workflow_names(project_name, 'merged.db')
     # create json with workflow information for block for DARE
     block_data = create_block_json(project_name, blocks, block, bmpp_parent, workflow_names)
     
@@ -576,20 +537,20 @@ def download_WT_block_data(project_name, case, block, star_parent):
     # build the somatic calling block
 
     # identify all call ready star runs for novaseq
-    star = get_star_case(project_name, case, 'novaseq', 'WT')
+    star = get_star_case(project_name, case, 'novaseq', 'WT', 'merged.db')
     # get the tumor samples for each star id
-    star_samples = map_samples_to_star_runs(project_name, star)
+    star_samples = map_samples_to_star_runs(project_name, star, 'merged.db')
     samples = get_WT_case_call_ready_samples(project_name, star_samples)
     # remove samples without analysis workflows
-    D = map_workflows_to_samples(project_name, 'novaseq', samples)
+    D = map_workflows_to_samples(project_name, 'novaseq', samples, 'merged.db')
     # find the parents of each workflow
-    parents = get_parent_workflows(project_name)
+    parents = get_parent_workflows(project_name, 'merged.db')
     # get the parent workflows for each block
     parent_workflows = map_workflows_to_parent(D, parents)
     # find the blocks by mapping the analysis workflows to their parent workflows    
     blocks = find_WT_analysis_blocks(D, parents, parent_workflows, star)
     # map each workflow run id to its workflow name
-    workflow_names = get_workflow_names(project_name)
+    workflow_names = get_workflow_names(project_name, 'merged.db')
     # create json with workflow information for block for DARE
     block_data = create_block_json(project_name, blocks, block, star_parent, workflow_names)
 
@@ -617,15 +578,15 @@ def download_cases_table(project_name):
     '''
     
     # get case information
-    cases = get_cases(project_name)
+    cases = get_cases(project_name, 'merged.db')
     # get library and sample counts
-    counts = get_sample_counts(project_name)
+    counts = get_sample_counts(project_name, 'merged.db')
     # add missing donors to counts (ie, when counts are 0)
     counts = add_missing_donors(cases, counts)
     # count libraries for each library type
     # get the library types
     library_types =  get_library_types(project_name)
-    libraries = count_libraries(project_name, library_types, cases)
+    libraries = count_libraries(project_name, library_types, cases, 'merged.db')
     
     D = {}
     for i in cases:
@@ -651,7 +612,7 @@ def download_identifiers_table(project_name):
     '''
     
     # get sequence file information
-    files = collect_sequence_info(project_name)
+    files = collect_sequence_info(project_name, 'merged.db')
     # re-organize sequence information
     sequences = get_sequences(files)
     

@@ -954,19 +954,20 @@ def add_workflow_relationships(parent_workflows, database, project, table = 'Par
 
 
 
-def count_files(project_name, file_table = 'Files'):
+def count_files(project_name, database, file_table = 'Files'):
     '''
-    (str, str) -> dict
+    (str, str, str) -> dict
     
     Returns a dictionary with the number of files for each workflow in project
     
     Parameters
     ----------
     - project_name (str): Name of project of interest
+    - database (str): Path to the sqlite database
     - file_table (str): Name of the table with File information
     '''
     
-    conn = connect_to_db()
+    conn = connect_to_db(database)
     data = conn.execute("SELECT DISTINCT {0}.file, {0}.wfrun_id FROM {0} WHERE {0}.project_id = '{1}'".format(file_table, project_name)).fetchall()
     conn.close()
 
@@ -1021,12 +1022,12 @@ def add_workflows_info_to_db(fpr, database, project_name, workflow_table = 'Work
     workflows, parents, files = get_workflow_relationships(fpr, project_name)
     
     # get the file count for each workflow
-    counts = count_files(project_name, file_table)
+    counts = count_files(project_name, database, file_table)
     # update workflow information with file count
     update_workflow_information(project_name, workflows, counts, 'file_count')
     
     # get the amount of data for each workflow
-    limskeys = get_workflow_limskeys(project_name, workflow_input_table)
+    limskeys = get_workflow_limskeys(project_name, database, workflow_input_table)
     for i in limskeys:
         limskeys[i] = len(limskeys[i])
     # update workflow information with lane count
@@ -1272,7 +1273,7 @@ def add_WGS_blocks_to_db(database, project, table):
     '''
     
     # get the WGS blocks for donors in project
-    blocks = find_WGS_blocks(project)
+    blocks = find_WGS_blocks(project, database)
 
     if blocks:
         # connect to db

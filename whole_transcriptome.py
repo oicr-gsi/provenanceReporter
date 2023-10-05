@@ -6,13 +6,13 @@ Created on Tue Jun  6 13:35:40 2023
 """
 
 from utilities import connect_to_db, get_children_workflows, remove_non_analysis_workflows
-from whole_genome import map_analysis_workflows_to_sample, get_parent_workflows
+from whole_genome import map_analysis_workflows_to_sample
 
 
 
-def get_WT_call_ready_cases(project_name, platform, library_type='WT'):
+def get_WT_call_ready_cases(project_name, platform, database, library_type='WT'):
     '''
-    (str, str, str) -> dict
+    (str, str, str, str) -> dict
 
     Returns a dictionary with samples and libraries and bmpp and downstream workflow ids for each case in a project,
     restricting data to specified platform and library type
@@ -22,11 +22,12 @@ def get_WT_call_ready_cases(project_name, platform, library_type='WT'):
     - project_name (str): Name of the project
     - platform (str): Name of sequencing platform.
                       Accepted values: novaseq, nextseq, hiseq, miseq
+    - database (str): Path to the sqlite database
     - library_type (str): 2 letters-code indicating the type of library                   
     '''
 
     # get all the samples for project name 
-    conn = connect_to_db()
+    conn = connect_to_db(database)
     data = conn.execute("SELECT DISTINCT Libraries.library, Libraries.sample, Libraries.project_id, \
                           Libraries.ext_id, Libraries.group_id, Libraries.library_type, \
                           Libraries.tissue_type, Libraries.tissue_origin, \
@@ -50,7 +51,7 @@ def get_WT_call_ready_cases(project_name, platform, library_type='WT'):
                 cases[i['sample']]['libraries'].append(i['library'])
             
     # get parent-children workflow relationships
-    parents = get_children_workflows(project_name)
+    parents = get_children_workflows(project_name, database)
 
     # find the bmpp downstream workflows
     for sample in cases:
@@ -76,9 +77,9 @@ def get_WT_call_ready_cases(project_name, platform, library_type='WT'):
 
 
 
-def get_star_case(project_name, case, platform, library_type):
+def get_star_case(project_name, case, platform, library_type, database):
     '''
-    (str, str, str, str) -> list
+    (str, str, str, str, database) -> list
     
     Returns a list of star call ready workflow Ids corresponding to the specific case from project 
     with input sequences from platform and library_type
@@ -89,8 +90,10 @@ def get_star_case(project_name, case, platform, library_type):
     - case (str): Donor id 
     - platform (str): Sequencing platform. Values are novaseq, miseq, nextseq and hiseq
     - library_type (str): 2-letters code describing the type of the library (eg, WG, WT,..)
+    - database (str): Path to the sqlite database
     '''
-    conn = connect_to_db()
+    
+    conn = connect_to_db(database)
     data = conn.execute("SELECT Libraries.library_type, Workflow_Inputs.platform, \
                         Workflow_Inputs.wfrun_id FROM Libraries JOIN Workflow_Inputs \
                         JOIN Workflows WHERE Libraries.project_id = '{0}' \
@@ -109,9 +112,9 @@ def get_star_case(project_name, case, platform, library_type):
 
 
 
-def get_WT_call_ready_samples(project_name, star_id):
+def get_WT_call_ready_samples(project_name, star_id, database):
     '''
-    (str, str) -> dict
+    (str, str, str) -> dict
     
     Returns a dictionary with normal and tumour samples from project_name processed through bamMergePreprcessing
     workflow with bmpp_run_id 
@@ -120,9 +123,10 @@ def get_WT_call_ready_samples(project_name, star_id):
     ----------
     - project_name (str): Name of the project of interest
     - star_id (str): star_call_ready workflow run identifiers
+    - database (str): Path to the sqlite database
     '''
     
-    conn = connect_to_db()
+    conn = connect_to_db(database)
     data = conn.execute("SELECT Libraries.sample, Libraries.group_id, Libraries.library, Libraries.tissue_type, \
                         Libraries.tissue_origin, Libraries.library_type \
                         FROM Libraries JOIN Workflow_Inputs WHERE Workflow_Inputs.library = Libraries.library \
@@ -165,9 +169,9 @@ def get_WT_case_call_ready_samples(project_name, star_samples):
  
 
 
-def map_samples_to_star_runs(project_name, star_ids):
+def map_samples_to_star_runs(project_name, star_ids, database):
     '''
-    (str, list) -> dict
+    (str, list, str) -> dict
     
     Returns a dictionary with normal, tumor samples for each bmpp run id
       
@@ -175,43 +179,21 @@ def map_samples_to_star_runs(project_name, star_ids):
     ----------
     - project_name (str): Name of the project of interest
     - star_ids (list): List of star_call_ready workflow run identifiers for a single case
+    - database (str): Path to the sqlite database
     '''
 
     D = {}
     for i in star_ids:
         # initiate dictionary
-        samples = get_WT_call_ready_samples(project_name, i)
+        samples = get_WT_call_ready_samples(project_name, i, database)
         D[i] = samples
     return D
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-def map_workflows_to_samples(project_name, platform, samples):
+def map_workflows_to_samples(project_name, platform, samples, database):
     '''
-    (str, str, dict) -> dict
+    (str, str, dict, str) -> dict
     
     Returns a dictionary with workflows processed by the WT pipeline for tumor samples
     
@@ -220,11 +202,12 @@ def map_workflows_to_samples(project_name, platform, samples):
     - project_name (str): Name of project of interest
     - platform (str): Sequencing platform. Values are: novaseq, miseq, hiseq and nextseq
     - samples (dict): Dictionary with tumor samples
+    - database (str): Path to the sqlite database
     '''
     
     D = {}
     for i in samples['tumour']:
-        L =  map_analysis_workflows_to_sample(project_name, i, platform)
+        L =  map_analysis_workflows_to_sample(project_name, i, platform, database)
         if L:
             D[i] = L 
     
