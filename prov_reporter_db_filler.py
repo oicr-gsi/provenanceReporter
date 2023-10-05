@@ -16,7 +16,7 @@ import traceback
 import os
 import subprocess
 from utilities import connect_to_db
-from whole_genome import get_workflow_limskeys
+from whole_genome import get_workflow_limskeys, find_WGS_blocks
 
 
 def extract_project_info(pinery):
@@ -668,7 +668,8 @@ def define_column_names():
                     'Libraries': ['library', 'sample', 'tissue_type', 'ext_id', 'tissue_origin',
                                   'library_type', 'prep', 'tissue_prep', 'sample_received_date', 'group_id', 'group_id_description', 'project_id'],
                     'Workflow_Inputs': ['library', 'run', 'lane', 'wfrun_id', 'limskey', 'barcode', 'platform', 'project_id'],
-                    'Samples': ['case_id', 'donor_id', 'species', 'sex', 'miso', 'created_date', 'modified_date', 'project_id', 'parent_project']}
+                    'Samples': ['case_id', 'donor_id', 'species', 'sex', 'miso', 'created_date', 'modified_date', 'project_id', 'parent_project'],
+                    'WGS_blocks': ['project_id', 'case_id', 'samples', 'bmpp_anchor', 'workflows', 'name', 'date', 'release_status', 'complete', 'network']}
         
     return column_names
 
@@ -697,7 +698,9 @@ def define_column_types():
                                   'VARCHAR(256)', 'VARCHAR(128)', 'VARCHAR(256)', 'VARCHAR(128)'],
                     'Workflow_Inputs': ['VARCHAR(128)', 'VARCHAR(256)', 'INTEGER', 'VARCHAR(572)', 
                                         'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)'],
-                    'Samples': ['VARCHAR(128) PRIMARY KEY NOT NULL', 'VARCHAR(256)', 'VARCHAR(256)', 'VARCHAR(128)', 'VARCHAR(572)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)']}
+                    'Samples': ['VARCHAR(128) PRIMARY KEY NOT NULL', 'VARCHAR(256)', 'VARCHAR(256)', 'VARCHAR(128)', 'VARCHAR(572)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)'],
+                    'WGS_blocks': ['VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(572)', 'VARCHAR(572)', 'TEXT', 'VARCHAR(256)', 'VARCHAR(128)', 'INT', 'INT', 'TEXT']}
+                    
     
     return column_types
 
@@ -723,7 +726,7 @@ def create_table(database, table):
     table_format = ', '.join(list(map(lambda x: ' '.join(x), list(zip(column_names, column_types)))))
 
 
-    if table  in ['Workflows', 'Parents', 'Files', 'FilesQC', 'Libraries', 'Workflow_Inputs', 'Samples']:
+    if table  in ['Workflows', 'Parents', 'Files', 'FilesQC', 'Libraries', 'Workflow_Inputs', 'Samples', 'WGS_blocks']:
         constraints = '''FOREIGN KEY (project_id)
             REFERENCES Projects (project_id)
             ON DELETE CASCADE ON UPDATE CASCADE'''
@@ -740,7 +743,13 @@ def create_table(database, table):
     
     if table == 'Worklows':
         table_format = table_format + ', PRIMARY KEY (wfrun_id, project_id)'
-        
+    
+    if table == 'WGS_blocks':
+        constraints = '''FOREIGN KEY (case_id)
+          REFERENCES Samples (case_id)
+          ON DELETE CASCADE ON UPDATE CASCADE'''
+        table_format = table_format + ', PRIMARY KEY (samples, bmpp_anchor)'
+      
     if table == 'Files':
         constraints = '''FOREIGN KEY (wfrun_id)
             REFERENCES Workflows (wfrun_id)
@@ -800,7 +809,7 @@ def initiate_db(database):
     tables = cur.fetchall()
     tables = [i[0] for i in tables]    
     conn.close()
-    for i in ['Projects', 'Workflows', 'Parents', 'Files', 'FilesQC', 'Libraries', 'Workflow_Inputs', 'Samples']:
+    for i in ['Projects', 'Workflows', 'Parents', 'Files', 'FilesQC', 'Libraries', 'Workflow_Inputs', 'Samples', 'WGS_blocks']:
         if i not in tables:
             create_table(database, i)
 
@@ -1249,6 +1258,55 @@ def add_samples_info_to_db(database, project, pinery, table, sample_info):
         conn.close()
 
 
+def add_WGS_blocks_to_db(database, project, table):
+    '''
+    (str, str, str, str) -> None
+    
+    Inserts WGS blocks data into WGS_blocks table of database    
+    
+    Parameters
+    ----------
+    - database (str): Path to the databae file
+    - project (str): Name of project of interest
+    - table (str): Name of table in database
+    '''
+    
+    # get the WGS blocks for donors in project
+    blocks = find_WGS_blocks(project)
+
+    if blocks:
+        # connect to db
+        conn = sqlite3.connect(database)
+        cur = conn.cursor()
+   
+        # get column names
+        data = cur.execute("SELECT * FROM {0} WHERE project_id = '{1}';".format(table, project))
+        column_names = [column[0] for column in data.description]
+
+        # add data into table
+        for d in blocks:
+            # loop over samples and blocks
+            for samples in d:
+                for block in d[samples]:
+                    L = [d[samples][block]['project_id'],
+                         d[samples][block]['case_id'],
+                         samples,
+                         block,
+                         ';'.join(d[samples][block]['workflows']),
+                         d[samples][block]['name'],
+                         d[samples][block]['date'],
+                         d[samples][block]['release_status'],
+                         d[samples][block]['complete'],
+                         d[samples][block]['network']]
+            
+            # insert project info
+            cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
+            conn.commit()
+ 
+        conn.close()
+
+
+
 def collect_lims_info(args):
     '''
     (str, str) -> str
@@ -1378,10 +1436,9 @@ def add_info(args):
     add_fileQC_info_to_db(args.database, args.project, args.fpr, args.nabu, 'FilesQC')
     # add library information
     add_library_info_to_db(args.database, args.project, args.pinery, args.lims_info, 'Libraries')
-    
-    # add WGS analysis blocks
-    
-    
+    # add WGS blocks
+    add_WGS_blocks_to_db(args.database, args.project, 'WGS_blocks')
+      
       
 
 

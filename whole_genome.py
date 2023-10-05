@@ -7,8 +7,8 @@ Created on Fri Jun  9 10:42:36 2023
 
 
 from utilities import connect_to_db, convert_epoch_time, remove_non_analysis_workflows,\
-    get_children_workflows
-
+    get_children_workflows, get_workflow_names, get_donors
+from networks import get_node_labels, make_adjacency_matrix, plot_workflow_network
 
 
 
@@ -490,13 +490,54 @@ def get_workflows_analysis_date(project_name):
 
 
 
+# def get_block_analysis_date(block_workflows, creation_dates):
+#     '''
+#     (dict, dict) -> dict, dict
+    
+#     Returns a dictionary with the most recent analysis date of any workflow downstream
+#     of bmpp parent workflows for each sample pair, and a dictionary with the analysis date 
+#     of each workflow downstream  of the bmpp workflows
+    
+#     Parameters
+#     ----------
+#     - block_workflows (dict): Dictionary of workflow run ids organized by sample pair and bmpp parent workflows
+#     - creation_dates (dict): Dictionary with creation date of each worklow in project
+#     '''
+
+#     block_date = {}
+#     workflow_dates = {}
+
+#     for block in block_workflows:
+#         block_date[block] = {}
+#         workflow_dates[block] = {}
+#         for bmpp in block_workflows[block]:
+#             workflow_dates[block][bmpp] = {}
+#             most_recent = 0
+#             # get the analysis date for each workflow
+#             for wf in block_workflows[block][bmpp]:
+#                 if wf in creation_dates:
+#                     wf_date = creation_dates[wf]
+#                 else:
+#                     wf_date = 'NA'
+#                 if wf_date != 'NA':
+#                     workflow_dates[block][bmpp][wf] = convert_epoch_time(wf_date)
+#                     if wf_date  > most_recent:
+#                         most_recent = wf_date
+#                 else:
+#                     workflow_dates[block][bmpp][wf] = 'NA'
+#             if most_recent:
+#                 block_date[block][bmpp] = convert_epoch_time(most_recent)
+#             else:
+#                 block_date[block][bmpp] = 'NA'
+#     return block_date, workflow_dates
+
+
 def get_block_analysis_date(block_workflows, creation_dates):
     '''
-    (dict, dict) -> dict, dict
+    (dict) -> dict, dict
     
     Returns a dictionary with the most recent analysis date of any workflow downstream
-    of bmpp parent workflows for each sample pair, and a dictionary with the analysis date 
-    of each workflow downstream  of the bmpp workflows
+    of bmpp parent workflows for each sample pair
     
     Parameters
     ----------
@@ -505,13 +546,9 @@ def get_block_analysis_date(block_workflows, creation_dates):
     '''
 
     block_date = {}
-    workflow_dates = {}
-
     for block in block_workflows:
         block_date[block] = {}
-        workflow_dates[block] = {}
         for bmpp in block_workflows[block]:
-            workflow_dates[block][bmpp] = {}
             most_recent = 0
             # get the analysis date for each workflow
             for wf in block_workflows[block][bmpp]:
@@ -520,17 +557,14 @@ def get_block_analysis_date(block_workflows, creation_dates):
                 else:
                     wf_date = 'NA'
                 if wf_date != 'NA':
-                    workflow_dates[block][bmpp][wf] = convert_epoch_time(wf_date)
                     if wf_date  > most_recent:
                         most_recent = wf_date
-                else:
-                    workflow_dates[block][bmpp][wf] = 'NA'
+                
             if most_recent:
                 block_date[block][bmpp] = convert_epoch_time(most_recent)
             else:
                 block_date[block][bmpp] = 'NA'
-    return block_date, workflow_dates
-
+    return block_date
 
 
 
@@ -714,7 +748,8 @@ def get_block_release_status(block_workflows, limskeys, release_status):
         for bmpp in block_workflows[block]:
             workflows = bmpp.split('.')
             status = all([get_workflow_release_status(j, limskeys, release_status) for j in workflows])
-            D[block][bmpp] = status
+            # record boolean as 0 or 1
+            D[block][bmpp] = int(status)
     return D
 
 
@@ -805,7 +840,8 @@ def is_block_complete(blocks, expected_workflows):
                 c.append(complete)
         
                 complete = all(c)
-            D[block][bmpp] = complete
+            # record boolean as 0 or 1
+            D[block][bmpp] = int(complete)
             
     return D
 
@@ -824,7 +860,7 @@ def order_blocks(blocks, amount_data):
     - amount_data (dict): Dictionary of amount of data for each workflow
     '''
         
-    # order sub-blocks (anchored by bmpp paret workflows) for each block (ie, sample pair)
+    # order sub-blocks (anchored by bmpp parent workflows) for each block (ie, sample pair)
     D = {}
         
     for block in blocks:
@@ -834,8 +870,7 @@ def order_blocks(blocks, amount_data):
             # sum all lanes for all call-ready workflows within each block
             workflows = list(map(lambda x: x.strip(), bmpp.split('.')))
             for workflow_id in workflows:
-                assert block in amount_data
-                total += amount_data[block][bmpp][workflow_id]
+                total += amount_data[workflow_id]
             L.append([total, bmpp])
         L = sorted(L, key=lambda x: x[0], reverse=True)
         D[block] = [i[1] for i in L]
@@ -974,3 +1009,120 @@ def get_call_ready_cases(project_name, platform, library_type):
 
 
 
+def find_WGS_blocks(project_name):
+    '''
+    (str) -> list
+    
+    Returns a list of WGS blocks for donors in project in which WGS blocks exist
+    
+    Parameters
+    ----------
+    - project_name (str): Name of project of interest
+    '''
+    
+    # make a list of donors:
+    donors = get_donors(project_name)
+    L = []
+    for case in donors:
+        blocks = find_case_WGS_blocks(project_name, case)
+        if blocks:
+            L.append(blocks)
+       
+    return blocks
+
+
+
+def find_case_WGS_blocks(project_name, case):
+    '''
+    (str, str) ->
+    
+    Returns a dictionary with the WGS blocks for case in project
+    
+    Parameters
+    ----------
+    - project_name (str): Name of project of interest
+    - case (str): Case in project
+    '''
+    
+    # organize the WGS blocks as a dictionary
+    WGS_blocks = {}
+    
+    
+    # get all the bmpp runs for WG library type and Novaseq platform
+    bmpp = get_bmpp_case(project_name, case, 'novaseq', 'WG')
+    
+    # proceed only in bmpp ids exist
+    if bmpp:
+        # get the normal and tumor samples for each bmpp id
+        bmpp_samples = map_samples_to_bmpp_runs(project_name, bmpp)
+        # identify all the samples processed
+        samples = get_case_call_ready_samples(project_name, bmpp_samples)
+        # get all pairs N/T samples
+        pairs = group_normal_tumor_pairs(samples)
+        # find analysis workflows for each N/T pairs
+        # remove sample pairs without analysis workflows
+        D = map_workflows_to_sample_pairs(project_name, 'novaseq', pairs)
+        # find the parents of each workflow
+        parents = get_parent_workflows(project_name)
+        # get the parent workflows for each block
+        parent_workflows = map_workflows_to_parent(D, parents)
+        # find the blocks by mapping the analysis workflows to their parent workflows    
+        blocks = find_analysis_blocks(D, parents, parent_workflows, bmpp)
+        # list all workflows for each block
+        block_workflows = list_block_workflows(blocks)
+        # get the workflow creation date for all the workflows in project
+        creation_dates = get_workflows_analysis_date(project_name)
+        # assign date to each block. most recent file creation date from all workflows within block 
+        # get the date of each workflow within block
+        block_date = get_block_analysis_date(block_workflows, creation_dates)
+        # map each workflow run id to its workflow name
+        workflow_names = get_workflow_names(project_name)
+        # get the workflow names
+        block_workflow_names = get_node_labels(block_workflows, workflow_names)
+        # convert workflow relationships to adjacency matrix for each block
+        matrix = make_adjacency_matrix(block_workflows, parent_workflows)
+        # create figures
+        figures = plot_workflow_network(matrix, block_workflow_names)
+        # get the samples for each bmpp id
+        samples_bmpp = sort_call_ready_samples(project_name, blocks, bmpp_samples, workflow_names)
+        
+        # get release status of input sequences for each block
+        # get the input limskeys for each workflow in project
+        limskeys = get_workflow_limskeys(project_name)
+        
+        # get the file swid and release status for each limskey for fastq-generating workflows
+        # excluding fastq-import workflows
+        status = get_file_release_status(project_name)
+        release_status = get_block_release_status(block_workflows, limskeys, status)
+    
+        # check if blocks are complete
+        expected_workflows = sorted(['mutect2', 'variantEffectPredictor', 'delly', 'varscan', 'sequenza', 'mavis'])           
+        complete = is_block_complete(blocks, expected_workflows)
+        
+        # get the amount of data for each workflow
+        amount_data = get_amount_data(project_name)
+        # order blocks based on the amount of data
+        ordered_blocks = order_blocks(blocks, amount_data)
+        
+        # name each block according to the selected block order
+        names = name_WGS_blocks(ordered_blocks)
+               
+        for samples in blocks:
+            WGS_blocks[samples] = {}
+            for block in blocks[samples]:
+                WGS_blocks[samples][block] = {}
+                # record network image
+                WGS_blocks[samples][block]['network'] = figures[samples][block]
+                # record all workflow ids
+                WGS_blocks[samples][block]['workflows'] = block_workflows[samples][block]
+                # record release status
+                WGS_blocks[samples][block]['release'] = release_status[samples][block]
+                # record block date
+                WGS_blocks[samples][block]['date'] = block_date[samples][block]
+                # record complete status
+                WGS_blocks[samples][block]['complete'] = complete[samples][block]
+                # reecord block name
+                WGS_blocks[samples][block]['name'] = names[samples][block]
+                
+                
+    return WGS_blocks
