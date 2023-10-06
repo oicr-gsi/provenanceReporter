@@ -433,6 +433,10 @@ def get_workflow_relationships(fpr, project_name):
             if project != project_name:
                 continue
             
+            # skip any workflow/file that has a skipped file
+            if line[51].lower() == 'true':
+                continue
+                        
             # get workflow, workflow version and workflow run accession
             workflow, workflow_version, workflow_run = line[30], line[31], line[36]
             # get file swid
@@ -623,6 +627,10 @@ def extract_workflow_info(fpr, project_name):
             if project != project_name:
                 continue             
     
+            if line[51].lower() == 'true':
+                continue
+    
+    
             # get sample name
             sample = line[7]
             # get workflow name and workflow run accession
@@ -680,7 +688,7 @@ def define_column_types():
 
     Returns a dictionary with column types for each table in database
     '''
-
+    
     # create dict to store column names for each table {table: [column names]}
     column_types = {'Workflows': ['VARCHAR(572)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'TEXT', 'INT', 'INT'],
                     'Parents': ['VARCHAR(572)', 'VARCHAR(572)', 'VARCHAR(128)'],
@@ -907,7 +915,7 @@ def add_workflows(workflows, database, project_name, table = 'Workflows'):
     
     # get column names
     column_names = define_column_names()[table]
-       
+    
     # connect to db
     conn = sqlite3.connect(database, timeout=30)
     cur = conn.cursor()
@@ -915,7 +923,7 @@ def add_workflows(workflows, database, project_name, table = 'Workflows'):
     for workflow_run in workflows[project_name]:
         # insert data into table
         values = [workflows[project_name][workflow_run][i] for i in column_names if i in workflows[project_name][workflow_run]]
-        values.insert(-1, project_name)
+        values.insert(3, project_name)
         cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(values)))
         conn.commit()
         
@@ -970,7 +978,7 @@ def count_files(project_name, database, file_table = 'Files'):
     conn = connect_to_db(database)
     data = conn.execute("SELECT DISTINCT {0}.file, {0}.wfrun_id FROM {0} WHERE {0}.project_id = '{1}'".format(file_table, project_name)).fetchall()
     conn.close()
-
+    
     counts = {}
     for i in data:
         counts[i['wfrun_id']] = counts.get(i['wfrun_id'], 0) + 1
@@ -1425,21 +1433,39 @@ def add_info(args):
     
     # add project information    
     add_project_info_to_db(args.database, args.pinery, args.project, args.lims_info, 'Projects')
+    print('added projects')
+    
     # add sample information
     add_samples_info_to_db(args.database, args.project, args.pinery, 'Samples', args.samples_info)
+    print('added samples') 
+    
+    
     # add file info
     add_file_info_to_db(args.database, args.project, args.fpr, args.nabu, 'Files')
+    print('added files')
+    
+    
     # add workflow input
     add_workflow_inputs_to_db(args.database, args.fpr, args.project, 'Workflow_Inputs')
+    print('added workflow inputs')
+    
+    
+    
     # add workflow information
     add_workflows_info_to_db(args.fpr, args.database, args.project, 'Workflows', 'Parents', 'Children', 'Files', 'Workflow_Inputs')
+    print('added workflows')
+    
     # add file QC info
     add_fileQC_info_to_db(args.database, args.project, args.fpr, args.nabu, 'FilesQC')
+    print('added filesqc')
+    
     # add library information
     add_library_info_to_db(args.database, args.project, args.pinery, args.lims_info, 'Libraries')
-    # add WGS blocks
-    add_WGS_blocks_to_db(args.database, args.project, 'WGS_blocks')
-      
+    print('added libraries')
+    
+    # # add WGS blocks
+    # add_WGS_blocks_to_db(args.database, args.project, 'WGS_blocks')
+    # print('added wgs blocks')  
       
 
 
