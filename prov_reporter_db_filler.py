@@ -1324,13 +1324,13 @@ def add_WGS_blocks_to_db(database, project, table):
                          ';'.join(d[samples][block]['workflows']),
                          d[samples][block]['name'],
                          d[samples][block]['date'],
-                         d[samples][block]['release_status'],
+                         d[samples][block]['release'],
                          d[samples][block]['complete'],
                          d[samples][block]['network']]
             
-            # insert project info
-            cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
-            conn.commit()
+                    # insert project info
+                    cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
+                    conn.commit()
  
         conn.close()
 
