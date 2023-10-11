@@ -235,9 +235,10 @@ def collect_file_info_from_fpr(fpr, project_name):
                 continue             
             if project not in D:
                 D[project] = {}
+            
             # check if file is skipped
-            if line[51].lower() == 'true':
-                continue
+            # if line[51].lower() == 'true':
+            #     continue
                    
             # get creation date
             creation_date = line[0]
@@ -281,13 +282,22 @@ def collect_file_info_from_fpr(fpr, project_name):
             workflow_run = line[36]
             # get limskey
             limskey = line[56]
+            
+            # get skip and stale status
+            skip = line[51]
+            if skip.lower() == 'true':
+                skip = 1
+            else:
+                skip = 0
+            stale = line[52]
+            
             # collect file info
             if file_swid not in D[project]:
                 D[project][file_swid] = {'creation_date': creation_date, 'md5sum': md5sum,
                                          'workflow': workflow, 'version': version,
                                          'wfrun_id': workflow_run, 'file': file,
                                          'library_type': library_type, 'attributes': attributes,
-                                         'limskey': [limskey]}
+                                         'limskey': [limskey], 'skip': skip, 'stale': stale}
             else:
                 D[project][file_swid]['limskey'].append(limskey)
     infile.close()
@@ -433,14 +443,22 @@ def get_workflow_relationships(fpr, project_name):
             if project != project_name:
                 continue
             
-            # skip any workflow/file that has a skipped file
-            if line[51].lower() == 'true':
-                continue
+            # # skip any workflow/file that has a skipped file
+            # if line[51].lower() == 'true':
+            #     continue
                         
             # get workflow, workflow version and workflow run accession
             workflow, workflow_version, workflow_run = line[30], line[31], line[36]
             # get file swid
             file_swid = line[44]
+            
+            # get skip and stale status
+            skip = line[51]
+            if skip.lower() == 'true':
+                skip = 1
+            else:
+                skip = 0
+            stale = line[52]
             
             # keep only unique string. file swid doesn't match file swid of worklow input files
             #file_swid = os.path.basename(file_swid)
@@ -472,9 +490,13 @@ def get_workflow_relationships(fpr, project_name):
             if project not in W:
                 W[project] = {}
             if workflow_run in W[project]:
-                assert W[project][workflow_run] == {'wfrun_id': workflow_run, 'wfv': workflow_version, 'wf': workflow, 'attributes': attributes}
+                assert W[project][workflow_run] == {'wfrun_id': workflow_run, 'wfv': workflow_version,
+                                                    'wf': workflow, 'attributes': attributes,
+                                                    'skip': skip, 'stale': stale}
             else:
-                W[project][workflow_run] = {'wfrun_id': workflow_run, 'wfv': workflow_version, 'wf': workflow, 'attributes': attributes}
+                W[project][workflow_run] = {'wfrun_id': workflow_run, 'wfv': workflow_version,
+                                            'wf': workflow, 'attributes': attributes,
+                                            'skip': skip, 'stale': stale}
         
             if project not in F:
                 F[project] = {}
@@ -516,7 +538,7 @@ def identify_parent_children_workflows(P, F):
                 parents[project][workflow] = parent_workflows
             else:
                 assert parents[project][workflow] == parent_workflows
-                                
+    
     return parents
 
     
@@ -627,8 +649,8 @@ def extract_workflow_info(fpr, project_name):
             if project != project_name:
                 continue             
     
-            if line[51].lower() == 'true':
-                continue
+            # if line[51].lower() == 'true':
+            #     continue
     
     
             # get sample name
@@ -668,10 +690,10 @@ def define_column_names():
     '''
 
     # create dict to store column names for each table {table: [column names]}
-    column_names = {'Workflows': ['wfrun_id', 'wf', 'wfv', 'project_id', 'attributes', 'file_count', 'lane_count'],
+    column_names = {'Workflows': ['wfrun_id', 'wf', 'wfv', 'project_id', 'attributes', 'file_count', 'lane_count', 'skip', 'stale'],
                     'Parents': ['parents_id', 'children_id', 'project_id'],
                     'Projects': ['project_id', 'pipeline', 'description', 'active', 'contact_name', 'contact_email', 'last_updated', 'expected_samples', 'sequenced_samples', 'library_types'],
-                    'Files': ['file_swid', 'project_id', 'md5sum', 'workflow', 'version', 'wfrun_id', 'file', 'library_type', 'attributes', 'creation_date', 'limskey'],
+                    'Files': ['file_swid', 'project_id', 'md5sum', 'workflow', 'version', 'wfrun_id', 'file', 'library_type', 'attributes', 'creation_date', 'limskey', 'skip', 'stale'],
                     'FilesQC': ['file_swid', 'project_id', 'skip', 'user', 'date', 'status', 'reference', 'fresh', 'ticket'],
                     'Libraries': ['library', 'sample', 'tissue_type', 'ext_id', 'tissue_origin',
                                   'library_type', 'prep', 'tissue_prep', 'sample_received_date', 'group_id', 'group_id_description', 'project_id'],
@@ -690,13 +712,13 @@ def define_column_types():
     '''
     
     # create dict to store column names for each table {table: [column names]}
-    column_types = {'Workflows': ['VARCHAR(572)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'TEXT', 'INT', 'INT'],
+    column_types = {'Workflows': ['VARCHAR(572)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'TEXT', 'INT', 'INT', 'INT', 'VARCHAR(128)'],
                     'Parents': ['VARCHAR(572)', 'VARCHAR(572)', 'VARCHAR(128)'],
                     'Projects': ['VARCHAR(128) PRIMARY KEY NOT NULL UNIQUE', 'VARCHAR(128)',
                                   'TEXT', 'VARCHAR(128)', 'VARCHAR(256)', 'VARCHAR(256)', 'VARCHAR(256)', 'INT', 'INT', 'VARCHAR(256)'],
                     'Files': ['VARCHAR(572) PRIMARY KEY NOT NULL UNIQUE', 'VARCHAR(128)',
                               'VARCHAR(256)', 'VARCHAR(128)', 'VARCHAR(128)',
-                              'VARCHAR(572)', 'TEXT', 'VARCHAR(128)', 'TEXT', 'INT', 'VARCHAR(256)'],
+                              'VARCHAR(572)', 'TEXT', 'VARCHAR(128)', 'TEXT', 'INT', 'VARCHAR(256)', 'INT', 'VARCHAR(128)'],
                     'FilesQC': ['VARCHAR(572) PRIMARY KEY NOT NULL UNIQUE', 'VARCHAR(128)',
                                 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)',
                                 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)'],
@@ -924,6 +946,7 @@ def add_workflows(workflows, database, project_name, table = 'Workflows'):
         # insert data into table
         values = [workflows[project_name][workflow_run][i] for i in column_names if i in workflows[project_name][workflow_run]]
         values.insert(3, project_name)
+        
         cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(values)))
         conn.commit()
         
@@ -1004,9 +1027,6 @@ def update_workflow_information(project, workflows, D, key):
     for workflow_id in D:
         workflows[project][workflow_id][key] = D[workflow_id]
     
-    
-
-
 
 def add_workflows_info_to_db(fpr, database, project_name, workflow_table = 'Workflows', parent_table = 'Parents', children_table = 'Children', file_table = 'Files', workflow_input_table = 'Workflow_Inputs'):
     '''
@@ -1041,7 +1061,6 @@ def add_workflows_info_to_db(fpr, database, project_name, workflow_table = 'Work
     # update workflow information with lane count
     update_workflow_information(project_name, workflows, limskeys, 'lane_count')
         
-    
     # check that project is defined in FPR (ie, may be defined in Pinery but no data recorded in FPR)
     if workflows and parents and files:
         # create a dict {workflow: [parent workflows]}
@@ -1219,6 +1238,7 @@ def add_workflow_inputs_to_db(database, fpr, project, table = 'Workflow_Inputs')
                                 L.append(int(i[j]))
                     L.append(project)
                     L.insert(3, workflow_run)
+                    
                     # insert project info
                     cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
                     conn.commit()
@@ -1463,9 +1483,9 @@ def add_info(args):
     add_library_info_to_db(args.database, args.project, args.pinery, args.lims_info, 'Libraries')
     print('added libraries')
     
-    # # add WGS blocks
-    # add_WGS_blocks_to_db(args.database, args.project, 'WGS_blocks')
-    # print('added wgs blocks')  
+    # add WGS blocks
+    add_WGS_blocks_to_db(args.database, args.project, 'WGS_blocks')
+    print('added wgs blocks')  
       
 
 
