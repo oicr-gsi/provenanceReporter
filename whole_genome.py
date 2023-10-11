@@ -1156,5 +1156,8 @@ def find_case_WGS_blocks(project_name, case, database):
                     WGS_blocks[samples][block]['complete'] = complete[samples][block]
                     # reecord block name
                     WGS_blocks[samples][block]['name'] = names[samples][block]
+                    # add project and case ids
+                    WGS_blocks[samples][block]['project_id'] = project_name
+                    WGS_blocks[samples][block]['case_id'] = case
     
     return WGS_blocks
