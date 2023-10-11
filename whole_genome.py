@@ -1055,12 +1055,11 @@ def find_WGS_blocks(project_name, database):
     donors = get_donors(project_name, database)
     L = []
     for case in donors:
-        print(case)
         blocks = find_case_WGS_blocks(project_name, case, database)
         if blocks:
             L.append(blocks)
        
-    return blocks
+    return L
 
 
 
@@ -1098,15 +1097,8 @@ def find_case_WGS_blocks(project_name, case, database):
             D = map_workflows_to_sample_pairs(project_name, 'novaseq', pairs, database)
             # find the parents of each workflow
             parents = get_parent_workflows(project_name, database)
-            
-            
-            
-            
             # get the parent workflows for each block
             parent_workflows = map_workflows_to_parent(D, parents)
-            
-            #print(parent_workflows)
-            
             # find the blocks by mapping the analysis workflows to their parent workflows    
             blocks = find_analysis_blocks(D, parents, parent_workflows, bmpp)
             # list all workflows for each block
@@ -1164,8 +1156,5 @@ def find_case_WGS_blocks(project_name, case, database):
                     WGS_blocks[samples][block]['complete'] = complete[samples][block]
                     # reecord block name
                     WGS_blocks[samples][block]['name'] = names[samples][block]
-    
-    print('case complete {0}'.format(case))    
-    
     
     return WGS_blocks
