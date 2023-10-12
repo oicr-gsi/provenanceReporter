@@ -95,8 +95,8 @@ def readable_time(date):
     - date (str): Epoch time
     '''
     
-    return time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(int(date)))
-
+    #return time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(int(date)))
+    return time.strftime('%Y-%m-%d', time.localtime(int(date)))
 
 
 @app.template_filter()
