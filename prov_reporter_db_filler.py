@@ -1287,7 +1287,7 @@ def add_samples_info_to_db(database, project, pinery, table, sample_info):
         conn.close()
 
 
-def add_WGS_blocks_to_db(database, project, table):
+def add_WGS_blocks_to_db(database, project, expected_workflows, table):
     '''
     (str, str, str, str) -> None
     
@@ -1297,11 +1297,12 @@ def add_WGS_blocks_to_db(database, project, table):
     ----------
     - database (str): Path to the databae file
     - project (str): Name of project of interest
+    - expected_workflows (list): List of expected workflow names to define a complete block
     - table (str): Name of table in database
     '''
     
     # get the WGS blocks for donors in project
-    blocks = find_WGS_blocks(project, database)
+    blocks = find_WGS_blocks(project, database, expected_workflows)
 
     if blocks:
         # connect to db
@@ -1484,7 +1485,8 @@ def add_info(args):
     print('added libraries')
     
     # add WGS blocks
-    add_WGS_blocks_to_db(args.database, args.project, 'WGS_blocks')
+    expected_WGS_workflows = sorted(['mutect2', 'variantEffectPredictor', 'delly', 'varscan', 'sequenza', 'mavis']) 
+    add_WGS_blocks_to_db(args.database, args.project, expected_WGS_workflows, 'WGS_blocks')
     print('added wgs blocks')  
       
 

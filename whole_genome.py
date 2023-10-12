@@ -1039,9 +1039,9 @@ def get_call_ready_cases(project_name, platform, library_type, database):
 
 
 
-def find_WGS_blocks(project_name, database):
+def find_WGS_blocks(project_name, database, expected_workflows):
     '''
-    (str, str) -> list
+    (str, str, list) -> list
     
     Returns a list of WGS blocks for donors in project in which WGS blocks exist
     
@@ -1049,13 +1049,14 @@ def find_WGS_blocks(project_name, database):
     ----------
     - project_name (str): Name of project of interest
     - database (str): Path to the sqlite database
+    - expected_workflows (list): List of expected workflow names to define a complete block
     '''
     
     # make a list of donors:
     donors = get_donors(project_name, database)
     L = []
     for case in donors:
-        blocks = find_case_WGS_blocks(project_name, case, database)
+        blocks = find_case_WGS_blocks(project_name, case, database, expected_workflows)
         if blocks:
             L.append(blocks)
        
@@ -1063,9 +1064,9 @@ def find_WGS_blocks(project_name, database):
 
 
 
-def find_case_WGS_blocks(project_name, case, database):
+def find_case_WGS_blocks(project_name, case, database, expected_workflows):
     '''
-    (str, str, str) -> dict
+    (str, str, str, list) -> dict
     
     Returns a dictionary with the WGS blocks for case in project
     
@@ -1074,6 +1075,7 @@ def find_case_WGS_blocks(project_name, case, database):
     - project_name (str): Name of project of interest
     - case (str): Case in project
     - database (str): Path to the sqlite database
+    - expected_workflows (list): List of expected workflow names to define a complete block
     '''
     
     # organize the WGS blocks as a dictionary
@@ -1129,7 +1131,6 @@ def find_case_WGS_blocks(project_name, case, database):
             release_status = get_block_release_status(block_workflows, limskeys, status)
     
             # check if blocks are complete
-            expected_workflows = sorted(['mutect2', 'variantEffectPredictor', 'delly', 'varscan', 'sequenza', 'mavis'])           
             complete = is_block_complete(blocks, expected_workflows)
         
             # get the amount of data for each workflow
@@ -1161,3 +1162,72 @@ def find_case_WGS_blocks(project_name, case, database):
                     WGS_blocks[samples][block]['case_id'] = case
     
     return WGS_blocks
+
+
+def get_WGS_blocks_info(project_name, case, database):
+    '''
+    (str, str, str) -> list 
+    
+    Returns a list of dictionaries containing WGS block information for a given project and case
+                
+    Parameters
+    ----------
+    - project_name (str): Name of project of interest
+    - case (str): Donor id 
+    - database (str): Path to the sqlite database
+    '''
+    
+            
+    conn = connect_to_db(database)
+    data = conn.execute("SELECT DISTINCT samples, bmpp_anchor, workflows, name, date, release_status, \
+                        complete, network from WGS_blocks WHERE project_id = '{0}' AND \
+                        case_id = '{1}'".format(project_name, case)).fetchall() 
+    conn.close()
+
+    L = [dict(i) for i in data]
+
+    D = {}
+    # group by samples
+    for i in L:
+        samples = i['samples']
+        if samples not in D:
+            D[samples] = []
+        # add call ready workflows
+        call_ready = list(map(lambda x: x.strip(), i['bmpp_anchor'].split('.')))
+        i['call_ready'] = call_ready    
+        workflows = list(map(lambda x: x.strip(), i['workflows'].split(';')))
+        # add caller workflows
+        callers = set(workflows).difference(set(call_ready))
+        i['callers'] = callers
+        # map each sample to the
+        bmpp_samples = map_samples_to_bmpp_runs(project_name, call_ready, 'merged.db')
+        i['pairs'] = bmpp_samples
+        D[samples].append(i)
+        # sort according to sub-block name
+        D[samples].sort(key = lambda x: x['name'])
+
+    return D    
+
+
+def get_sequencing_platform(project_name, database, table = 'Workflow_Inputs'):
+    '''
+    (str, str, str) -> list 
+    
+    Returns a dictionary with the sequencing platform of input raw sequences
+    for each workflow for project
+                
+    Parameters
+    ----------
+    - project_name (str): Name of project of interest
+    - database (str): Path to the sqlite database
+    '''
+                
+    conn = connect_to_db(database)
+    data = conn.execute("SELECT DISTINCT wfrun_id, platform FROM {0} WHERE project_id = '{1}'".format(table, project_name)).fetchall() 
+    conn.close()
+
+    D = {}
+    for i in data:
+        D[i['wfrun_id']] = i['platform']
+    
+    return D

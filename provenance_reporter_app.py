@@ -31,7 +31,7 @@ from whole_genome import get_call_ready_cases, get_bmpp_case, get_case_call_read
     get_block_analysis_date, sort_call_ready_samples, get_block_release_status, \
     get_amount_data, is_block_complete, order_blocks, name_WGS_blocks, create_block_json, map_samples_to_bmpp_runs, \
     get_parent_workflows, get_workflows_analysis_date, get_workflow_file_count, \
-    get_workflow_limskeys, get_file_release_status    
+    get_workflow_limskeys, get_file_release_status, get_WGS_blocks_info, get_sequencing_platform    
 from networks import get_node_labels, make_adjacency_matrix, plot_workflow_network
 from whole_transcriptome import get_WT_call_ready_cases, get_star_case, get_WT_case_call_ready_samples, \
     map_workflows_to_samples, find_WT_analysis_blocks, name_WT_blocks, map_samples_to_star_runs
@@ -80,6 +80,23 @@ def find_workflow_id(generic_name, bmpp_children_workflows, library):
     else:
         return 'NA'
     
+
+
+
+@app.template_filter()
+def readable_time(date):
+    '''
+    (str) -> str
+    
+    Returns epoch time in readable format
+    
+    Parameters
+    ----------
+    - date (str): Epoch time
+    '''
+    
+    return time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(int(date)))
+
 
 
 @app.template_filter()
@@ -189,6 +206,15 @@ def whole_genome_sequencing(project_name):
     return render_template('Whole_Genome_Sequencing.html', routes = routes, project=project, samples=samples, cases=cases, pipelines=pipelines)
 
 
+
+
+
+
+
+
+
+
+
 @app.route('/<project_name>/whole_genome_sequencing/<case>')
 def wgs_case(project_name, case):
     
@@ -199,125 +225,152 @@ def wgs_case(project_name, case):
     pipelines = get_pipelines(project_name, 'merged.db')
     # get miso link
     miso_link = get_miso_sample_link(project_name, case, 'merged.db')
-    
-    
-    
-    
+    # get the WGS blocks
+    blocks = get_WGS_blocks_info(project_name, case, 'merged.db')
+    # sort sample pairs names
+    sample_pairs_names = sorted(list(blocks.keys()))
+    # get the workflow names
+    workflow_names = get_workflow_names(project_name, 'merged.db')
     # get the file count of each workflow in project
     file_counts = get_workflow_file_count(project_name, 'merged.db')
-    #file_counts = get_block_workflow_file_count(block_workflows, file_counts)
-    
     # get the amount of data for each workflow
     amount_data = get_amount_data(project_name, 'merged.db')
-        
-    
     # get the creation date of all workflows
     creation_dates = get_workflows_analysis_date(project_name, 'merged.db')
     
     
+    # get the sequencing platform of each workflow
+    platforms = get_sequencing_platform(project_name, 'merged.db')
     
-    
-    
-    
-    
-    
-    
-    # get all the bmpp runs for WG library type and Novaseq platform
-    bmpp = get_bmpp_case(project_name, case, 'novaseq', 'WG', 'merged.db')
-           
-    
-    # get the normal and tumor samples for each bmpp id
-    bmpp_samples = map_samples_to_bmpp_runs(project_name, bmpp, 'merged.db')
-    
-    
-    # identify all the samples processed
-    samples = get_case_call_ready_samples(project_name, bmpp_samples)
-    
-    
-    # get all pairs N/T samples
-    pairs = group_normal_tumor_pairs(samples)
-    
-    
-    # find analysis workflows for each N/T pairs
-    # remove sample pairs without analysis workflows
-    D = map_workflows_to_sample_pairs(project_name, 'novaseq', pairs, 'merged.db')
     
        
-    # find the parents of each workflow
-    parents = get_parent_workflows(project_name, 'merged.db')
     
-    # get the parent workflows for each block
-    parent_workflows = map_workflows_to_parent(D, parents)
     
-    # find the blocks by mapping the analysis workflows to their parent workflows    
-    blocks = find_analysis_blocks(D, parents, parent_workflows, bmpp)
     
-    # list all workflows for each block
-    block_workflows = list_block_workflows(blocks)
+    # # get all the bmpp runs for WG library type and Novaseq platform
+    # bmpp = get_bmpp_case(project_name, case, 'novaseq', 'WG', 'merged.db')
+           
     
-    # get the workflow creation date for all the workflows in project
-    creation_dates = get_workflows_analysis_date(project_name, 'merged.db')
-    # assign date to each block. most recent file creation date from all workflows within block 
-    # get the date of each workflow within block
-    block_date, workflow_date = get_block_analysis_date(block_workflows, creation_dates)
+    # # get the normal and tumor samples for each bmpp id
+    # bmpp_samples = map_samples_to_bmpp_runs(project_name, bmpp, 'merged.db')
     
-    # map each workflow run id to its workflow name
-    workflow_names = get_workflow_names(project_name, 'merged.db')
-    # get the workflow names
-    block_workflow_names = get_node_labels(block_workflows, workflow_names)
     
-    # convert workflow relationships to adjacency matrix for each block
-    matrix = make_adjacency_matrix(block_workflows, parent_workflows)
+    # # identify all the samples processed
+    # samples = get_case_call_ready_samples(project_name, bmpp_samples)
     
-    # create figures
-    figures = plot_workflow_network(matrix, block_workflow_names)
+    
+    # # get all pairs N/T samples
+    # pairs = group_normal_tumor_pairs(samples)
+    
+    
+    # # find analysis workflows for each N/T pairs
+    # # remove sample pairs without analysis workflows
+    # D = map_workflows_to_sample_pairs(project_name, 'novaseq', pairs, 'merged.db')
+    
+       
+    # # find the parents of each workflow
+    # parents = get_parent_workflows(project_name, 'merged.db')
+    
+    # # get the parent workflows for each block
+    # parent_workflows = map_workflows_to_parent(D, parents)
+    
+    # # find the blocks by mapping the analysis workflows to their parent workflows    
+    # blocks = find_analysis_blocks(D, parents, parent_workflows, bmpp)
+    
+    # # list all workflows for each block
+    # block_workflows = list_block_workflows(blocks)
+    
+    # # get the workflow creation date for all the workflows in project
+    # creation_dates = get_workflows_analysis_date(project_name, 'merged.db')
+    # # assign date to each block. most recent file creation date from all workflows within block 
+    # # get the date of each workflow within block
+    # block_date, workflow_date = get_block_analysis_date(block_workflows, creation_dates)
+    
+    # # map each workflow run id to its workflow name
+    # # get the workflow names
+    # block_workflow_names = get_node_labels(block_workflows, workflow_names)
+    
+    # # convert workflow relationships to adjacency matrix for each block
+    # matrix = make_adjacency_matrix(block_workflows, parent_workflows)
+    
+    # # create figures
+    # figures = plot_workflow_network(matrix, block_workflow_names)
     
      
-    # get the samples for each bmpp id
-    samples_bmpp = sort_call_ready_samples(project_name, blocks, bmpp_samples, workflow_names)
+    # # get the samples for each bmpp id
+    # samples_bmpp = sort_call_ready_samples(project_name, blocks, bmpp_samples, workflow_names)
     
         
-    # get release status of input sequences for each block
-    # get the input limskeys for each workflow in project
-    limskeys = get_workflow_limskeys(project_name, 'merged.db')
+    # # get release status of input sequences for each block
+    # # get the input limskeys for each workflow in project
+    # limskeys = get_workflow_limskeys(project_name, 'merged.db')
     
     
       
-    # get the file swid and release status for each limskey for fastq-generating workflows
-    # excluding fastq-import workflows
-    status = get_file_release_status(project_name, 'merged.db')
-    release_status = get_block_release_status(block_workflows, limskeys, status)
+    # # get the file swid and release status for each limskey for fastq-generating workflows
+    # # excluding fastq-import workflows
+    # status = get_file_release_status(project_name, 'merged.db')
+    # release_status = get_block_release_status(block_workflows, limskeys, status)
     
     
     
     
-    # check if blocks are complete
-    expected_workflows = sorted(['mutect2', 'variantEffectPredictor', 'delly', 'varscan', 'sequenza', 'mavis'])           
-    complete = is_block_complete(blocks, expected_workflows)
+    # # check if blocks are complete
+    # expected_workflows = sorted(['mutect2', 'variantEffectPredictor', 'delly', 'varscan', 'sequenza', 'mavis'])           
+    # complete = is_block_complete(blocks, expected_workflows)
     
     
     
-    # order blocks based on the amount of data
-    ordered_blocks = order_blocks(blocks, amount_data)
+    # # order blocks based on the amount of data
+    # ordered_blocks = order_blocks(blocks, amount_data)
     
 
-    # name each block according to the selected block order
-    names = name_WGS_blocks(ordered_blocks)
+    # # name each block according to the selected block order
+    # names = name_WGS_blocks(ordered_blocks)
     
         
     
-    # sort sample pairs names
-    sample_pairs_names = sorted(list(blocks.keys()))
+    
     
     
         
-    return render_template('WGS_case.html', project=project, routes = routes,
-                           case=case, pipelines=pipelines, sample_pairs_names=sample_pairs_names,
-                           blocks=blocks, names=names, ordered_blocks=ordered_blocks,
-                           miso_link=miso_link, complete=complete, release_status=release_status,
-                           block_date=block_date, workflow_date=workflow_date,
-                           figures=figures, samples_bmpp=samples_bmpp, 
-                           file_counts=file_counts, amount_data=amount_data)
+    # return render_template('WGS_case.html',
+    #                        project=project,
+    #                        routes = routes,
+    #                        case=case,
+    #                        pipelines=pipelines,
+    #                        
+    #                        blocks=blocks,
+    #                        names=names,
+    #                        ordered_blocks=ordered_blocks,
+    #                        miso_link=miso_link,
+    #                        complete=complete,
+    #                        release_status=release_status,
+    #                        block_date=block_date,
+    #                        workflow_date=workflow_date,
+    #                        figures=figures,
+    #                        samples_bmpp=samples_bmpp, 
+    #                        ,
+    #                        )
+
+
+
+    return render_template('WGS_case.html',
+                           project=project,
+                           routes = routes,
+                           case=case,
+                           pipelines=pipelines,
+                           blocks=blocks,
+                           sample_pairs_names=sample_pairs_names,
+                           workflow_names=workflow_names,
+                           file_counts=file_counts,
+                           amount_data=amount_data,
+                           creation_dates=creation_dates,
+                           platforms=platforms
+                           )
+
+
+
 
 
 
