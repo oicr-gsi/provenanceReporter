@@ -59,7 +59,9 @@
               <th>file count</th>
               <th>lane count</th>
               <th>date</th>      
-              <th>samples</th>
+              <th>Normal</th>
+              <th>Tumour</th>
+
             </thead>     
         
            {% for bmpp_run in block['call_ready'] %}
@@ -74,6 +76,10 @@
                   {% for i in block['pairs'][bmpp_run]['normal'] %}
                     <dt>{{i}}</dt>
                   {% endfor %}
+                </dl>
+              </td>
+              <td>
+                <dl>
                   {% for i in block['pairs'][bmpp_run]['tumour'] %}
                     <dt>{{i}}</dt> 
                   {% endfor %}
