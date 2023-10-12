@@ -216,43 +216,6 @@ def map_workflows_to_sample_pairs(project_name, platform, pairs, database):
     return D
 
 
-
-# def get_case_samples(project_name, case, library_type, database):
-#     '''
-#     (str, str, str, str) -> dict
-    
-#     Returns a dictionary of normal and tumor samples
-    
-#     Parameters
-#     ----------
-#     - project_name (str): Project of interest
-#     - case (str): Donor identifier in project
-#     - library_type (str): 2-letters code of library design
-#     - database (str): Path to the sqlite database 
-#     '''
-    
-#     conn = connect_to_db(database)
-#     data = conn.execute("SELECT Libraries.sample, Libraries.group_id, Libraries.library, \
-#                         Libraries.tissue_type, Libraries.tissue_origin, Libraries.library_type \
-#                         FROM Libraries WHERE Libraries.project_id = '{0}' \
-#                         AND Libraries.sample = '{1}' AND Libraries.library_type = '{2}'".format(project_name, case, library_type)).fetchall()
-#     conn.close()
-
-#     data = list(set(data))
-    
-#     samples = {'normal': [], 'tumour': []}
-#     for i in data:
-#         if i['tissue_type'] == 'R':
-#             tissue = 'normal'
-#         else:
-#             tissue = 'tumour'
-#         sample = '_'.join([i['sample'], i['tissue_type'], i['tissue_origin'], i['library_type'], i['group_id']]) 
-#         if sample not in samples[tissue]:
-#             samples[tissue].append(sample)
-
-#     return samples
-
-
 def group_normal_tumor_pairs(samples):
     '''
     (dict) -> list
@@ -321,30 +284,6 @@ def get_sample_bmpp(project_name, sample, platform, database):
     bmpps = list(set([i['wfrun_id'] for i in data if platform in i['platform'].lower()]))
     
     return bmpps
-
-
-# def map_sample_pairs_to_bmpp_runs(project_name, platform, pairs, database):
-#     '''
-#     (str, str, list, str) -> dict
-    
-    
-    
-#     '''
-    
-#     D = {}
-#     for samples in pairs:
-#         bmpp_1 = get_sample_bmpp(project_name, samples[0], platform, database)
-#         bmpp_2 = get_sample_bmpp(project_name, samples[1], platform, database)
-
-#         if bmpp_1 and bmpp_2:
-            
-
-#             print('1', bmpp_1)
-#             print('2', bmpp_2)
-
-#             D['.'.join(samples)] = list(set(bmpp_1  + bmpp_2))
-    
-#     return D
 
 
 def map_workflows_to_parent(D, parents):
@@ -514,49 +453,6 @@ def get_workflows_analysis_date(project_name, database):
     return D
 
 
-
-# def get_block_analysis_date(block_workflows, creation_dates):
-#     '''
-#     (dict, dict) -> dict, dict
-    
-#     Returns a dictionary with the most recent analysis date of any workflow downstream
-#     of bmpp parent workflows for each sample pair, and a dictionary with the analysis date 
-#     of each workflow downstream  of the bmpp workflows
-    
-#     Parameters
-#     ----------
-#     - block_workflows (dict): Dictionary of workflow run ids organized by sample pair and bmpp parent workflows
-#     - creation_dates (dict): Dictionary with creation date of each worklow in project
-#     '''
-
-#     block_date = {}
-#     workflow_dates = {}
-
-#     for block in block_workflows:
-#         block_date[block] = {}
-#         workflow_dates[block] = {}
-#         for bmpp in block_workflows[block]:
-#             workflow_dates[block][bmpp] = {}
-#             most_recent = 0
-#             # get the analysis date for each workflow
-#             for wf in block_workflows[block][bmpp]:
-#                 if wf in creation_dates:
-#                     wf_date = creation_dates[wf]
-#                 else:
-#                     wf_date = 'NA'
-#                 if wf_date != 'NA':
-#                     workflow_dates[block][bmpp][wf] = convert_epoch_time(wf_date)
-#                     if wf_date  > most_recent:
-#                         most_recent = wf_date
-#                 else:
-#                     workflow_dates[block][bmpp][wf] = 'NA'
-#             if most_recent:
-#                 block_date[block][bmpp] = convert_epoch_time(most_recent)
-#             else:
-#                 block_date[block][bmpp] = 'NA'
-#     return block_date, workflow_dates
-
-
 def get_block_analysis_date(block_workflows, creation_dates):
     '''
     (dict) -> dict, dict
@@ -643,33 +539,6 @@ def get_workflow_file_count(project_name, database, workflow_table='Workflows'):
         counts[i['wfrun_id']] = i['file_count']
     
     return counts
-
-
-
-
-
-# def get_block_workflow_file_count(block_workflows, file_counts):
-#     '''
-#     (dict, dict) -> dict
-    
-#     Returns a dictionary with the file count for each workflow of each block
-#     and bmpp parent_workflow
-    
-#     Parameters
-#     ----------
-#     - block_workflows (dict): Dictionary of workflow run ids organized by sample pair and bmpp parent workflows
-#     - file_counts (dict): Dictionary with file count for each workflow in project
-#     '''
-        
-#     D = {}
-#     for block in block_workflows:
-#         for bmpp in block_workflows[block]:
-#             for workflow in block_workflows[block][bmpp]:
-#                 if workflow in file_counts:
-#                     D[workflow] = file_counts[workflow]
-#                 else:
-#                     D[workflow] = 0
-#     return D
 
 
 def get_workflow_limskeys(project_name, database, workflow_input_table='Workflow_Inputs'):
@@ -779,29 +648,6 @@ def get_block_release_status(block_workflows, limskeys, release_status):
             # record boolean as 0 or 1
             D[block][bmpp] = int(status)
     return D
-
-
-# def get_amount_data(block_workflows, limskeys):
-#     '''
-#     (dict, dict) -> dict
-    
-#     Returns a dictionary with the amount of lane data for each workflow 
-#     of each sample plair and parent bmpp workflow
-    
-#     Parameters
-#     ----------
-#     - block_workflows (dict): Dictionary of workflow run ids organized by sample pair and bmpp parent workflows
-#     - limskeys (dict): Dictionary with workflow run id, list of limskeys
-#     '''
-    
-#     D = {}
-#     for block in block_workflows:
-#         D[block] = {}
-#         for bmpp in block_workflows[block]:
-#             D[block][bmpp] = {}
-#             for workflow_id in block_workflows[block][bmpp]:
-#                 D[block][bmpp][workflow_id] = len(limskeys[workflow_id])
-#     return D
 
 
 def get_amount_data(project_name, database, workflow_table='Workflows'):
