@@ -33,7 +33,7 @@
            <table id="block_header_table">
              <tr>
                <td><span style="font-size:16px; font-style:normal;">{{ block['name'] }}</span></td>
-               <td>Date: {{block['date']}} </td>
+               <td>Date: {{block['date'].split().0}} </td>
                {% if block['complete'] %}
                  <td>Complete: <span style="font-size:32px;color:#70db70">&#10004;</span></td>
                {% else %}
