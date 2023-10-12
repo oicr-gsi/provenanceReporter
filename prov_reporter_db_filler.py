@@ -15,6 +15,8 @@ import time
 import traceback
 import os
 import subprocess
+from utilities import connect_to_db
+from whole_genome import get_workflow_limskeys, find_WGS_blocks
 
 
 def extract_project_info(pinery):
@@ -233,9 +235,10 @@ def collect_file_info_from_fpr(fpr, project_name):
                 continue             
             if project not in D:
                 D[project] = {}
+            
             # check if file is skipped
-            if line[51].lower() == 'true':
-                continue
+            # if line[51].lower() == 'true':
+            #     continue
                    
             # get creation date
             creation_date = line[0]
@@ -279,13 +282,22 @@ def collect_file_info_from_fpr(fpr, project_name):
             workflow_run = line[36]
             # get limskey
             limskey = line[56]
+            
+            # get skip and stale status
+            skip = line[51]
+            if skip.lower() == 'true':
+                skip = 1
+            else:
+                skip = 0
+            stale = line[52]
+            
             # collect file info
             if file_swid not in D[project]:
                 D[project][file_swid] = {'creation_date': creation_date, 'md5sum': md5sum,
                                          'workflow': workflow, 'version': version,
                                          'wfrun_id': workflow_run, 'file': file,
                                          'library_type': library_type, 'attributes': attributes,
-                                         'limskey': [limskey]}
+                                         'limskey': [limskey], 'skip': skip, 'stale': stale}
             else:
                 D[project][file_swid]['limskey'].append(limskey)
     infile.close()
@@ -431,10 +443,22 @@ def get_workflow_relationships(fpr, project_name):
             if project != project_name:
                 continue
             
+            # # skip any workflow/file that has a skipped file
+            # if line[51].lower() == 'true':
+            #     continue
+                        
             # get workflow, workflow version and workflow run accession
             workflow, workflow_version, workflow_run = line[30], line[31], line[36]
             # get file swid
             file_swid = line[44]
+            
+            # get skip and stale status
+            skip = line[51]
+            if skip.lower() == 'true':
+                skip = 1
+            else:
+                skip = 0
+            stale = line[52]
             
             # keep only unique string. file swid doesn't match file swid of worklow input files
             #file_swid = os.path.basename(file_swid)
@@ -466,9 +490,13 @@ def get_workflow_relationships(fpr, project_name):
             if project not in W:
                 W[project] = {}
             if workflow_run in W[project]:
-                assert W[project][workflow_run] == {'wfrun_id': workflow_run, 'wfv': workflow_version, 'wf': workflow, 'attributes': attributes}
+                assert W[project][workflow_run] == {'wfrun_id': workflow_run, 'wfv': workflow_version,
+                                                    'wf': workflow, 'attributes': attributes,
+                                                    'skip': skip, 'stale': stale}
             else:
-                W[project][workflow_run] = {'wfrun_id': workflow_run, 'wfv': workflow_version, 'wf': workflow, 'attributes': attributes}
+                W[project][workflow_run] = {'wfrun_id': workflow_run, 'wfv': workflow_version,
+                                            'wf': workflow, 'attributes': attributes,
+                                            'skip': skip, 'stale': stale}
         
             if project not in F:
                 F[project] = {}
@@ -510,7 +538,7 @@ def identify_parent_children_workflows(P, F):
                 parents[project][workflow] = parent_workflows
             else:
                 assert parents[project][workflow] == parent_workflows
-                                
+    
     return parents
 
     
@@ -621,6 +649,10 @@ def extract_workflow_info(fpr, project_name):
             if project != project_name:
                 continue             
     
+            # if line[51].lower() == 'true':
+            #     continue
+    
+    
             # get sample name
             sample = line[7]
             # get workflow name and workflow run accession
@@ -658,15 +690,16 @@ def define_column_names():
     '''
 
     # create dict to store column names for each table {table: [column names]}
-    column_names = {'Workflows': ['wfrun_id', 'wf', 'wfv', 'project_id', 'attributes'],
+    column_names = {'Workflows': ['wfrun_id', 'wf', 'wfv', 'project_id', 'attributes', 'file_count', 'lane_count', 'skip', 'stale'],
                     'Parents': ['parents_id', 'children_id', 'project_id'],
                     'Projects': ['project_id', 'pipeline', 'description', 'active', 'contact_name', 'contact_email', 'last_updated', 'expected_samples', 'sequenced_samples', 'library_types'],
-                    'Files': ['file_swid', 'project_id', 'md5sum', 'workflow', 'version', 'wfrun_id', 'file', 'library_type', 'attributes', 'creation_date', 'limskey'],
+                    'Files': ['file_swid', 'project_id', 'md5sum', 'workflow', 'version', 'wfrun_id', 'file', 'library_type', 'attributes', 'creation_date', 'limskey', 'skip', 'stale'],
                     'FilesQC': ['file_swid', 'project_id', 'skip', 'user', 'date', 'status', 'reference', 'fresh', 'ticket'],
                     'Libraries': ['library', 'sample', 'tissue_type', 'ext_id', 'tissue_origin',
                                   'library_type', 'prep', 'tissue_prep', 'sample_received_date', 'group_id', 'group_id_description', 'project_id'],
                     'Workflow_Inputs': ['library', 'run', 'lane', 'wfrun_id', 'limskey', 'barcode', 'platform', 'project_id'],
-                    'Samples': ['case_id', 'donor_id', 'species', 'sex', 'miso', 'created_date', 'modified_date', 'project_id', 'parent_project']}
+                    'Samples': ['case_id', 'donor_id', 'species', 'sex', 'miso', 'created_date', 'modified_date', 'project_id', 'parent_project'],
+                    'WGS_blocks': ['project_id', 'case_id', 'samples', 'bmpp_anchor', 'workflows', 'name', 'date', 'release_status', 'complete', 'network']}
         
     return column_names
 
@@ -677,15 +710,15 @@ def define_column_types():
 
     Returns a dictionary with column types for each table in database
     '''
-
+    
     # create dict to store column names for each table {table: [column names]}
-    column_types = {'Workflows': ['VARCHAR(572)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'TEXT'],
+    column_types = {'Workflows': ['VARCHAR(572)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'TEXT', 'INT', 'INT', 'INT', 'VARCHAR(128)'],
                     'Parents': ['VARCHAR(572)', 'VARCHAR(572)', 'VARCHAR(128)'],
                     'Projects': ['VARCHAR(128) PRIMARY KEY NOT NULL UNIQUE', 'VARCHAR(128)',
                                   'TEXT', 'VARCHAR(128)', 'VARCHAR(256)', 'VARCHAR(256)', 'VARCHAR(256)', 'INT', 'INT', 'VARCHAR(256)'],
                     'Files': ['VARCHAR(572) PRIMARY KEY NOT NULL UNIQUE', 'VARCHAR(128)',
                               'VARCHAR(256)', 'VARCHAR(128)', 'VARCHAR(128)',
-                              'VARCHAR(572)', 'TEXT', 'VARCHAR(128)', 'TEXT', 'INT', 'VARCHAR(256)'],
+                              'VARCHAR(572)', 'TEXT', 'VARCHAR(128)', 'TEXT', 'INT', 'VARCHAR(256)', 'INT', 'VARCHAR(128)'],
                     'FilesQC': ['VARCHAR(572) PRIMARY KEY NOT NULL UNIQUE', 'VARCHAR(128)',
                                 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)',
                                 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)'],
@@ -695,7 +728,9 @@ def define_column_types():
                                   'VARCHAR(256)', 'VARCHAR(128)', 'VARCHAR(256)', 'VARCHAR(128)'],
                     'Workflow_Inputs': ['VARCHAR(128)', 'VARCHAR(256)', 'INTEGER', 'VARCHAR(572)', 
                                         'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)'],
-                    'Samples': ['VARCHAR(128) PRIMARY KEY NOT NULL', 'VARCHAR(256)', 'VARCHAR(256)', 'VARCHAR(128)', 'VARCHAR(572)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)']}
+                    'Samples': ['VARCHAR(128) PRIMARY KEY NOT NULL', 'VARCHAR(256)', 'VARCHAR(256)', 'VARCHAR(128)', 'VARCHAR(572)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)'],
+                    'WGS_blocks': ['VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(572)', 'VARCHAR(572)', 'TEXT', 'VARCHAR(256)', 'VARCHAR(128)', 'INT', 'INT', 'TEXT']}
+                    
     
     return column_types
 
@@ -721,7 +756,7 @@ def create_table(database, table):
     table_format = ', '.join(list(map(lambda x: ' '.join(x), list(zip(column_names, column_types)))))
 
 
-    if table  in ['Workflows', 'Parents', 'Files', 'FilesQC', 'Libraries', 'Workflow_Inputs', 'Samples']:
+    if table  in ['Workflows', 'Parents', 'Files', 'FilesQC', 'Libraries', 'Workflow_Inputs', 'Samples', 'WGS_blocks']:
         constraints = '''FOREIGN KEY (project_id)
             REFERENCES Projects (project_id)
             ON DELETE CASCADE ON UPDATE CASCADE'''
@@ -738,7 +773,13 @@ def create_table(database, table):
     
     if table == 'Worklows':
         table_format = table_format + ', PRIMARY KEY (wfrun_id, project_id)'
-        
+    
+    if table == 'WGS_blocks':
+        constraints = '''FOREIGN KEY (case_id)
+          REFERENCES Samples (case_id)
+          ON DELETE CASCADE ON UPDATE CASCADE'''
+        table_format = table_format + ', PRIMARY KEY (samples, bmpp_anchor)'
+      
     if table == 'Files':
         constraints = '''FOREIGN KEY (wfrun_id)
             REFERENCES Workflows (wfrun_id)
@@ -798,7 +839,7 @@ def initiate_db(database):
     tables = cur.fetchall()
     tables = [i[0] for i in tables]    
     conn.close()
-    for i in ['Projects', 'Workflows', 'Parents', 'Files', 'FilesQC', 'Libraries', 'Workflow_Inputs', 'Samples']:
+    for i in ['Projects', 'Workflows', 'Parents', 'Files', 'FilesQC', 'Libraries', 'Workflow_Inputs', 'Samples', 'WGS_blocks']:
         if i not in tables:
             create_table(database, i)
 
@@ -896,7 +937,7 @@ def add_workflows(workflows, database, project_name, table = 'Workflows'):
     
     # get column names
     column_names = define_column_names()[table]
-       
+    
     # connect to db
     conn = sqlite3.connect(database, timeout=30)
     cur = conn.cursor()
@@ -904,7 +945,8 @@ def add_workflows(workflows, database, project_name, table = 'Workflows'):
     for workflow_run in workflows[project_name]:
         # insert data into table
         values = [workflows[project_name][workflow_run][i] for i in column_names if i in workflows[project_name][workflow_run]]
-        values.insert(-1, project_name)
+        values.insert(3, project_name)
+        
         cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(values)))
         conn.commit()
         
@@ -941,9 +983,54 @@ def add_workflow_relationships(parent_workflows, database, project, table = 'Par
     conn.close()
 
 
-def add_workflows_info_to_db(fpr, database, project_name, workflow_table = 'Workflows', parent_table = 'Parents', children_table = 'Children'):
+
+
+def count_files(project_name, database, file_table = 'Files'):
     '''
-    (str, str, str, str, str) -> None
+    (str, str, str) -> dict
+    
+    Returns a dictionary with the number of files for each workflow in project
+    
+    Parameters
+    ----------
+    - project_name (str): Name of project of interest
+    - database (str): Path to the sqlite database
+    - file_table (str): Name of the table with File information
+    '''
+    
+    conn = connect_to_db(database)
+    data = conn.execute("SELECT DISTINCT {0}.file, {0}.wfrun_id FROM {0} WHERE {0}.project_id = '{1}'".format(file_table, project_name)).fetchall()
+    conn.close()
+    
+    counts = {}
+    for i in data:
+        counts[i['wfrun_id']] = counts.get(i['wfrun_id'], 0) + 1
+       
+    return counts
+
+
+def update_workflow_information(project, workflows, D, key):
+    '''
+    (str, dict, dict, str) -> None
+    
+    Update in place the dictionary workflows for a given project using key to store information contains in dictionary D
+    
+    Parameters
+    ----------
+    - project (str): Project of interest
+    - workflows (dict): Dictionary containing workflow information for a given project
+    - D (dictionary): Dictionary containing file count or amount of input sequencing lanes for each workflow of project
+    - key (str): Key use to store the information from D in workflows.
+                 Valid keys are file_count or lane_count
+    '''
+    
+    for workflow_id in D:
+        workflows[project][workflow_id][key] = D[workflow_id]
+    
+
+def add_workflows_info_to_db(fpr, database, project_name, workflow_table = 'Workflows', parent_table = 'Parents', children_table = 'Children', file_table = 'Files', workflow_input_table = 'Workflow_Inputs'):
+    '''
+    (str, str, str, str, str, str, str) -> None
     
     Inserts or updates workflow information and parent-children workflow relationships
  
@@ -955,11 +1042,25 @@ def add_workflows_info_to_db(fpr, database, project_name, workflow_table = 'Work
     - workflow_table (str): Name of the table storing workflow information. Default is Workflows
     - parent_table (str): Name of the table storing parents-children workflow relationships. Default is Parents
     - children_table (str): Name of the table storing children-parents workflow relationships. Default is Children
+    - file_table (str): Name of the table storing file information. Default is Files
+    - workflow_input_table (str): Name of the table storing the workflow input information. Default is Workflow_Inputs
     '''
 
     # get the workflow inputs and workflow info
     workflows, parents, files = get_workflow_relationships(fpr, project_name)
     
+    # get the file count for each workflow
+    counts = count_files(project_name, database, file_table)
+    # update workflow information with file count
+    update_workflow_information(project_name, workflows, counts, 'file_count')
+    
+    # get the amount of data for each workflow
+    limskeys = get_workflow_limskeys(project_name, database, workflow_input_table)
+    for i in limskeys:
+        limskeys[i] = len(limskeys[i])
+    # update workflow information with lane count
+    update_workflow_information(project_name, workflows, limskeys, 'lane_count')
+        
     # check that project is defined in FPR (ie, may be defined in Pinery but no data recorded in FPR)
     if workflows and parents and files:
         # create a dict {workflow: [parent workflows]}
@@ -1137,6 +1238,7 @@ def add_workflow_inputs_to_db(database, fpr, project, table = 'Workflow_Inputs')
                                 L.append(int(i[j]))
                     L.append(project)
                     L.insert(3, workflow_run)
+                    
                     # insert project info
                     cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
                     conn.commit()
@@ -1183,6 +1285,56 @@ def add_samples_info_to_db(database, project, pinery, table, sample_info):
             conn.commit()
  
         conn.close()
+
+
+def add_WGS_blocks_to_db(database, project, expected_workflows, table):
+    '''
+    (str, str, str, str) -> None
+    
+    Inserts WGS blocks data into WGS_blocks table of database    
+    
+    Parameters
+    ----------
+    - database (str): Path to the databae file
+    - project (str): Name of project of interest
+    - expected_workflows (list): List of expected workflow names to define a complete block
+    - table (str): Name of table in database
+    '''
+    
+    # get the WGS blocks for donors in project
+    blocks = find_WGS_blocks(project, database, expected_workflows)
+
+    if blocks:
+        # connect to db
+        conn = sqlite3.connect(database)
+        cur = conn.cursor()
+   
+        # get column names
+        data = cur.execute("SELECT * FROM {0} WHERE project_id = '{1}';".format(table, project))
+        column_names = [column[0] for column in data.description]
+
+        # add data into table
+        for d in blocks:
+            # loop over samples and blocks
+            for samples in d:
+                for block in d[samples]:
+                    L = [d[samples][block]['project_id'],
+                         d[samples][block]['case_id'],
+                         samples,
+                         block,
+                         ';'.join(d[samples][block]['workflows']),
+                         d[samples][block]['name'],
+                         d[samples][block]['date'],
+                         d[samples][block]['release'],
+                         d[samples][block]['complete'],
+                         d[samples][block]['network']]
+            
+                    # insert project info
+                    cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
+                    conn.commit()
+ 
+        conn.close()
+
 
 
 def collect_lims_info(args):
@@ -1296,31 +1448,47 @@ def add_info(args):
     - project (str): Name of the project
     '''
     
-    start = time.time()
-    
-    
     # create database if file doesn't exist
     if os.path.isfile(args.database) == False:
         initiate_db(args.database)
     
     # add project information    
     add_project_info_to_db(args.database, args.pinery, args.project, args.lims_info, 'Projects')
+    print('added projects')
+    
     # add sample information
     add_samples_info_to_db(args.database, args.project, args.pinery, 'Samples', args.samples_info)
-    # add workflow information
-    add_workflows_info_to_db(args.fpr, args.database, args.project, 'Workflows', 'Parents', 'Children')
-    # add file QC info
-    add_fileQC_info_to_db(args.database, args.project, args.fpr, args.nabu, 'FilesQC')
+    print('added samples') 
+    
+    
     # add file info
     add_file_info_to_db(args.database, args.project, args.fpr, args.nabu, 'Files')
-    # add library information
-    add_library_info_to_db(args.database, args.project, args.pinery, args.lims_info, 'Libraries')
+    print('added files')
+    
+    
     # add workflow input
     add_workflow_inputs_to_db(args.database, args.fpr, args.project, 'Workflow_Inputs')
+    print('added workflow inputs')
     
-    end = time.time()
-
-    print('{0}: {1}'.format(args.project, end -start))    
+    
+    
+    # add workflow information
+    add_workflows_info_to_db(args.fpr, args.database, args.project, 'Workflows', 'Parents', 'Children', 'Files', 'Workflow_Inputs')
+    print('added workflows')
+    
+    # add file QC info
+    add_fileQC_info_to_db(args.database, args.project, args.fpr, args.nabu, 'FilesQC')
+    print('added filesqc')
+    
+    # add library information
+    add_library_info_to_db(args.database, args.project, args.pinery, args.lims_info, 'Libraries')
+    print('added libraries')
+    
+    # add WGS blocks
+    expected_WGS_workflows = sorted(['mutect2', 'variantEffectPredictor', 'delly', 'varscan', 'sequenza', 'mavis']) 
+    add_WGS_blocks_to_db(args.database, args.project, expected_WGS_workflows, 'WGS_blocks')
+    print('added wgs blocks')  
+      
 
 
 def launch_jobs(args):

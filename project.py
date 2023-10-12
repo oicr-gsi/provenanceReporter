@@ -9,18 +9,20 @@ Created on Sun Aug 13 21:11:22 2023
 from utilities import connect_to_db
 
 
-def get_project_info(project_name):
+def get_project_info(project_name, database):
     '''
-    (str) -> list
+    (str, str) -> list
     
     Returns a list with project information extracted from database for project_name 
     
     Parameters
     ----------
     - project_name (str): Project of interest
+    - database (str): Path to the sqlite database
     '''
+    
     # connect to db
-    conn = connect_to_db()
+    conn = connect_to_db(database)
     # extract project info
     project = conn.execute('SELECT * FROM Projects WHERE project_id=\"{0}\"'.format(project_name)).fetchall()[0]
     conn.close()
@@ -28,18 +30,19 @@ def get_project_info(project_name):
     return project
 
 
-def get_cases(project_name):
+def get_cases(project_name, database):
     '''
-    (str) -> list
+    (str, str) -> list
     
     Returns a list of dictionaries with case information
     
     Paramaters
     -----------
     - project_name (str): Project of interest
+    - database (str): Path to the sqlite database
     '''
     
-    conn = connect_to_db()
+    conn = connect_to_db(database)
     data = conn.execute("SELECT DISTINCT case_id, donor_id, species, sex, created_date, modified_date, miso, parent_project FROM Samples WHERE project_id = '{0}'".format(project_name)).fetchall()
     
     data = [dict(i) for i in data]
@@ -47,18 +50,19 @@ def get_cases(project_name):
     return data
 
 
-def get_sample_counts(project_name):
+def get_sample_counts(project_name, database):
     '''
-    (str) - > dict
+    (str, str) - > dict
     
     Returns a dictionary with sample counts for each donor of a project of interest
     
     Parameters
     ----------
     - project_name (str): Name of project of interest
+    - database (str): Path to the sqlite database
     '''
     
-    conn = connect_to_db()
+    conn = connect_to_db(database)
     
     data = conn.execute("SELECT DISTINCT sample, tissue_type, group_id FROM Libraries WHERE project_id = '{0}';".format(project_name)).fetchall()
     conn.close()
@@ -110,19 +114,20 @@ def add_missing_donors(cases, counts):
     return counts    
 
 
-def get_library_types(project_name):
+def get_library_types(project_name, database):
     '''
-    (str) -> list
+    (str, str) -> list
     
     Returns a list of different library types for a given project
     
     Parameters
     ----------
     - project_name (str): Name of project of interest
+    - database (str): Path to the sqlite database
     '''
     
     # connect to db
-    conn = connect_to_db()
+    conn = connect_to_db(database)
     # extract library types
     data = conn.execute("SELECT DISTINCT library_types FROM Projects WHERE project_id = '{0}';".format(project_name)).fetchall()
     conn.close()
@@ -132,9 +137,9 @@ def get_library_types(project_name):
     return library_types
 
 
-def count_libraries(project_name, library_types, cases):
+def count_libraries(project_name, library_types, cases, database):
     '''
-    (str, list, list) -> dict
+    (str, list, list, str) -> dict
     
     Returns a dictionary with libraries for each library type and sample for a given project
        
@@ -143,10 +148,11 @@ def count_libraries(project_name, library_types, cases):
     - project_name (str) Name of the project of interest
     - library_types (list): List of library types recorded for project
     - cases (list): List of dictionary with case information  
+    - database (str): Path to the sqlite database
     '''
     
     # connect to db
-    conn = connect_to_db()
+    conn = connect_to_db(database)
     # extract library source
     data = conn.execute("SELECT DISTINCT sample, library_type, library FROM Libraries WHERE project_id = '{0}';".format(project_name)).fetchall()
     conn.close()
@@ -167,18 +173,19 @@ def count_libraries(project_name, library_types, cases):
 
 
 
-def get_last_sequencing(project_name):
+def get_last_sequencing(project_name, database):
     '''
-    (str) -> str
+    (str, str) -> str
     
     Returns the date of the last sequencing for the project of interest
     
     Paramaters
     ----------
     - project_name (str): Project of interest
+    - database (str): Path to the sqlite database
     '''
     
-    conn = connect_to_db()
+    conn = connect_to_db(database)
     sequencing = conn.execute("SELECT DISTINCT Workflow_Inputs.run FROM Workflow_Inputs JOIN Files \
                               WHERE Workflow_Inputs.project_id = '{0}' AND Files.project_id = '{0}' \
                               AND Files.wfrun_id = Workflow_Inputs.wfrun_id \

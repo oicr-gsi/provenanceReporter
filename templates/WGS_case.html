@@ -27,19 +27,19 @@
 
        <p style="font-size:22px; font-style:bold;"> Samples: {{pair}} </p>
        
-       {% for block in ordered_blocks[pair] %}
+       {% for block in blocks[pair] %}
 
          <div class="somatic_block">
            <table id="block_header_table">
              <tr>
-               <td><span style="font-size:16px; font-style:normal;">{{ names[pair][block] }}</span></td>
-               <td>Date: {{block_date[pair][block]}} </td>
-               {% if complete[pair][block] %}
+               <td><span style="font-size:16px; font-style:normal;">{{ block['name'] }}</span></td>
+               <td>Date: {{block['date'].split().0}} </td>
+               {% if block['complete'] %}
                  <td>Complete: <span style="font-size:32px;color:#70db70">&#10004;</span></td>
                {% else %}
                  <td>Complete: <span style="font-size:32px;color:#ff3300;">&#10006;</span></td>
                {% endif %}
-               {% if release_status[pair][block] %}
+               {% if block['release_status'] %}
                  <td>Release Status: <span style="font-size:32px;color:#70db70">&#10004;</span></td>
                {% else %}
                  <td>Release Status: <span style="font-size:32px;color:#ff3300;">&#10006;</span></td>
@@ -49,88 +49,84 @@
                  </td>
              </tr>
            </table>
-         
 
-              
+           <p style="font-size:22px; font-style:bold;"> Call-ready workflows </p>     
 
-      <p style="font-size:22px; font-style:bold;"> Call-ready workflows </p>     
+           <table id="block_table">
+            <thead>
+              <th>workflow_run_id</th>
+              <th>workflow</th>
+              <th>file count</th>
+              <th>lane count</th>
+              <th>date</th>      
+              <th>Normal</th>
+              <th>Tumour</th>
 
-       <table id="block_table">
-         <thead>
-          <th>workflow_run_id</th>
-          <th>workflow</th>
-          <th>file count</th>
-          <th>lane count</th>
-          <th>date</th>      
-          <th>samples</th>
-        </thead>     
+            </thead>     
         
-        {% for bmpp_run in samples_bmpp[pair][block] %}
-          <tr>
-            <td>{{bmpp_run | shorten_workflow_id}}</td>
-            <td>{{samples_bmpp[pair][block][bmpp_run]['name'].0}}</td>
-            <td>{{file_counts[bmpp_run]}}</td>
-            <td>{{amount_data[pair][block][bmpp_run]}}</td>
-            <td>{{workflow_date[pair][block][bmpp_run]}}</td>
-            <td>
-              <dl>
-              {% for i in samples_bmpp[pair][block][bmpp_run]['samples']['normal'] %}
-                <dt>{{i}}</dt>
-              {% endfor %}
-              {% for i in samples_bmpp[pair][block][bmpp_run]['samples']['tumour'] %}
-                <dt>{{i}}</dt> 
-              {% endfor %}
-            </dl>
-            </td>
-          </tr>
-         {% endfor %}
-       </table>
+           {% for bmpp_run in block['call_ready'] %}
+            <tr>
+              <td>{{bmpp_run | shorten_workflow_id}}</td>
+              <td>{{workflow_names[bmpp_run].0}}</td>
+              <td>{{file_counts[bmpp_run]}}</td>
+              <td>{{amount_data[bmpp_run]}}</td>
+              <td>{{creation_dates[bmpp_run] | readable_time}}</td>
+              <td>
+                <dl>
+                  {% for i in block['pairs'][bmpp_run]['normal'] %}
+                    <dt>{{i}}</dt>
+                  {% endfor %}
+                </dl>
+              </td>
+              <td>
+                <dl>
+                  {% for i in block['pairs'][bmpp_run]['tumour'] %}
+                    <dt>{{i}}</dt> 
+                  {% endfor %}
+                </dl>
+              </td>
+            </tr>
+           {% endfor %}
+           </table>
      
-
-      
-
-      
-      <p style="font-size:22px; font-style:bold;"> Caller workflows </p>
-
-      <table id="block_table">
-        <thead>
-          <th>workflow_run_id</th>
-          <th>workflow</th>
-          <th>file count</th>
-          <th>lane count</th>
-          <th>date</th>     
-          <th>platform</th>
-        </thead>     
+           <p style="font-size:22px; font-style:bold;"> Caller workflows </p>
+           
+           <table id="block_table">
+            <thead>
+             <th>workflow_run_id</th>
+             <th>workflow</th>
+             <th>parent</th>
+             <th>file count</th>
+             <th>lane count</th>
+             <th>date</th>     
+             <th>platform</th>
+            </thead>     
        
-       {% for d in blocks[pair][block] %}
-         {% for workflow in d %}
+           {% for workflow_id in block['callers'] %}
            <tr>
-             <td>{{d[workflow]['parent']['wfrun_id'] | shorten_workflow_id}}</td>
-             <td>{{d[workflow]['parent']['wf']}}</td>
-             <td>{{file_counts[d[workflow]['parent']['wfrun_id']]}}</td>              
-             <td>{{amount_data[pair][block][d[workflow]['parent']['wfrun_id']]}}</td>             
-             <td>{{workflow_date[pair][block][d[workflow]['parent']['wfrun_id']]}}</td>
-             <td>{{d[workflow]['parent']['platform']}}</td>     
+             <td>{{workflow_id | shorten_workflow_id}}</td>
+             <td>{{workflow_names[workflow_id].0}}</td>
+             <td>
+               <dl>
+                 {% for i in parents[workflow_id] %}
+                   <dt>{{i}}:</dt>
+                     {% for k in parents[workflow_id][i] %}
+                       <dt>{{k | shorten_workflow_id}}</dt>
+                     {% endfor %}
+                 {% endfor %}
+               </dl>
+             </td>
+             <td>{{file_counts[workflow_id]}}</td>              
+             <td>{{amount_data[workflow_id]}}</td>             
+             <td>{{creation_dates[workflow_id] | readable_time}}</td>
+             <td>{{platforms[workflow_id]}}</td>     
            </tr>
-           {% if d[workflow]['children'] %}
-             {% for k in d[workflow]['children'] %}
-               <tr>
-                 <td>{{k['wfrun_id'] | shorten_workflow_id}}</td>
-                 <td>{{k['wf']}}</td>
-                 <td>{{file_counts[k['wfrun_id']]}}</td>
-                 <td>{{amount_data[pair][block][k['wfrun_id']]}}</td>
-                 <td>{{workflow_date[pair][block][k['wfrun_id']]}}</td>          
-                 <td>{{k['platform']}}</td>
-               </tr>     
-             {% endfor %}         
-           {% endif %}
-         {% endfor %}    
-       {% endfor %}
-      </table>
+           {% endfor %}         
+           </table>
        
 
-     <p style="font-size:22px; font-style:bold;"> Workflow relationships: </p>
-     <img src="data:image/png;base64,{{figures[pair][block]}}" alt="workflow_network" title="workflows" style="padding-right: 8px; padding-left:8px; width:25%; height:25%"/>
+        <p style="font-size:22px; font-style:bold;"> Workflow relationships: </p>
+        <img src="data:image/png;base64,{{block['network']}}" alt="workflow_network" title="workflows" style="padding-right: 8px; padding-left:8px; width:25%; height:25%"/>
      
      </div>   
 
