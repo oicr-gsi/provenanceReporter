@@ -95,6 +95,7 @@
             <thead>
              <th>workflow_run_id</th>
              <th>workflow</th>
+             <th>parent</th>
              <th>file count</th>
              <th>lane count</th>
              <th>date</th>     
@@ -105,6 +106,16 @@
            <tr>
              <td>{{workflow_id | shorten_workflow_id}}</td>
              <td>{{workflow_names[workflow_id].0}}</td>
+             <td>
+               <dl>
+                 {% for i in parents[workflow_id] %}
+                   <dt>{{i}}:</dt>
+                     {% for k in parents[workflow_id][i] %}
+                       <dt>{{k | shorten_workflow_id}}</dt>
+                     {% endfor %}
+                 {% endfor %}
+               </dl>
+             </td>
              <td>{{file_counts[workflow_id]}}</td>              
              <td>{{amount_data[workflow_id]}}</td>             
              <td>{{creation_dates[workflow_id] | readable_time}}</td>
