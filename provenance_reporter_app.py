@@ -24,12 +24,12 @@ import numpy as np
 import io
 import base64
 
-from utilities import connect_to_db, get_children_workflows, get_miso_sample_link,\
+from utilities import connect_to_db, get_miso_sample_link,\
     get_pipelines, get_workflow_names, get_library_design
 from whole_genome import get_call_ready_cases, get_bmpp_case, get_case_call_ready_samples, group_normal_tumor_pairs, \
     find_analysis_blocks, map_workflows_to_sample_pairs, map_workflows_to_parent, list_block_workflows, \
     get_block_analysis_date, sort_call_ready_samples, get_block_release_status, \
-    get_amount_data, is_block_complete, order_blocks, name_WGS_blocks, create_block_json, map_samples_to_bmpp_runs, \
+    get_amount_data, is_block_complete, order_blocks, create_block_json, map_samples_to_bmpp_runs, \
     get_parent_workflows, get_workflows_analysis_date, get_workflow_file_count, \
     get_workflow_limskeys, get_file_release_status, get_WGS_blocks_info, get_sequencing_platform    
 from networks import get_node_labels, make_adjacency_matrix, plot_workflow_network
@@ -207,14 +207,6 @@ def whole_genome_sequencing(project_name):
 
 
 
-
-
-
-
-
-
-
-
 @app.route('/<project_name>/whole_genome_sequencing/<case>')
 def wgs_case(project_name, case):
     
@@ -323,9 +315,7 @@ def wgs_case(project_name, case):
     # ordered_blocks = order_blocks(blocks, amount_data)
     
 
-    # # name each block according to the selected block order
-    # names = name_WGS_blocks(ordered_blocks)
-    
+        
         
     
     
