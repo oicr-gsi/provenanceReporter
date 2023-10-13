@@ -1099,10 +1099,9 @@ def get_WGS_blocks_info(project_name, case, database):
     - database (str): Path to the sqlite database
     '''
     
-            
     conn = connect_to_db(database)
     data = conn.execute("SELECT DISTINCT samples, bmpp_anchor, workflows, name, date, release_status, \
-                        complete, network from WGS_blocks WHERE project_id = '{0}' AND \
+                        complete, extra, network from WGS_blocks WHERE project_id = '{0}' AND \
                         case_id = '{1}'".format(project_name, case)).fetchall() 
     conn.close()
 
