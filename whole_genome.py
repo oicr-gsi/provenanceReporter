@@ -676,7 +676,7 @@ def get_amount_data(project_name, database, workflow_table='Workflows'):
 
 def is_block_complete(blocks, expected_workflows):
     '''
-    (list, list) -> dict
+    (dict, list) -> dict
     
     Returns a dictionary indicating if the downstream workflows of each parent bmpp workflows
     are complete (ie, contains all the expected workflows) for each block (ie,sample pair)
@@ -721,6 +721,42 @@ def is_block_complete(blocks, expected_workflows):
     return D
 
 
+
+def extra_workflows(block_workflows, expected_workflows):
+    '''
+    (dict, list) -> dict
+    
+    Returns a dictionary indicating if each parent bmpp workflow has extra (more than expected)
+    downstream workflows for each block (ie,sample pair)
+    
+    Parameters
+    ----------
+    - block_workflows (dict): Dictionary wirh list of workflows for each sample pair and parent bmpp
+    - expected_workflows (list): List of expected generic workflows names
+    '''
+    
+    D = {}
+    
+    for block in block_workflows:
+        D[block] = {}
+        for bmpp in block_workflows[block]:
+            L = block_workflows[block][bmpp]
+            if len(L) == 0:
+                extra = False
+            else:
+                # remove call ready workflows
+                call_ready = list(map(lambda x: x.strip(), bmpp.split('.')))
+                callers = set(call_ready).difference(set(call_ready))
+                if len(callers) > len(expected_workflows):
+                    extra = True
+                else:
+                    extra = False
+            # record boolean as 0 or 1
+            D[block][bmpp] = int(extra)
+             
+            
+    return D
+    
 
 def order_blocks(blocks, amount_data):
     '''
