@@ -674,7 +674,55 @@ def get_amount_data(project_name, database, workflow_table='Workflows'):
     return counts
 
 
-def is_block_complete(blocks, expected_workflows):
+# def is_block_complete(blocks, expected_workflows):
+#     '''
+#     (dict, list) -> dict
+    
+#     Returns a dictionary indicating if the downstream workflows of each parent bmpp workflows
+#     are complete (ie, contains all the expected workflows) for each block (ie,sample pair)
+    
+#     Parameters
+#     ----------
+#     - blocks (dict): Dictionary of workflow information organized by sample pair and parent bmpp workflows
+#     - expected_workflows (list): List of expected generic workflows names
+#     '''
+    
+#     D = {}
+    
+#     for block in blocks:
+#         D[block] = {}
+#         for bmpp in blocks[block]:
+#             if len(blocks[block][bmpp]) == 0:
+#                 complete = False
+#             else:
+#                 complete = True
+#                 c = []
+        
+#                 workflows = []
+#                 for d in blocks[block][bmpp]:
+#                     for workflow in d:
+#                         workflows.append(d[workflow]['parent']['wf'])
+#                         if d[workflow]['children']:
+#                             for k in d[workflow]['children']:
+#                                 workflows.append(k['wf'])
+#                 # homogeneize workflow names by removing the matched suffix
+#                 for i in range(len(workflows)):
+#                     if '_' in workflows[i]:
+#                         workflows[i] = workflows[i].split('_')[0]
+#                 # check that all workflows are present
+#                 if sorted(list(set(workflows))) != sorted(list(set(expected_workflows))):
+#                     complete = False
+#                 c.append(complete)
+        
+#                 complete = all(c)
+#             # record boolean as 0 or 1
+#             D[block][bmpp] = int(complete)
+            
+#     return D
+
+
+
+def is_block_complete(block_workflows, expected_workflows, workflow_names):
     '''
     (dict, list) -> dict
     
@@ -683,43 +731,31 @@ def is_block_complete(blocks, expected_workflows):
     
     Parameters
     ----------
-    - blocks (dict): Dictionary of workflow information organized by sample pair and parent bmpp workflows
+    - block_workflows (dict): Dictionary wirh list of workflows for each sample pair and parent bmpp
     - expected_workflows (list): List of expected generic workflows names
     '''
     
     D = {}
     
-    for block in blocks:
+    for block in block_workflows:
         D[block] = {}
-        for bmpp in blocks[block]:
-            if len(blocks[block][bmpp]) == 0:
+        for bmpp in block_workflows[block]:
+            if len(block_workflows[block][bmpp]) == 0:
                 complete = False
             else:
-                complete = True
-                c = []
-        
-                workflows = []
-                for d in blocks[block][bmpp]:
-                    for workflow in d:
-                        workflows.append(d[workflow]['parent']['wf'])
-                        if d[workflow]['children']:
-                            for k in d[workflow]['children']:
-                                workflows.append(k['wf'])
+                # make a list of caller workflows (ie, remove bmpp)
+                call_ready = list(map(lambda x: x.strip(), bmpp.split('.')))
+                callers = set(block_workflows[block][bmpp]).difference(set(call_ready))
+                workflows = [workflow_names[i][0] for i in callers]
                 # homogeneize workflow names by removing the matched suffix
                 for i in range(len(workflows)):
-                    if '_' in workflows[i]:
-                        workflows[i] = workflows[i].split('_')[0]
+                    workflows[i] = workflows[i].split('_')[0]
                 # check that all workflows are present
-                if sorted(list(set(workflows))) != sorted(list(set(expected_workflows))):
-                    complete = False
-                c.append(complete)
-        
-                complete = all(c)
+                complete = set(expected_workflows).issubset(set(workflows))
             # record boolean as 0 or 1
             D[block][bmpp] = int(complete)
             
     return D
-
 
 
 def extra_workflows(block_workflows, expected_workflows):
@@ -1013,7 +1049,9 @@ def find_case_WGS_blocks(project_name, case, database, expected_workflows):
             release_status = get_block_release_status(block_workflows, limskeys, status)
     
             # check if blocks are complete
-            complete = is_block_complete(blocks, expected_workflows)
+            complete = is_block_complete(blocks, expected_workflows, workflow_names)
+            # check if blocks have extra workflows
+            extra = extra_workflows(block_workflows, expected_workflows)
         
             # get the amount of data for each workflow
             amount_data = get_amount_data(project_name, database)
@@ -1037,6 +1075,8 @@ def find_case_WGS_blocks(project_name, case, database, expected_workflows):
                     WGS_blocks[samples][block]['date'] = block_date[samples][block]
                     # record complete status
                     WGS_blocks[samples][block]['complete'] = complete[samples][block]
+                    # record extra workflow status
+                    WGS_blocks[samples][block]['extra'] = extra[samples][block]
                     # reecord block name
                     WGS_blocks[samples][block]['name'] = names[samples][block]
                     # add project and case ids
