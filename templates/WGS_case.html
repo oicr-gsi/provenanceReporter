@@ -96,6 +96,9 @@
      
            <p style="font-size:22px; font-style:bold;"> Caller workflows </p>
            
+
+
+
            <table id="block_table">
             <thead>
              <th>workflow_run_id</th>
@@ -114,10 +117,11 @@
              <td>
                <dl>
                  {% for i in parents[workflow_id] %}
-                   <dt>{{i}}:</dt>
+                   <dt>
                      {% for k in parents[workflow_id][i] %}
-                       <dt>{{k | shorten_workflow_id}}</dt>
+                       <div class="tooltip">{{k | shorten_workflow_id}}<span class="tooltiptext">{{i}}</span></div>
                      {% endfor %}
+                   </dt>
                  {% endfor %}
                </dl>
              </td>
