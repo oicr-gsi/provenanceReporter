@@ -1771,11 +1771,13 @@ def migrate(args):
     # copy merged database to server
     subprocess.call('scp -i {0} {1} {2}:~/provenance-reporter/'.format(args.pemfile, args.merged_database, args.server), shell=True)
 
-    # remove project databases
-    project_databases = [os.path.join(databasedir, i) for i in os.listdir(databasedir) if '.db' in i]
-    for i in project_databases:
-        assert '/scratch2/groups/gsi/bis/rjovelin/provenance_reporter/databases' in i and '.db' in i
-        os.remove(i)
+    
+    if args.remove_db:
+        # remove project databases
+        project_databases = [os.path.join(databasedir, i) for i in os.listdir(databasedir) if '.db' in i]
+        for i in project_databases:
+            assert '/scratch2/groups/gsi/bis/rjovelin/provenance_reporter/databases' in i and '.db' in i
+            os.remove(i)
         
 
 
@@ -1830,6 +1832,7 @@ if __name__ == '__main__':
     migrate_parser.add_argument('-md', '--merged_database', dest='merged_database', help='Path to the merged database', required = True)
     migrate_parser.add_argument('-pf', '--pem_file', dest='pemfile', default='~/.ssh/provenance_reporter.pem', help='Path to the pem file to access the server')
     migrate_parser.add_argument('-s', '--server', dest='server', help='Provenance reporter server.', required=True)
+    migrate_parser.add_argument('-rmdb', '--removedb', dest='remove_db', action='store_true', help='Remove project databases if activated')
     migrate_parser.set_defaults(func=migrate)
     
     # get arguments from the command line
