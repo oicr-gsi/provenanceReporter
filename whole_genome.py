@@ -1049,7 +1049,7 @@ def find_case_WGS_blocks(project_name, case, database, expected_workflows):
             release_status = get_block_release_status(block_workflows, limskeys, status)
     
             # check if blocks are complete
-            complete = is_block_complete(blocks, expected_workflows, workflow_names)
+            complete = is_block_complete(block_workflows, expected_workflows, workflow_names)
             # check if blocks have extra workflows
             extra = extra_workflows(block_workflows, expected_workflows)
         
