@@ -758,12 +758,12 @@ def is_block_complete(block_workflows, expected_workflows, workflow_names):
     return D
 
 
-def extra_workflows(block_workflows, expected_workflows):
+def is_block_clean(block_workflows, expected_workflows):
     '''
     (dict, list) -> dict
     
-    Returns a dictionary indicating if each parent bmpp workflow has extra (more than expected)
-    downstream workflows for each block (ie,sample pair)
+    Returns a dictionary indicating if each parent bmpp workflow has onlly expected 
+    or extra (more than expected) downstream workflows for each block (ie,sample pair)
     
     Parameters
     ----------
@@ -778,21 +778,51 @@ def extra_workflows(block_workflows, expected_workflows):
         for bmpp in block_workflows[block]:
             L = block_workflows[block][bmpp]
             if len(L) == 0:
-                extra = False
+                clean = False
             else:
                 # remove call ready workflows
                 call_ready = list(map(lambda x: x.strip(), bmpp.split('.')))
                 callers = set(call_ready).difference(set(call_ready))
-                if len(callers) > len(expected_workflows):
-                    extra = True
+                if len(callers) == len(expected_workflows):
+                    clean = True
                 else:
-                    extra = False
+                    clean = False
             # record boolean as 0 or 1
-            D[block][bmpp] = int(extra)
+            D[block][bmpp] = int(clean)
              
-            
     return D
     
+
+# def order_blocks(blocks, amount_data):
+#     '''
+#     (dict) -> dict
+    
+#     Returns a dictionary with bmpp parent workflows ordered by amount of lane data
+#     for each sample pair
+    
+#     Parameters
+#     ----------
+#     - blocks (dict): Dictionary of workflow information organized by sample pair and parent bmpp workflows
+#     - amount_data (dict): Dictionary of amount of data for each workflow
+#     '''
+        
+#     # order sub-blocks (anchored by bmpp parent workflows) for each block (ie, sample pair)
+#     D = {}
+        
+#     for block in blocks:
+#         L = []
+#         for bmpp in blocks[block]:
+#             total = 0
+#             # sum all lanes for all call-ready workflows within each block
+#             workflows = list(map(lambda x: x.strip(), bmpp.split('.')))
+#             for workflow_id in workflows:
+#                 total += amount_data[workflow_id]
+#             L.append([total, bmpp])
+#         L = sorted(L, key=lambda x: x[0], reverse=True)
+#         D[block] = [i[1] for i in L]
+    
+#     return D    
+
 
 def order_blocks(blocks, amount_data):
     '''
@@ -823,6 +853,19 @@ def order_blocks(blocks, amount_data):
         D[block] = [i[1] for i in L]
     
     return D    
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
