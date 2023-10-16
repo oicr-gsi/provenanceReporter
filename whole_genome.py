@@ -1094,7 +1094,7 @@ def find_case_WGS_blocks(project_name, case, database, expected_workflows):
             # check if blocks are complete
             complete = is_block_complete(block_workflows, expected_workflows, workflow_names)
             # check if blocks have extra workflows
-            extra = extra_workflows(block_workflows, expected_workflows)
+            clean = is_block_clean(block_workflows, expected_workflows)
         
             # get the amount of data for each workflow
             amount_data = get_amount_data(project_name, database)
@@ -1119,7 +1119,7 @@ def find_case_WGS_blocks(project_name, case, database, expected_workflows):
                     # record complete status
                     WGS_blocks[samples][block]['complete'] = complete[samples][block]
                     # record extra workflow status
-                    WGS_blocks[samples][block]['extra'] = extra[samples][block]
+                    WGS_blocks[samples][block]['clean'] = clean[samples][block]
                     # reecord block name
                     WGS_blocks[samples][block]['name'] = names[samples][block]
                     # add project and case ids
@@ -1144,7 +1144,7 @@ def get_WGS_blocks_info(project_name, case, database):
     
     conn = connect_to_db(database)
     data = conn.execute("SELECT DISTINCT samples, bmpp_anchor, workflows, name, date, release_status, \
-                        complete, extra, network from WGS_blocks WHERE project_id = '{0}' AND \
+                        complete, clean, network from WGS_blocks WHERE project_id = '{0}' AND \
                         case_id = '{1}'".format(project_name, case)).fetchall() 
     conn.close()
 

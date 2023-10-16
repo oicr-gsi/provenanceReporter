@@ -699,7 +699,7 @@ def define_column_names():
                                   'library_type', 'prep', 'tissue_prep', 'sample_received_date', 'group_id', 'group_id_description', 'project_id'],
                     'Workflow_Inputs': ['library', 'run', 'lane', 'wfrun_id', 'limskey', 'barcode', 'platform', 'project_id'],
                     'Samples': ['case_id', 'donor_id', 'species', 'sex', 'miso', 'created_date', 'modified_date', 'project_id', 'parent_project'],
-                    'WGS_blocks': ['project_id', 'case_id', 'samples', 'bmpp_anchor', 'workflows', 'name', 'date', 'release_status', 'complete', 'extra', 'network']}
+                    'WGS_blocks': ['project_id', 'case_id', 'samples', 'bmpp_anchor', 'workflows', 'name', 'date', 'release_status', 'complete', 'clean', 'network']}
         
     return column_names
 
@@ -1327,7 +1327,7 @@ def add_WGS_blocks_to_db(database, project, expected_workflows, table):
                          d[samples][block]['date'],
                          d[samples][block]['release'],
                          d[samples][block]['complete'],
-                         d[samples][block]['extra'],
+                         d[samples][block]['clean'],
                          d[samples][block]['network']]
             
                     # insert project info
