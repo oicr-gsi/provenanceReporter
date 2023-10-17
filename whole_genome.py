@@ -1138,9 +1138,8 @@ def find_case_WGS_blocks(project_name, case, database, expected_workflows):
         
             # get the amount of data for each workflow
             amount_data = get_amount_data(project_name, database)
-            # order blocks based on the amount of data
-            ordered_blocks = order_blocks(blocks, amount_data)
-        
+            # order blocks based on scores
+            ordered_blocks = order_blocks(blocks, amount_data, release_status, complete, clean)
             # name each block according to the selected block order
             names = name_WGS_blocks(ordered_blocks)
                
@@ -1204,7 +1203,7 @@ def get_WGS_blocks_info(project_name, case, database):
         callers = set(workflows).difference(set(call_ready))
         i['callers'] = callers
         # map each sample to the
-        bmpp_samples = map_samples_to_bmpp_runs(project_name, call_ready, 'merged.db')
+        bmpp_samples = map_samples_to_bmpp_runs(project_name, call_ready, database)
         i['pairs'] = bmpp_samples
         D[samples].append(i)
         # sort according to sub-block name
