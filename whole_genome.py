@@ -674,54 +674,6 @@ def get_amount_data(project_name, database, workflow_table='Workflows'):
     return counts
 
 
-# def is_block_complete(blocks, expected_workflows):
-#     '''
-#     (dict, list) -> dict
-    
-#     Returns a dictionary indicating if the downstream workflows of each parent bmpp workflows
-#     are complete (ie, contains all the expected workflows) for each block (ie,sample pair)
-    
-#     Parameters
-#     ----------
-#     - blocks (dict): Dictionary of workflow information organized by sample pair and parent bmpp workflows
-#     - expected_workflows (list): List of expected generic workflows names
-#     '''
-    
-#     D = {}
-    
-#     for block in blocks:
-#         D[block] = {}
-#         for bmpp in blocks[block]:
-#             if len(blocks[block][bmpp]) == 0:
-#                 complete = False
-#             else:
-#                 complete = True
-#                 c = []
-        
-#                 workflows = []
-#                 for d in blocks[block][bmpp]:
-#                     for workflow in d:
-#                         workflows.append(d[workflow]['parent']['wf'])
-#                         if d[workflow]['children']:
-#                             for k in d[workflow]['children']:
-#                                 workflows.append(k['wf'])
-#                 # homogeneize workflow names by removing the matched suffix
-#                 for i in range(len(workflows)):
-#                     if '_' in workflows[i]:
-#                         workflows[i] = workflows[i].split('_')[0]
-#                 # check that all workflows are present
-#                 if sorted(list(set(workflows))) != sorted(list(set(expected_workflows))):
-#                     complete = False
-#                 c.append(complete)
-        
-#                 complete = all(c)
-#             # record boolean as 0 or 1
-#             D[block][bmpp] = int(complete)
-            
-#     return D
-
-
-
 def is_block_complete(block_workflows, expected_workflows, workflow_names):
     '''
     (dict, list) -> dict
@@ -792,38 +744,6 @@ def is_block_clean(block_workflows, expected_workflows):
              
     return D
     
-
-# def order_blocks(blocks, amount_data):
-#     '''
-#     (dict) -> dict
-    
-#     Returns a dictionary with bmpp parent workflows ordered by amount of lane data
-#     for each sample pair
-    
-#     Parameters
-#     ----------
-#     - blocks (dict): Dictionary of workflow information organized by sample pair and parent bmpp workflows
-#     - amount_data (dict): Dictionary of amount of data for each workflow
-#     '''
-        
-#     # order sub-blocks (anchored by bmpp parent workflows) for each block (ie, sample pair)
-#     D = {}
-        
-#     for block in blocks:
-#         L = []
-#         for bmpp in blocks[block]:
-#             total = 0
-#             # sum all lanes for all call-ready workflows within each block
-#             workflows = list(map(lambda x: x.strip(), bmpp.split('.')))
-#             for workflow_id in workflows:
-#                 total += amount_data[workflow_id]
-#             L.append([total, bmpp])
-#         L = sorted(L, key=lambda x: x[0], reverse=True)
-#         D[block] = [i[1] for i in L]
-    
-#     return D    
-
-
 
 def score_blocks(blocks, amount_data, release_status, complete, clean):
     '''
