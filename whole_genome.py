@@ -824,9 +824,62 @@ def is_block_clean(block_workflows, expected_workflows):
 #     return D    
 
 
-def order_blocks(blocks, amount_data):
+
+def score_blocks(blocks, amount_data, release_status, complete, clean):
     '''
-    (dict) -> dict
+    (dict, dict, dict, dict, dict) -> dict
+    
+    Returns a dictionary with scores (based on amount of data, release status and workflows generated)
+    for each sub-block (bmpp anchor) for each sample pair (block)
+       
+    Parameters
+    ----------
+    - blocks (dict): Dictionary of workflow information organized by sample pair and parent bmpp workflows
+    - amount_data (dict): Dictionary of amount of data for each workflow
+    - release_status (dict): Dictionary with release status for each sub-blocks
+    - complete (dict): Dictionary with block completeness (ie presence of all expected workflows) for each sub-block
+    - clean (dict): Dictionary with block cleaness (ie presence of only expected workflows) for each sub-block 
+    '''
+    
+    # rank blocks according to lane count
+    ranks = {}
+    for block in blocks:
+        d = {}
+        for bmpp in blocks[block]:
+            # sum all lanes for all call-ready workflows within each block
+            total = 0
+            workflows = list(map(lambda x: x.strip(), bmpp.split('.')))
+            for workflow_id in workflows:
+                total += amount_data[workflow_id]
+            d[bmpp] = total
+        L = sorted(list(set(d.values())))
+        # get the indices (ranks) for each bmpp anchor
+        # weighted by the number of values
+        ranks[block] = {}
+        for bmpp in d:
+            for i in range(len(L)):
+                if L[i] == d[bmpp]:
+                    ranks[block][bmpp] = (i + 1) / len(L)
+    
+    # score sub-blocks within each block
+    D = {}
+    for block in blocks:
+        for bmpp in blocks[block]:
+            score = 0
+            score += complete[block][bmpp]
+            score += clean[block][bmpp]
+            score += release_status[block][bmpp]
+            score += ranks[block][bmpp]
+            if block not in D:
+                D[block] = {}
+            D[block][bmpp] = score
+    
+    return D
+
+
+def order_blocks(blocks, amount_data, release_status, complete, clean):
+    '''
+    (dict, dict, dict, dict, dict) -> dict
     
     Returns a dictionary with bmpp parent workflows ordered by amount of lane data
     for each sample pair
@@ -835,37 +888,23 @@ def order_blocks(blocks, amount_data):
     ----------
     - blocks (dict): Dictionary of workflow information organized by sample pair and parent bmpp workflows
     - amount_data (dict): Dictionary of amount of data for each workflow
+    - release_status (dict): Dictionary with release status for each sub-blocks
+    - complete (dict): Dictionary with block completeness (ie presence of all expected workflows) for each sub-block
+    - clean (dict): Dictionary with block cleaness (ie presence of only expected workflows) for each sub-block 
     '''
-        
-    # order sub-blocks (anchored by bmpp parent workflows) for each block (ie, sample pair)
+    
+    # score the blocks
+    scores = score_blocks(blocks, amount_data, release_status, complete, clean)
+    
     D = {}
-        
     for block in blocks:
         L = []
         for bmpp in blocks[block]:
-            total = 0
-            # sum all lanes for all call-ready workflows within each block
-            workflows = list(map(lambda x: x.strip(), bmpp.split('.')))
-            for workflow_id in workflows:
-                total += amount_data[workflow_id]
-            L.append([total, bmpp])
-        L = sorted(L, key=lambda x: x[0], reverse=True)
+            L.append([scores[block][bmpp], bmpp])
+        # sort sub-blocks according to score    
+        L.sort(key=lambda x: x[0])
         D[block] = [i[1] for i in L]
-    
-    return D    
-
-
-
-
-
-
-
-
-
-
-
-
-
+    return D
 
 
 
@@ -885,7 +924,8 @@ def name_WGS_blocks(ordered_blocks):
     for block in ordered_blocks:
         counter = 1
         names[block] = {}
-        for i in ordered_blocks[block]:
+        # loop in reverse order, list is sorted according to ascending scores
+        for i in ordered_blocks[block][::-1]:
             k = 'WGS Analysis Block {0}'.format(counter)
             names[block][i] = k
             counter += 1
