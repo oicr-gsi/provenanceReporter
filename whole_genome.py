@@ -954,14 +954,14 @@ def create_block_json(project_name, blocks, block, bmpp_parent, workflow_names):
     # re-organize the sample pair
     sample_id = '.'.join(list(map(lambda x: x.strip(), block.split('|'))))
     # get the workflow ids for that block
-    D[sample_id] = list_block_workflows(blocks)[block][bmpp_parent]
+    for i in blocks[block]:
+        if i['bmpp_anchor'] == bmpp_parent:
+            D[sample_id] = map(lambda x: x.strip(), i['workflows'].split(';'))
     
     block_data = {}
-    
     for sample in D:
         if sample not in block_data:
             block_data[sample] = {}
-            
         for workflow_id in D[sample]:
             workflow_name = workflow_names[workflow_id][0]
             workflow_version = workflow_names[workflow_id][1]

@@ -543,24 +543,9 @@ def download_block_data(project_name, case, block, bmpp_parent):
     
     '''
     
-    # get all the bmpp runs for WG library type and Novaseq platform
-    bmpp = get_bmpp_case(project_name, case, 'novaseq', 'WG', 'merged.db')
-    # get the normal and tumor samples for each bmpp id
-    bmpp_samples = map_samples_to_bmpp_runs(project_name, bmpp, 'merged.db')
-    # identify all the samples processed
-    samples = get_case_call_ready_samples(project_name, bmpp_samples)
-    # get all pairs N/T samples
-    pairs = group_normal_tumor_pairs(samples)
-    # find analysis workflows for each N/T pairs
-    # remove sample pairs without analysis workflows
-    D = map_workflows_to_sample_pairs(project_name, 'novaseq', pairs, 'merged.db')
-    # get the parents of each workflow
-    parents = get_parent_workflows(project_name, 'merged')
-    # get the parent workflows for each block
-    parent_workflows = map_workflows_to_parent(D, parents)
-    # find the blocks by mapping the analysis workflows to their parent workflows    
-    blocks = find_analysis_blocks(D, parents, parent_workflows, bmpp)
-    # map each workflow run id to its workflow name
+    # get the WGS blocks
+    blocks = get_WGS_blocks_info(project_name, case, 'merged.db')
+    # get the workflow names
     workflow_names = get_workflow_names(project_name, 'merged.db')
     # create json with workflow information for block for DARE
     block_data = create_block_json(project_name, blocks, block, bmpp_parent, workflow_names)
