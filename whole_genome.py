@@ -1088,23 +1088,24 @@ def find_case_WGS_blocks(project_name, case, database, expected_workflows):
     return WGS_blocks
 
 
-def get_WGS_blocks_info(project_name, case, database):
+def get_WGTS_blocks_info(project_name, case, database, table):
     '''
-    (str, str, str) -> list 
+    (str, str, str, str) -> list 
     
-    Returns a list of dictionaries containing WGS block information for a given project and case
+    Returns a list of dictionaries containing WGS or WT block information for a given project and case
                 
     Parameters
     ----------
     - project_name (str): Name of project of interest
     - case (str): Donor id 
     - database (str): Path to the sqlite database
+    - table (str): Table with block information: WGS_blocks or WT_blocks
     '''
     
     conn = connect_to_db(database)
     data = conn.execute("SELECT DISTINCT samples, bmpp_anchor, workflows, name, date, release_status, \
-                        complete, clean, network from WGS_blocks WHERE project_id = '{0}' AND \
-                        case_id = '{1}'".format(project_name, case)).fetchall() 
+                        complete, clean, network from {0} WHERE project_id = '{1}' AND \
+                        case_id = '{2}'".format(table, project_name, case)).fetchall() 
     conn.close()
 
     L = [dict(i) for i in data]
