@@ -17,6 +17,7 @@ import os
 import subprocess
 from utilities import connect_to_db
 from whole_genome import get_workflow_limskeys, find_WGS_blocks
+from whole_transcriptome import find_WT_blocks
 
 
 def extract_project_info(pinery):
@@ -699,7 +700,8 @@ def define_column_names():
                                   'library_type', 'prep', 'tissue_prep', 'sample_received_date', 'group_id', 'group_id_description', 'project_id'],
                     'Workflow_Inputs': ['library', 'run', 'lane', 'wfrun_id', 'limskey', 'barcode', 'platform', 'project_id'],
                     'Samples': ['case_id', 'donor_id', 'species', 'sex', 'miso', 'created_date', 'modified_date', 'project_id', 'parent_project'],
-                    'WGS_blocks': ['project_id', 'case_id', 'samples', 'bmpp_anchor', 'workflows', 'name', 'date', 'release_status', 'complete', 'clean', 'network']}
+                    'WGS_blocks': ['project_id', 'case_id', 'samples', 'bmpp_anchor', 'workflows', 'name', 'date', 'release_status', 'complete', 'clean', 'network'],
+                    'WT_blocks': ['project_id', 'case_id', 'samples', 'bmpp_anchor', 'workflows', 'name', 'date', 'release_status', 'complete', 'clean', 'network']}
         
     return column_names
 
@@ -729,7 +731,8 @@ def define_column_types():
                     'Workflow_Inputs': ['VARCHAR(128)', 'VARCHAR(256)', 'INTEGER', 'VARCHAR(572)', 
                                         'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)'],
                     'Samples': ['VARCHAR(128) PRIMARY KEY NOT NULL', 'VARCHAR(256)', 'VARCHAR(256)', 'VARCHAR(128)', 'VARCHAR(572)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)'],
-                    'WGS_blocks': ['VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(572)', 'VARCHAR(572)', 'TEXT', 'VARCHAR(256)', 'VARCHAR(128)', 'INT', 'INT', 'INT', 'TEXT']}
+                    'WGS_blocks': ['VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(572)', 'VARCHAR(572)', 'TEXT', 'VARCHAR(256)', 'VARCHAR(128)', 'INT', 'INT', 'INT', 'TEXT'],
+                    'WT_blocks': ['VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(572)', 'VARCHAR(572)', 'TEXT', 'VARCHAR(256)', 'VARCHAR(128)', 'INT', 'INT', 'INT', 'TEXT']}
                     
     
     return column_types
@@ -756,7 +759,7 @@ def create_table(database, table):
     table_format = ', '.join(list(map(lambda x: ' '.join(x), list(zip(column_names, column_types)))))
 
 
-    if table  in ['Workflows', 'Parents', 'Files', 'FilesQC', 'Libraries', 'Workflow_Inputs', 'Samples', 'WGS_blocks']:
+    if table  in ['Workflows', 'Parents', 'Files', 'FilesQC', 'Libraries', 'Workflow_Inputs', 'Samples', 'WGS_blocks', 'WT_blocks']:
         constraints = '''FOREIGN KEY (project_id)
             REFERENCES Projects (project_id)
             ON DELETE CASCADE ON UPDATE CASCADE'''
@@ -774,7 +777,7 @@ def create_table(database, table):
     if table == 'Worklows':
         table_format = table_format + ', PRIMARY KEY (wfrun_id, project_id)'
     
-    if table == 'WGS_blocks':
+    if table in ['WGS_blocks', 'WT_blocks']:
         constraints = '''FOREIGN KEY (case_id)
           REFERENCES Samples (case_id)
           ON DELETE CASCADE ON UPDATE CASCADE'''
@@ -1287,7 +1290,7 @@ def add_samples_info_to_db(database, project, pinery, table, sample_info):
         conn.close()
 
 
-def add_WGS_blocks_to_db(database, project, expected_workflows, table):
+def add_blocks_to_db(database, project, expected_workflows, table, pipeline):
     '''
     (str, str, str, str) -> None
     
@@ -1299,10 +1302,14 @@ def add_WGS_blocks_to_db(database, project, expected_workflows, table):
     - project (str): Name of project of interest
     - expected_workflows (list): List of expected workflow names to define a complete block
     - table (str): Name of table in database
+    - pipeline (str): Indicate WT or WGS pipeline
     '''
     
-    # get the WGS blocks for donors in project
-    blocks = find_WGS_blocks(project, database, expected_workflows)
+    if pipeline == 'WGS':
+        # get the WGS blocks for donors in project
+        blocks = find_WGS_blocks(project, database, expected_workflows)
+    elif pipeline == 'WT':
+        blocks = find_WT_blocks(project, database, expected_workflows)
 
     if blocks:
         # connect to db
@@ -1335,7 +1342,6 @@ def add_WGS_blocks_to_db(database, project, expected_workflows, table):
                     conn.commit()
  
         conn.close()
-
 
 
 def collect_lims_info(args):
@@ -1487,8 +1493,14 @@ def add_info(args):
     
     # add WGS blocks
     expected_WGS_workflows = sorted(['mutect2', 'variantEffectPredictor', 'delly', 'varscan', 'sequenza', 'mavis']) 
-    add_WGS_blocks_to_db(args.database, args.project, expected_WGS_workflows, 'WGS_blocks')
+    add_blocks_to_db(args.database, args.project, expected_WGS_workflows, 'WGS_blocks', 'WGS')
     print('added wgs blocks')  
+    
+    # add WT blocks
+    expected_WT_workflows = sorted(['arriba', 'rsem', 'star', 'starfusion', 'mavis'])
+    add_blocks_to_db(args.database, args.project, expected_WT_workflows, 'WT_blocks', 'WT')
+    print('added WT blocks')  
+        
       
 
 

@@ -5,9 +5,14 @@ Created on Tue Jun  6 13:35:40 2023
 @author: rjovelin
 """
 
-from utilities import connect_to_db, get_children_workflows, remove_non_analysis_workflows
-from whole_genome import map_analysis_workflows_to_sample
-
+from utilities import connect_to_db, get_children_workflows, remove_non_analysis_workflows, \
+     get_workflow_names, get_donors
+from whole_genome import map_analysis_workflows_to_sample, get_parent_workflows, \
+    map_workflows_to_parent, list_block_workflows, get_workflows_analysis_date, \
+    get_block_analysis_date, sort_call_ready_samples, is_block_complete, \
+    get_workflow_limskeys, get_file_release_status, get_block_release_status, is_block_clean, \
+    get_amount_data, order_blocks    
+from networks import get_node_labels, make_adjacency_matrix, plot_workflow_network
 
 
 def get_WT_call_ready_cases(project_name, platform, database, library_type='WT'):
@@ -285,3 +290,121 @@ def name_WT_blocks(ordered_blocks):
             names[block][i] = k
             counter += 1
     return names
+
+
+def find_case_WT_blocks(project_name, case, database, expected_workflows):
+    '''
+    (str, str, str, list) -> dict
+    
+    Returns a dictionary with the WT blocks for case in project
+    
+    Parameters
+    ----------
+    - project_name (str): Name of project of interest
+    - case (str): Case in project
+    - database (str): Path to the sqlite database
+    - expected_workflows (list): List of expected workflow names to define a complete block
+    '''
+       
+    WT_blocks = {}
+            
+    # build the somatic calling block
+    # identify all call ready star runs for novaseq
+    star = get_star_case(project_name, case, 'novaseq', 'WT', database)
+    # proceed only in star ids exist
+    if star:
+        # get the tumor samples for each star id
+        star_samples = map_samples_to_star_runs(project_name, star, database)
+        # identify all the samples processed
+        samples = get_WT_case_call_ready_samples(project_name, star_samples)
+        if samples['tumour']:
+            # remove samples without analysis workflows
+            D = map_workflows_to_samples(project_name, 'novaseq', samples, database)
+            # find the parents of each workflow
+            parents = get_parent_workflows(project_name, database)
+            # get the parent workflows for each block
+            parent_workflows = map_workflows_to_parent(D, parents)
+            # find the blocks by mapping the analysis workflows to their parent workflows    
+            blocks = find_WT_analysis_blocks(D, parents, parent_workflows, star)
+            # list all workflows for each block
+            block_workflows = list_block_workflows(blocks)
+            # get the workflow creation date for all the workflows in project
+            creation_dates = get_workflows_analysis_date(project_name, database)
+            # assign date to each block. most recent file creation date from all workflows within block 
+            block_date = get_block_analysis_date(block_workflows, creation_dates)
+            # map each workflow run id to its workflow name
+            workflow_names = get_workflow_names(project_name, database)
+            # get the workflow names
+            block_workflow_names = get_node_labels(block_workflows, workflow_names)
+            # convert workflow relationships to adjacency matrix for each block
+            matrix = make_adjacency_matrix(block_workflows, parent_workflows)
+            # create figures
+            figures = plot_workflow_network(matrix, block_workflow_names)
+            # get the samples for each star id
+            samples_star = sort_call_ready_samples(project_name, blocks, star_samples, workflow_names)
+            # get release status of input sequences for each block
+            # get the input limskeys for each workflow in project
+            limskeys = get_workflow_limskeys(project_name, database)
+            # get the file swid and release status for each limskey for fastq-generating workflows
+            # excluding fastq-import workflows
+            status = get_file_release_status(project_name, database)
+            release_status = get_block_release_status(block_workflows, limskeys, status)
+            # check if blocks are complete
+            complete = is_block_complete(block_workflows, expected_workflows, workflow_names)
+            # check if blocks have extra workflows
+            clean = is_block_clean(block_workflows, expected_workflows)
+            # get the amount of data for each block
+            amount_data = get_amount_data(project_name, database)
+            # order blocks based on scores
+            ordered_blocks = order_blocks(blocks, amount_data, release_status, complete, clean)
+            # name each block according to the selected block order
+            names = name_WT_blocks(ordered_blocks)
+                        
+            for samples in blocks:
+                WT_blocks[samples] = {}
+                for block in blocks[samples]:
+                    WT_blocks[samples][block] = {}
+                    # record network image
+                    WT_blocks[samples][block]['network'] = figures[samples][block]
+                    # record all workflow ids
+                    WT_blocks[samples][block]['workflows'] = block_workflows[samples][block]
+                    # record release status
+                    WT_blocks[samples][block]['release'] = release_status[samples][block]
+                    # record block date
+                    WT_blocks[samples][block]['date'] = block_date[samples][block]
+                    # record complete status
+                    WT_blocks[samples][block]['complete'] = complete[samples][block]
+                    # record extra workflow status
+                    WT_blocks[samples][block]['clean'] = clean[samples][block]
+                    # record block name
+                    WT_blocks[samples][block]['name'] = names[samples][block]
+                    # add project and case ids
+                    WT_blocks[samples][block]['project_id'] = project_name
+                    WT_blocks[samples][block]['case_id'] = case
+        
+        return WT_blocks
+
+
+
+def find_WT_blocks(project_name, database, expected_workflows):
+    '''
+    (str, str, list) -> list
+    
+    Returns a list of WGS blocks for donors in project in which WGS blocks exist
+    
+    Parameters
+    ----------
+    - project_name (str): Name of project of interest
+    - database (str): Path to the sqlite database
+    - expected_workflows (list): List of expected workflow names to define a complete block
+    '''
+    
+    # make a list of donors:
+    donors = get_donors(project_name, database)
+    L = []
+    for case in donors:
+        blocks = find_case_WT_blocks(project_name, case, database, expected_workflows)
+        if blocks:
+            L.append(blocks)
+       
+    return L
