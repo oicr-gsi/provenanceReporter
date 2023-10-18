@@ -842,7 +842,8 @@ def initiate_db(database):
     tables = cur.fetchall()
     tables = [i[0] for i in tables]    
     conn.close()
-    for i in ['Projects', 'Workflows', 'Parents', 'Files', 'FilesQC', 'Libraries', 'Workflow_Inputs', 'Samples', 'WGS_blocks']:
+    for i in ['Projects', 'Workflows', 'Parents', 'Files', 'FilesQC', 'Libraries',
+              'Workflow_Inputs', 'Samples', 'WGS_blocks', 'WT_blocks']:
         if i not in tables:
             create_table(database, i)
 
