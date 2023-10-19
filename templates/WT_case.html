@@ -73,7 +73,7 @@
             <td>{{workflow_names[star_run].0}}</td>
             <td>{{file_counts[star_run]}}</td>
             <td>{{amount_data[star_run]}}</td>
-            <td>{{creation_dates[star_run]}}</td>
+            <td>{{creation_dates[star_run] | readable_time}}</td>
             <td>
               <dl>
                 {% for i in block['pairs'][star_run]['tumour'] %}
