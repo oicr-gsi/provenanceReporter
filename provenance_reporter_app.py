@@ -327,7 +327,7 @@ def download_block_data(project_name, case, pair, bmpp_parent):
         response=json.dumps(block_data),
         mimetype="application/json",
         status=200,
-        headers={"Content-disposition": "attachment; filename={0}_WGS_{1}_{2}.json".format(project_name, case, pair_name)})
+        headers={"Content-disposition": "attachment; filename={0}.WGS.{1}.{2}.{3}.json".format(project_name, case, pair_name, bmpp_parent)})
 
 
 @app.route('/download_wt_block/<project_name>/<case>/<pair>/<star_parent>')
@@ -347,7 +347,7 @@ def download_WT_block_data(project_name, case, pair, star_parent):
         response=json.dumps(block_data),
         mimetype="application/json",
         status=200,
-        headers={"Content-disposition": "attachment; filename={0}_WT_{1}_{2}.json".format(project_name, case, pair)})
+        headers={"Content-disposition": "attachment; filename={0}.WT.{1}.{2}.{3}.json".format(project_name, case, pair, star_parent)})
 
     
        
