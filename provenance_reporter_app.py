@@ -309,60 +309,45 @@ def wt_case(project_name, case):
                            )
 
 
-@app.route('/download_wgs_block/<project_name>/<case>/<block>/<bmpp_parent>')
-def download_block_data(project_name, case, block, bmpp_parent):
-    '''
-    
-    
-    '''
-    
+@app.route('/download_wgs_block/<project_name>/<case>/<pair>/<bmpp_parent>')
+def download_block_data(project_name, case, pair, bmpp_parent):
+        
     database = 'merged.db'
     
     # get the WGS blocks
-    blocks = get_WGTS_blocks_info(project_name, case, database)
+    blocks = get_WGTS_blocks_info(project_name, case, database, 'WGS_blocks')
     # get the workflow names
     workflow_names = get_workflow_names(project_name, database)
     # create json with workflow information for block for DARE
-    block_data = create_block_json(project_name, blocks, block, bmpp_parent, workflow_names)
+    block_data = create_block_json(project_name, blocks, pair, bmpp_parent, workflow_names)
+    
+    pair_name = '.'.join(map(lambda x: x.strip(), pair.split('|')))
+    # send the json to outoutfile                    
+    return Response(
+        response=json.dumps(block_data),
+        mimetype="application/json",
+        status=200,
+        headers={"Content-disposition": "attachment; filename={0}_WGS_{1}_{2}.json".format(project_name, case, pair_name)})
+
+
+@app.route('/download_wt_block/<project_name>/<case>/<pair>/<star_parent>')
+def download_WT_block_data(project_name, case, pair, star_parent):
+
+    database = 'merged.db'
+    
+    # get the WT blocks
+    blocks = get_WGTS_blocks_info(project_name, case, database, 'WT_blocks')
+    # get the workflow names
+    workflow_names = get_workflow_names(project_name, database)
+    # create json with workflow information for block for DARE
+    block_data = create_block_json(project_name, blocks, pair, star_parent, workflow_names)
     
     # send the json to outoutfile                    
     return Response(
         response=json.dumps(block_data),
         mimetype="application/json",
         status=200,
-        headers={"Content-disposition": "attachment; filename={0}_WGS_{1}_{2}.json".format(project_name, case, block)})
-
-
-@app.route('/download_wt_block/<project_name>/<case>/<block>/<star_parent>')
-def download_WT_block_data(project_name, case, block, star_parent):
-
-    # build the somatic calling block
-
-    # identify all call ready star runs for novaseq
-    star = get_star_case(project_name, case, 'novaseq', 'WT', 'merged.db')
-    # get the tumor samples for each star id
-    star_samples = map_samples_to_star_runs(project_name, star, 'merged.db')
-    samples = get_WT_case_call_ready_samples(project_name, star_samples)
-    # remove samples without analysis workflows
-    D = map_workflows_to_samples(project_name, 'novaseq', samples, 'merged.db')
-    # find the parents of each workflow
-    parents = get_parent_workflows(project_name, 'merged.db')
-    # get the parent workflows for each block
-    parent_workflows = map_workflows_to_parent(D, parents)
-    # find the blocks by mapping the analysis workflows to their parent workflows    
-    blocks = find_WT_analysis_blocks(D, parents, parent_workflows, star)
-    # map each workflow run id to its workflow name
-    workflow_names = get_workflow_names(project_name, 'merged.db')
-    # create json with workflow information for block for DARE
-    block_data = create_block_json(project_name, blocks, block, star_parent, workflow_names)
-
-
-    # send the json to outoutfile                    
-    return Response(
-        response=json.dumps(block_data),
-        mimetype="application/json",
-        status=200,
-        headers={"Content-disposition": "attachment; filename={0}_WT_{1}_{2}.json".format(project_name, case, block)})
+        headers={"Content-disposition": "attachment; filename={0}_WT_{1}_{2}.json".format(project_name, case, pair)})
 
     
        
