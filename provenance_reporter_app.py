@@ -242,7 +242,7 @@ def wgs_case(project_name, case):
                            amount_data=amount_data,
                            creation_dates=creation_dates,
                            platforms=platforms,
-                           parents=parents
+                           parents=parents,
                            )
 
 
@@ -309,17 +309,19 @@ def wt_case(project_name, case):
                            )
 
 
-@app.route('/download_wgs_block/<project_name>/<case>/<pair>/<anchor_wf>')
-def download_block_data(project_name, case, pair, anchor_wf):
+@app.route('/download_block/<project_name>/<case>/<pair>/<anchor_wf>/<table>')
+def download_block_data(project_name, case, pair, anchor_wf, table):
         
     database = 'merged.db'
     
     # get the WGS blocks
-    blocks = get_WGTS_blocks_info(project_name, case, database, 'WGS_blocks')
+    blocks = get_WGTS_blocks_info(project_name, case, database, table)
     # get the workflow names
     workflow_names = get_workflow_names(project_name, database)
     # create json with workflow information for block for DARE
     block_data = create_block_json(project_name, blocks, pair, anchor_wf, workflow_names)
+    
+    pipeline = table.split('_')[0]
     
     pair_name = '.'.join(map(lambda x: x.strip(), pair.split('|')))
     # send the json to outoutfile                    
@@ -327,29 +329,9 @@ def download_block_data(project_name, case, pair, anchor_wf):
         response=json.dumps(block_data),
         mimetype="application/json",
         status=200,
-        headers={"Content-disposition": "attachment; filename={0}.WGS.{1}.{2}.{3}.json".format(project_name, case, pair_name, anchor_wf)})
+        headers={"Content-disposition": "attachment; filename={0}.{1}.{2}.{3}.{4}.json".format(project_name, pipeline, case, pair_name, anchor_wf)})
 
-
-@app.route('/download_wt_block/<project_name>/<case>/<pair>/<anchor_wf>')
-def download_WT_block_data(project_name, case, pair, anchor_wf):
-
-    database = 'merged.db'
-    
-    # get the WT blocks
-    blocks = get_WGTS_blocks_info(project_name, case, database, 'WT_blocks')
-    # get the workflow names
-    workflow_names = get_workflow_names(project_name, database)
-    # create json with workflow information for block for DARE
-    block_data = create_block_json(project_name, blocks, pair, anchor_wf, workflow_names)
-    
-    # send the json to outoutfile                    
-    return Response(
-        response=json.dumps(block_data),
-        mimetype="application/json",
-        status=200,
-        headers={"Content-disposition": "attachment; filename={0}.WT.{1}.{2}.{3}.json".format(project_name, case, pair, anchor_wf)})
-
-    
+   
        
 
 @app.route('/download_cases/<project_name>')
