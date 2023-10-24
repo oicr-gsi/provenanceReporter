@@ -853,20 +853,20 @@ def name_WGS_blocks(ordered_blocks):
 
 
 
-def create_block_json(project_name, blocks, block, bmpp_parent, workflow_names):
+def create_block_json(project_name, blocks, block, anchor_workflow, workflow_names):
     '''
     (str, dict, str, str, dict)
     
     Returns a dictionary with workflow information for a given block (ie, sample pair)
-    and bmpp parent workflow
+    and anchor parent workflow (bmpp or star)
     
     Parameters
     ----------
     - project_name (str): Name of project of interest
     - blocks (dict): Dictionary with block information
     - block (str): Sample pair in blocks
-    - bmpp_parent (str): bamMergePreprocessing parent workflow(s)
-    - workflow_names (dict): Dictionaru with workflow name and version for each workflow in project
+    - anchor_workflow (str): bamMergePreprocessing parent workflow(s) or star_call_ready parent workflow
+    - workflow_names (dict): Dictionary with workflow name and version for each workflow in project
     '''
     
     # organize the workflows by block and samples
@@ -875,7 +875,7 @@ def create_block_json(project_name, blocks, block, bmpp_parent, workflow_names):
     sample_id = '.'.join(list(map(lambda x: x.strip(), block.split('|'))))
     # get the workflow ids for that block
     for i in blocks[block]:
-        if i['bmpp_anchor'] == bmpp_parent:
+        if i['anchor_wf'] == anchor_workflow:
             D[sample_id] = map(lambda x: x.strip(), i['workflows'].split(';'))
     
     block_data = {}
@@ -1103,7 +1103,7 @@ def get_WGTS_blocks_info(project_name, case, database, table):
     '''
     
     conn = connect_to_db(database)
-    data = conn.execute("SELECT DISTINCT samples, bmpp_anchor, workflows, name, date, release_status, \
+    data = conn.execute("SELECT DISTINCT samples, anchor_wf, workflows, name, date, release_status, \
                         complete, clean, network from {0} WHERE project_id = '{1}' AND \
                         case_id = '{2}'".format(table, project_name, case)).fetchall() 
     conn.close()
@@ -1117,7 +1117,7 @@ def get_WGTS_blocks_info(project_name, case, database, table):
         if samples not in D:
             D[samples] = []
         # add call ready workflows
-        call_ready = list(map(lambda x: x.strip(), i['bmpp_anchor'].split('.')))
+        call_ready = list(map(lambda x: x.strip(), i['anchor_wf'].split('.')))
         i['call_ready'] = call_ready    
         workflows = list(map(lambda x: x.strip(), i['workflows'].split(';')))
         # add caller workflows

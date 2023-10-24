@@ -309,8 +309,8 @@ def wt_case(project_name, case):
                            )
 
 
-@app.route('/download_wgs_block/<project_name>/<case>/<pair>/<bmpp_parent>')
-def download_block_data(project_name, case, pair, bmpp_parent):
+@app.route('/download_wgs_block/<project_name>/<case>/<pair>/<anchor_wf>')
+def download_block_data(project_name, case, pair, anchor_wf):
         
     database = 'merged.db'
     
@@ -319,7 +319,7 @@ def download_block_data(project_name, case, pair, bmpp_parent):
     # get the workflow names
     workflow_names = get_workflow_names(project_name, database)
     # create json with workflow information for block for DARE
-    block_data = create_block_json(project_name, blocks, pair, bmpp_parent, workflow_names)
+    block_data = create_block_json(project_name, blocks, pair, anchor_wf, workflow_names)
     
     pair_name = '.'.join(map(lambda x: x.strip(), pair.split('|')))
     # send the json to outoutfile                    
@@ -327,11 +327,11 @@ def download_block_data(project_name, case, pair, bmpp_parent):
         response=json.dumps(block_data),
         mimetype="application/json",
         status=200,
-        headers={"Content-disposition": "attachment; filename={0}.WGS.{1}.{2}.{3}.json".format(project_name, case, pair_name, bmpp_parent)})
+        headers={"Content-disposition": "attachment; filename={0}.WGS.{1}.{2}.{3}.json".format(project_name, case, pair_name, anchor_wf)})
 
 
-@app.route('/download_wt_block/<project_name>/<case>/<pair>/<star_parent>')
-def download_WT_block_data(project_name, case, pair, star_parent):
+@app.route('/download_wt_block/<project_name>/<case>/<pair>/<anchor_wf>')
+def download_WT_block_data(project_name, case, pair, anchor_wf):
 
     database = 'merged.db'
     
@@ -340,14 +340,14 @@ def download_WT_block_data(project_name, case, pair, star_parent):
     # get the workflow names
     workflow_names = get_workflow_names(project_name, database)
     # create json with workflow information for block for DARE
-    block_data = create_block_json(project_name, blocks, pair, star_parent, workflow_names)
+    block_data = create_block_json(project_name, blocks, pair, anchor_wf, workflow_names)
     
     # send the json to outoutfile                    
     return Response(
         response=json.dumps(block_data),
         mimetype="application/json",
         status=200,
-        headers={"Content-disposition": "attachment; filename={0}.WT.{1}.{2}.{3}.json".format(project_name, case, pair, star_parent)})
+        headers={"Content-disposition": "attachment; filename={0}.WT.{1}.{2}.{3}.json".format(project_name, case, pair, anchor_wf)})
 
     
        

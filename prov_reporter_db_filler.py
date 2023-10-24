@@ -700,8 +700,8 @@ def define_column_names():
                                   'library_type', 'prep', 'tissue_prep', 'sample_received_date', 'group_id', 'group_id_description', 'project_id'],
                     'Workflow_Inputs': ['library', 'run', 'lane', 'wfrun_id', 'limskey', 'barcode', 'platform', 'project_id'],
                     'Samples': ['case_id', 'donor_id', 'species', 'sex', 'miso', 'created_date', 'modified_date', 'project_id', 'parent_project'],
-                    'WGS_blocks': ['project_id', 'case_id', 'samples', 'bmpp_anchor', 'workflows', 'name', 'date', 'release_status', 'complete', 'clean', 'network'],
-                    'WT_blocks': ['project_id', 'case_id', 'samples', 'bmpp_anchor', 'workflows', 'name', 'date', 'release_status', 'complete', 'clean', 'network']}
+                    'WGS_blocks': ['project_id', 'case_id', 'samples', 'anchor_wf', 'workflows', 'name', 'date', 'release_status', 'complete', 'clean', 'network'],
+                    'WT_blocks': ['project_id', 'case_id', 'samples', 'anchor_wf', 'workflows', 'name', 'date', 'release_status', 'complete', 'clean', 'network']}
         
     return column_names
 
@@ -781,7 +781,7 @@ def create_table(database, table):
         constraints = '''FOREIGN KEY (case_id)
           REFERENCES Samples (case_id)
           ON DELETE CASCADE ON UPDATE CASCADE'''
-        table_format = table_format + ', PRIMARY KEY (samples, bmpp_anchor)'
+        table_format = table_format + ', PRIMARY KEY (samples, anchor_wf)'
       
     if table == 'Files':
         constraints = '''FOREIGN KEY (wfrun_id)
