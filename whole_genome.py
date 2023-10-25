@@ -885,12 +885,11 @@ def create_block_json(project_name, blocks, block, anchor_workflow, workflow_nam
         for workflow_id in D[sample]:
             workflow_name = workflow_names[workflow_id][0]
             workflow_version = workflow_names[workflow_id][1]
-            block_data[sample][workflow_name] = {'workflow_id': workflow_id, 'workflow_version': workflow_version}
+            if workflow_name not in block_data[sample]:
+                block_data[sample][workflow_name] = []
+            block_data[sample][workflow_name].append({'workflow_id': workflow_id, 'workflow_version': workflow_version})
     
     return block_data                
-
-
-
 
 
 def get_call_ready_cases(project_name, platform, library_type, database):
