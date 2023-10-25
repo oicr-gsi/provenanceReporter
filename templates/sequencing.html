@@ -112,7 +112,7 @@ Flow cell identifier, 6. Lane number, 7. Demultiplex barcodes</span></th>
 
 
   
-   <script>
+<script>
    function searchFunction() {
    var input, filter, table, tr, td, i, txtValue;
    var rowCount = 0    
@@ -136,36 +136,9 @@ Flow cell identifier, 6. Lane number, 7. Demultiplex barcodes</span></th>
    }
 
 
-   function checkPlatform(){
-    var input, filter, checkbox, table, tr, td, i, textValue;
-    var rowCount = 0
-    checkbox = document.getElementById('platform');
-    filter = checkbox.value.toUpperCase()
-    input = document.getElementById("platform");
-
-    table = document.getElementById("project_table");
-    tr = table.getElementsByTagName("tr");         
-    for (i = 1; i < tr.length; i++) {
-    td= tr[i];
-     if (td) {
-       txtValue = td.textContent || td.innerText;
-       if (checkbox.checked != false) {
-	    alert("Checkbox checked")
-            tr[i].style.display = "";
-            rowCount++;                   
-            
-
-    }else{
-	    alert("Not Checked")
-            tr[i].style.display = "none";
-    }
-  document.getElementById("count").innerHTML = rowCount
-  
-}
-}
 
 
-  </script>
+</script>
 
   {% endif %}
 
