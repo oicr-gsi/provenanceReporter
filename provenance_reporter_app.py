@@ -33,7 +33,7 @@ from whole_transcriptome import get_WT_call_ready_cases, get_star_case, get_WT_c
     map_workflows_to_samples, find_WT_analysis_blocks, map_samples_to_star_runs
 from project import get_project_info, get_cases, get_sample_counts, count_libraries, \
      get_library_types, add_missing_donors, get_last_sequencing
-from sequencing import get_sequences, collect_sequence_info
+from sequencing import get_sequences, collect_sequence_info, platform_name
 
 
    
@@ -181,8 +181,12 @@ def sequencing(project_name):
     files = collect_sequence_info(project_name, database)
     # re-organize sequence information
     sequences = get_sequences(files)
-
-    return render_template('sequencing.html', routes=routes, project=project, sequences=sequences, pipelines=pipelines)
+    # map the instrument short name to sequencing platform
+    platform_names = platform_name(project_name, database)
+    
+    return render_template('sequencing.html', routes=routes,
+                           project=project, sequences=sequences,
+                           pipelines=pipelines, platform_names=platform_names)
 
 
 

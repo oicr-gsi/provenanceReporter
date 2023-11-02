@@ -1,6 +1,7 @@
 {% extends 'project_base.html' %}
 
 
+
 {% block link %}
 <a href="{{ url_for('project_page', project_name=project['project_id']) }}">{{ project['project_id'] }}</a>
 <a class="selected" href="{{ url_for('sequencing', project_name=project['project_id']) }}">Sequencing</a>
@@ -15,6 +16,8 @@
 
 
 {% block content %}
+
+
   <div class="project_title">
     <p>{% block title %}{{ project['project_id'] }} {% endblock %}
       {% if sequences %}
@@ -26,32 +29,18 @@
     </p>   
   </div> 
 
-      
 
-
-
-<div class="dropdown">
+  <div class="dropdown">
   <button class="dropbtn">Select Platform</button>
-  <div class="dropdown-content">
-           
-      <input type="checkbox" id="platform" name="novaseq" value="novaseq" onchange="checkPlatform()" CHECKED>
-      <label for="novaseq"> NovaSeq</label><br>
-      <input type="checkbox" id="platform" name="hiseq" value="hiseq" CHECKED>
-      <label for="hiseq"> HiSeq</label><br>
-      <input type="checkbox" id="platform" name="miseq" value= "miseq" CHECKED>
-      <label for="miseq"> MiSeq</label><br><br>
-      <input type="submit" value="Submit">
-      
-  </div>
-</div>
-
-
-
-
-
-
-
-
+    <div class="dropdown-content">
+      <form>
+        <label><input type="checkbox" name="platform" value="novaseq" id="novaseq"/> NovaSeq</label><br>      
+        <label><input type="checkbox" name="platform" value="hiseq" id="hiseq"/> HiSeq</label><br>      
+        <label><input type="checkbox" name="platform" value="nextseq" id="nextseq"/> NextSeq</label><br>      
+        <label><input type="checkbox" name="platform" value="miseq" id="miseq"/> MiSeq</label><br>      
+      </form>          
+    </div>
+  </div>    
 
 
 
@@ -82,7 +71,7 @@ Flow cell identifier, 6. Lane number, 7. Demultiplex barcodes</span></th>
    </thead>     
 
    {% for i in sequences %}
-     <tr>
+     <tr class="platform" data-id="{{platform_names[i['platform']]}}" data-category="{{platform_names[i['platform']]}}">
        <td> {{i['case']}} </td>
        <td> {{i['sample']}} </td>
        <td> {{i['group_id']}} </td>
@@ -111,7 +100,15 @@ Flow cell identifier, 6. Lane number, 7. Demultiplex barcodes</span></th>
 </footer>
 
 
-  
+
+  {% endif %}
+
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+
+
+
+
 <script>
    function searchFunction() {
    var input, filter, table, tr, td, i, txtValue;
@@ -134,13 +131,74 @@ Flow cell identifier, 6. Lane number, 7. Demultiplex barcodes</span></th>
     }
    document.getElementById("count").innerHTML = rowCount
    }
+</script>
 
 
+<script>
+
+
+
+
+var $filterCheckboxes = $('input[type="checkbox"]');
+var filterFunc = function() {
+  
+  var selectedFilters = {};
+
+  $filterCheckboxes.filter(':checked').each(function() {
+
+    if (!selectedFilters.hasOwnProperty(this.name)) {
+      selectedFilters[this.name] = [];
+    }
+
+    selectedFilters[this.name].push(this.value);
+  });
+
+  // create a collection containing all of the filterable elements
+  var $filteredResults = $('.platform');
+
+  // loop over the selected filter name -> (array) values pairs
+  $.each(selectedFilters, function(name, filterValues) {
+
+    // filter each .flower element
+    $filteredResults = $filteredResults.filter(function() {
+
+      var matched = false,
+        currentFilterValues = $(this).data('category').split(' ');
+
+      // loop over each category value in the current .platform's data-category
+      $.each(currentFilterValues, function(_, currentFilterValue) {
+
+        // if the current category exists in the selected filters array
+        // set matched to true, and stop looping. as we're ORing in each
+        // set of filters, we only need to match once
+
+        if ($.inArray(currentFilterValue, filterValues) != -1) {
+          matched = true;
+          return false;
+        }
+      });
+
+      // if matched is true the current .platform element is returned
+      return matched;
+
+    });
+  });
+
+  $('.platform').hide().filter($filteredResults).show();
+}
+
+
+
+$filterCheckboxes.on('change', filterFunc);  
 
 
 </script>
 
-  {% endif %}
+
+
+
+
+
 
 
    

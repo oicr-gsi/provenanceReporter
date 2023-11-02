@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <link rel="stylesheet" href="{{ url_for('static', filename= 'css/style.css') }}">
+  <link rel="shortcut icon" href="#">  
   <title>{% block title %} {% endblock %}</title>
 </head>
 <body>
@@ -13,6 +14,8 @@
   </div>
 
   {% block content %} {% endblock %}
-  
+
+
+
 </body>
 </html>
