@@ -691,7 +691,7 @@ def define_column_names():
     '''
 
     # create dict to store column names for each table {table: [column names]}
-    column_names = {'Workflows': ['wfrun_id', 'wf', 'wfv', 'project_id', 'attributes', 'file_count', 'lane_count', 'skip', 'stale'],
+    column_names = {'Workflows': ['wfrun_id', 'wf', 'wfv', 'project_id', 'attributes', 'file_count', 'lane_count', 'skip', 'stale', 'selected'],
                     'Parents': ['parents_id', 'children_id', 'project_id'],
                     'Projects': ['project_id', 'pipeline', 'description', 'active', 'contact_name', 'contact_email', 'last_updated', 'expected_samples', 'sequenced_samples', 'library_types'],
                     'Files': ['file_swid', 'project_id', 'md5sum', 'workflow', 'version', 'wfrun_id', 'file', 'library_type', 'attributes', 'creation_date', 'limskey', 'skip', 'stale'],
@@ -714,7 +714,7 @@ def define_column_types():
     '''
     
     # create dict to store column names for each table {table: [column names]}
-    column_types = {'Workflows': ['VARCHAR(572)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'TEXT', 'INT', 'INT', 'INT', 'VARCHAR(128)'],
+    column_types = {'Workflows': ['VARCHAR(572)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'TEXT', 'INT', 'INT', 'INT', 'VARCHAR(128)', 'INT'],
                     'Parents': ['VARCHAR(572)', 'VARCHAR(572)', 'VARCHAR(128)'],
                     'Projects': ['VARCHAR(128) PRIMARY KEY NOT NULL UNIQUE', 'VARCHAR(128)',
                                   'TEXT', 'VARCHAR(128)', 'VARCHAR(256)', 'VARCHAR(256)', 'VARCHAR(256)', 'INT', 'INT', 'VARCHAR(256)'],
@@ -950,6 +950,7 @@ def add_workflows(workflows, database, project_name, table = 'Workflows'):
         # insert data into table
         values = [workflows[project_name][workflow_run][i] for i in column_names if i in workflows[project_name][workflow_run]]
         values.insert(3, project_name)
+        values.append(0)
         
         cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(values)))
         conn.commit()
