@@ -42,6 +42,7 @@
      <th>Samples</th>
      <th>Count of call-ready workflows</th>
      <th>Count of downstream workflows</th>
+     <th>Analysis blocks</th>
    </thead>     
 
    {% for i in samples %}
@@ -61,6 +62,19 @@
        <td>
          <a class="project_links" href="{{ url_for('wgs_case', project_name=project['project_id'], case=i)}}">{{cases[i]['downstream'] | length}}</a>
        </td>
+       <td>       
+         <dl>
+         {% for j in block_status[i] %}
+           <dt>
+             {% if j in ['ready', 'review'] %}
+               <a class="project_links" href="{{ url_for('wgs_case', project_name=project['project_id'], case=i)}}">{{j}}</a>  
+             {% else %}
+               <a class="project_links" href="{{ url_for('wgs_case', project_name=project['project_id'], case=i)}}">{{j | shorten_workflow_id}}</a>
+             {% endif %}
+           </dt>
+         {% endfor %}
+         </dl>
+       </td>       
      </tr>
    {% endfor %}               
    </table>
