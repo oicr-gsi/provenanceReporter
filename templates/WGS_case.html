@@ -50,6 +50,15 @@
                  <td><div class="tooltip">Release Status:<span class="tooltiptext">Input raw sequences released?</span></div> <span style="font-size:32px;color:#ff3300;">&#10006;</span></td>
                {% endif %}
                  <td>
+                   <form>
+                     <input type="checkbox" name="workflow" value="workflow" id="workflow"/>      
+                   </form>
+                   <button id="submitt_button">Select block</button>
+                 </td>
+                 <td>
+                   <button id="submitt_button">Select workflows</button>
+                 </td>
+                 <td>
                    <button id="download_button"><a href="{{url_for('download_block_data', project_name=project['project_id'], case=case, pair=pair, anchor_wf=block['anchor_wf'], table='WGS_blocks')}}">Download json</a></button>
                  </td>
              </tr>
@@ -66,6 +75,7 @@
               <th>date</th>      
               <th>Normal</th>
               <th>Tumour</th>
+              <th>select</th> 
 
             </thead>     
         
@@ -90,6 +100,15 @@
                   {% endfor %}
                 </dl>
               </td>
+              <td>
+                <form>
+                  {% if selected[bmpp_run] %}
+                    <input type="checkbox" name="workflow" value="workflow" id="workflow" checked/>
+                  {% else %}
+                    <input type="checkbox" name="workflow" value="workflow" id="workflow"/>  
+                  {% endif %}    
+                </form>
+              </td>     
             </tr>
            {% endfor %}
            </table>
@@ -107,7 +126,7 @@
              <th>file count</th>
              <th>lane count</th>
              <th>date</th>     
-             <th>platform</th>
+             <th>select</th>
             </thead>     
        
            {% for workflow_id in block['callers'] %}
@@ -128,7 +147,15 @@
              <td>{{file_counts[workflow_id]}}</td>              
              <td>{{amount_data[workflow_id]}}</td>             
              <td>{{creation_dates[workflow_id] | readable_time}}</td>
-             <td>{{platforms[workflow_id]}}</td>     
+             <td>
+               <form>
+               {% if selected[workflow_id] %}
+                 <input type="checkbox" name="workflow" value="workflow" id="workflow" checked/>
+               {% else %}
+                 <input type="checkbox" name="workflow" value="workflow" id="workflow"/>  
+               {% endif %}    
+               </form>
+             </td>     
            </tr>
            {% endfor %}         
            </table>
