@@ -853,9 +853,9 @@ def name_WGS_blocks(ordered_blocks):
 
 
 
-def create_block_json(project_name, blocks, block, anchor_workflow, workflow_names):
+def create_block_json(project_name, blocks, block, anchor_workflow, workflow_names, selected_workflows):
     '''
-    (str, dict, str, str, dict)
+    (str, dict, str, str, dict, dict)
     
     Returns a dictionary with workflow information for a given block (ie, sample pair)
     and anchor parent workflow (bmpp or star)
@@ -867,6 +867,7 @@ def create_block_json(project_name, blocks, block, anchor_workflow, workflow_nam
     - block (str): Sample pair in blocks
     - anchor_workflow (str): bamMergePreprocessing parent workflow(s) or star_call_ready parent workflow
     - workflow_names (dict): Dictionary with workflow name and version for each workflow in project
+    - selected_workflows (dict): Dictionary with selected status of each workflow in project
     '''
     
     # organize the workflows by block and samples
@@ -880,14 +881,16 @@ def create_block_json(project_name, blocks, block, anchor_workflow, workflow_nam
     
     block_data = {}
     for sample in D:
-        if sample not in block_data:
-            block_data[sample] = {}
         for workflow_id in D[sample]:
-            workflow_name = workflow_names[workflow_id][0]
-            workflow_version = workflow_names[workflow_id][1]
-            if workflow_name not in block_data[sample]:
-                block_data[sample][workflow_name] = []
-            block_data[sample][workflow_name].append({'workflow_id': workflow_id, 'workflow_version': workflow_version})
+            # check if workflow is selected
+            if selected_workflows[workflow_id]:
+                workflow_name = workflow_names[workflow_id][0]
+                workflow_version = workflow_names[workflow_id][1]
+                if sample not in block_data:
+                    block_data[sample] = {}
+                if workflow_name not in block_data[sample]:
+                   block_data[sample][workflow_name] = []
+                block_data[sample][workflow_name].append({'workflow_id': workflow_id, 'workflow_version': workflow_version})
     
     return block_data                
 
@@ -1178,7 +1181,7 @@ def get_selected_workflows(project_name, database, table = 'Workflows'):
 
     D = {}
     for i in data:
-        D[i['wfrun_id']] = i['selected']
+        D[i['wfrun_id']] = int(i['selected'])
     
     return D
 
@@ -1251,3 +1254,65 @@ def review_wgs_blocks(project_name, database):
                         D[case].append('review')
                 D[case] = sorted(list(set(D[case])))
     return D
+
+
+
+def get_case_workflows(case, database, table = 'WGS_blocks'):
+    '''
+    (str, str, str) -> list
+    
+    Returns a list of all workflows for a given case
+    
+    Parameters
+    ----------
+    - case (str): Donor identifier
+    - database (str): Path to the sqlite database
+    - table (str): Name of the table storing analysis blocks
+    '''
+        
+    # update selected status
+    conn = connect_to_db(database)    
+    cur = conn.cursor()
+    cur.execute("SELECT workflows FROM {0} WHERE case_id = '{1}'".format(table, case))
+    data = cur.fetchall()   
+    conn.close()
+    
+    L = []
+    
+    for i in data:
+        workflows = i['workflows'].split(';')
+        L.extend(workflows)
+    L = list(set(L))
+    return L
+        
+    
+def update_wf_selection(workflows, selected_wf, database, table = 'Workflows'):
+    '''
+    (list, list, str, str) -> None
+    
+    Update the selected status of workflows 
+    
+    Parameters
+    ----------
+    - workflows (list): List of workflows from analysis blocks for a given case
+                        for which the selected status need to be updated
+    - selected_wf (list): List of selected workflows 
+    - database (str): Path to the sqlite database
+    - table (str): Table storing workflows information
+    '''
+    
+    # update selected status
+    conn = connect_to_db(database)
+    cur = conn.cursor()
+    for i in workflows:
+        if i in selected_wf:
+            status = 1
+        else:
+            status = 0
+        cur.execute('UPDATE Workflows SET selected = \"{0}\" WHERE wfrun_id = \"{1}\"'.format(status, i))
+        conn.commit()
+    conn.close()
+            
+               
+    
+    

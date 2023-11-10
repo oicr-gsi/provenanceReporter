@@ -16,6 +16,10 @@
 {% endblock %}
 
 
+
+
+
+
 {% block content %}
   <div class="project_title">
     <p><span style="font-size:30px; font-style:normal;"> Somatic callers analysis blocks </span></p>  
@@ -28,7 +32,8 @@
        <p style="font-size:22px; font-style:bold;"> Samples: {{pair}} </p>
        
        {% for block in blocks[pair] %}
-
+         
+         <form method="POST" action = "">
          <div class="somatic_block">
            <table id="block_header_table">
              <tr>
@@ -50,13 +55,7 @@
                  <td><div class="tooltip">Release Status:<span class="tooltiptext">Input raw sequences released?</span></div> <span style="font-size:32px;color:#ff3300;">&#10006;</span></td>
                {% endif %}
                  <td>
-                   <form>
-                     <input type="checkbox" name="workflow" value="workflow" id="workflow"/>      
-                   </form>
-                   <button id="submitt_button">Select block</button>
-                 </td>
-                 <td>
-                   <button id="submitt_button">Select workflows</button>
+                   <button type = "submit" value="submit">Select workflows</button>
                  </td>
                  <td>
                    <button id="download_button"><a href="{{url_for('download_block_data', project_name=project['project_id'], case=case, pair=pair, anchor_wf=block['anchor_wf'], table='WGS_blocks')}}">Download json</a></button>
@@ -64,6 +63,8 @@
              </tr>
            </table>
 
+
+   
            <p style="font-size:22px; font-style:bold;"> Call-ready workflows </p>     
 
            <table id="block_table">
@@ -101,13 +102,11 @@
                 </dl>
               </td>
               <td>
-                <form>
-                  {% if selected[bmpp_run] %}
-                    <input type="checkbox" name="workflow" value="workflow" id="workflow" checked/>
+                {% if selected[bmpp_run] %}
+                    <input type="checkbox" name="workflow" value="{{bmpp_run}}" id="workflow" checked/>
                   {% else %}
-                    <input type="checkbox" name="workflow" value="workflow" id="workflow"/>  
+                    <input type="checkbox" name="workflow" value="{{bmpp_run}}" id="workflow"/>  
                   {% endif %}    
-                </form>
               </td>     
             </tr>
            {% endfor %}
@@ -148,13 +147,11 @@
              <td>{{amount_data[workflow_id]}}</td>             
              <td>{{creation_dates[workflow_id] | readable_time}}</td>
              <td>
-               <form>
                {% if selected[workflow_id] %}
-                 <input type="checkbox" name="workflow" value="workflow" id="workflow" checked/>
+                 <input type="checkbox" name="workflow" value="{{workflow_id}}" id="workflow" checked/>
                {% else %}
-                 <input type="checkbox" name="workflow" value="workflow" id="workflow"/>  
+                 <input type="checkbox" name="workflow" value="{{workflow_id}}" id="workflow"/>  
                {% endif %}    
-               </form>
              </td>     
            </tr>
            {% endfor %}         
@@ -165,6 +162,7 @@
         <img src="data:image/png;base64,{{block['network']}}" alt="workflow_network" title="workflows" style="padding-right: 8px; padding-left:8px; width:25%; height:25%"/>
      
      </div>   
+     </form>     
 
      {% endfor %}
 
@@ -175,5 +173,4 @@
 
   {% endfor %}
 {% endblock %}
-
 

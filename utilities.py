@@ -7,6 +7,9 @@ Created on Tue Jun  6 15:04:02 2023
 
 import sqlite3
 import time
+import string
+import random
+
 
 
 
@@ -217,4 +220,23 @@ def get_donors(project_name, database):
     
     return donors
 
+
+
+def secret_key_generator(size=10):
+    '''
+    (int)
+    
+    Returns a random string of length size with upper and lower case characters
+    and digit
+    
+    Parameters
+    ----------
+    - size (int): Length of the random string
+    '''
+    
+    chars=string.ascii_uppercase + string.ascii_lowercase + string.digits
+    s = ''.join(random.choice(chars) for i in range(size))
+    
+    return s
+    
     

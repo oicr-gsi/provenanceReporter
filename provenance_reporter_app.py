@@ -25,10 +25,11 @@ import io
 import base64
 
 from utilities import connect_to_db, get_miso_sample_link,\
-    get_pipelines, get_workflow_names, get_library_design
+    get_pipelines, get_workflow_names, get_library_design, secret_key_generator
 from whole_genome import get_call_ready_cases, map_workflows_to_parent, \
     get_amount_data, create_block_json, get_parent_workflows, get_workflows_analysis_date, \
-    get_workflow_file_count, get_WGTS_blocks_info, get_sequencing_platform    
+    get_workflow_file_count, get_WGTS_blocks_info, get_sequencing_platform, get_selected_workflows, \
+    review_wgs_blocks, get_case_workflows, update_wf_selection    
 from whole_transcriptome import get_WT_call_ready_cases, get_star_case, get_WT_case_call_ready_samples, \
     map_workflows_to_samples, find_WT_analysis_blocks, map_samples_to_star_runs
 from project import get_project_info, get_cases, get_sample_counts, count_libraries, \
@@ -42,9 +43,9 @@ routes = {'Whole Genome': 'whole_genome_sequencing', 'Whole Transcriptome': 'who
 
 
 app = Flask(__name__)
-
-
-
+#app.config['SECRET_KEY'] = secret_key_generator(10)
+#app.config['SECRET_KEY'] = 'pinkipou'
+app.secret_key = secret_key_generator(10)
 
 @app.template_filter()
 def find_workflow_id(generic_name, bmpp_children_workflows, library):
@@ -201,13 +202,26 @@ def whole_genome_sequencing(project_name):
     # get samples and libraries and workflow ids for each case
     cases = get_call_ready_cases(project_name, 'novaseq', 'WG', database)
     samples = sorted(list(cases.keys()))
+    # get analysis block status
+    block_status = review_wgs_blocks(project_name, database)
+        
    
-    return render_template('Whole_Genome_Sequencing.html', routes = routes, project=project, samples=samples, cases=cases, pipelines=pipelines)
+    return render_template('Whole_Genome_Sequencing.html',
+                           routes = routes,
+                           project=project,
+                           samples=samples,
+                           cases=cases,
+                           pipelines=pipelines,
+                           block_status = block_status
+                           )
 
 
 
-@app.route('/<project_name>/whole_genome_sequencing/<case>')
+@app.route('/<project_name>/whole_genome_sequencing/<case>', methods = ['POST', 'GET'])
 def wgs_case(project_name, case):
+    
+    
+    print('method', request.method)
     
     database = 'merged.db'
     
@@ -233,8 +247,21 @@ def wgs_case(project_name, case):
     platforms = get_sequencing_platform(project_name, database)
     # find the parents of each workflow
     parents = get_parent_workflows(project_name, database)
+    # extract selected status of each workflow
+    selected = get_selected_workflows(project_name, database, 'Workflows')
     
-    return render_template('WGS_case.html',
+    if request.method == 'POST':
+        # get the list of checked workflows        
+        selected_workflows = request.form.getlist('workflow')
+        print(selected_workflows)
+        # get all the workflows from all analysis blocks for the given case
+        workflows = get_case_workflows(case, database, 'WGS_blocks')
+        update_wf_selection(workflows, selected_workflows, database, 'Workflows')
+        
+        return redirect(url_for('wgs_case', case=case, project_name=project_name))
+    
+    else:
+        return render_template('WGS_case.html',
                            project=project,
                            routes = routes,
                            case=case,
@@ -247,6 +274,7 @@ def wgs_case(project_name, case):
                            creation_dates=creation_dates,
                            platforms=platforms,
                            parents=parents,
+                           selected = selected
                            )
 
 
@@ -313,6 +341,79 @@ def wt_case(project_name, case):
                            )
 
 
+
+
+
+
+@app.route('/check_workflows/<project_name>/<case>/<pair>/<anchor_wf>/<table>')
+def check_wgs_box(project_name, case, pair, anchor_wf, table, methods=['POST', 'GET']):
+    
+    database = 'merged.db'
+    # get the list of checked workflows        
+    workflows = request.form.getlist('workflow')
+    
+    print(workflows)
+    
+    if request.method == 'POST' and 'workflows' in request.form and workflows:
+        # update selected status
+        conn = connect_to_db(database)    
+        cur = conn.cursor()
+        for i in workflows:
+            cur.execute('UPDATE Workflows SET selected = \"1\" WHERE wfrun_id = \"{0}\"'.format(i))
+            conn.commit()
+        conn.close()
+
+    return redirect(url_for('WGS_case.html'))
+    
+
+
+# @app.route('/download_block/<project_name>/<case>/<pair>/<anchor_wf>/<table>')
+# def submit_block_data(project_name, case, pair, anchor_wf, table, methods=('GET', 'POST')):
+    
+    
+#     database = 'merged.db'
+    
+    
+    
+  
+    
+    
+
+    
+    
+#     # get the WGS blocks
+#     blocks = get_WGTS_blocks_info(project_name, case, database, table)
+#     # get the workflow names
+#     workflow_names = get_workflow_names(project_name, database)
+#     # get selected workflows
+#     selected_workflows = get_selected_workflows(project_name, database)
+#     # create json with workflow information for block for DARE
+#     block_data = create_block_json(project_name, blocks, pair, anchor_wf, workflow_names)
+    
+#     pipeline = table.split('_')[0]
+    
+#     pair_name = '.'.join(map(lambda x: x.strip(), pair.split('|')))
+    
+#     if block_data:
+        
+#         # send the json to outoutfile                    
+#         return Response(
+#             response=json.dumps(block_data),
+#             mimetype="application/json",
+#             status=200,
+#             headers={"Content-disposition": "attachment; filename={0}.{1}.{2}.{3}.{4}.json".format(project_name, pipeline, case, pair_name, anchor_wf)})
+        
+#     else:
+        
+    
+    
+#     return redirect(url_for('index'))
+#     return redirect('/')
+
+#     return render_template('create.html')
+
+        
+
 @app.route('/download_block/<project_name>/<case>/<pair>/<anchor_wf>/<table>')
 def download_block_data(project_name, case, pair, anchor_wf, table):
         
@@ -322,12 +423,14 @@ def download_block_data(project_name, case, pair, anchor_wf, table):
     blocks = get_WGTS_blocks_info(project_name, case, database, table)
     # get the workflow names
     workflow_names = get_workflow_names(project_name, database)
+    # get selected workflows
+    selected_workflows = get_selected_workflows(project_name, database)
     # create json with workflow information for block for DARE
-    block_data = create_block_json(project_name, blocks, pair, anchor_wf, workflow_names)
-    
+    block_data = create_block_json(project_name, blocks, pair, anchor_wf, workflow_names, selected_workflows)
     pipeline = table.split('_')[0]
     
     pair_name = '.'.join(map(lambda x: x.strip(), pair.split('|')))
+    
     # send the json to outoutfile                    
     return Response(
         response=json.dumps(block_data),
@@ -335,8 +438,7 @@ def download_block_data(project_name, case, pair, anchor_wf, table):
         status=200,
         headers={"Content-disposition": "attachment; filename={0}.{1}.{2}.{3}.{4}.json".format(project_name, pipeline, case, pair_name, anchor_wf)})
 
-   
-       
+
 
 @app.route('/download_cases/<project_name>')
 def download_cases_table(project_name):
