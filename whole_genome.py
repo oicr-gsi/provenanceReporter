@@ -1284,11 +1284,46 @@ def get_case_workflows(case, database, table = 'WGS_blocks'):
         L.extend(workflows)
     L = list(set(L))
     return L
+
+
+def get_workflow_selection_status(project_name, case, database, workflow_table = 'Workflows', 
+                                  workflow_input_table = 'Workflow_Inputs', library_table = 'Libraries',
+                                  block_table = 'WGS_blocks'):
+    '''
+    (str, str, str) -> list
+    
+    Returns a list of all workflows for a given case
+    
+    Parameters
+    ----------
+    - case (str): Donor identifier
+    - database (str): Path to the sqlite database
+    - table (str): Name of the table storing analysis blocks
+    '''
         
+    # select all workflows for a specific case
+    
+    conn = connect_to_db(database)    
+    cur = conn.cursor()
+    cur.execute("SELECT DISTINCT {0}.wfrun_id, {0}.selected FROM {0} JOIN {1} JOIN {2} \
+                WHERE {0}.project_id = '{3}' AND {1}.library = {2}.library AND {1}.sample = '{4}' \
+                AND {0}.wfrun_id = {2}.wfrun_id".format(workflow_table, library_table,                 
+                workflow_input_table, project_name, case))
+    data = cur.fetchall()
+    conn.close()
+    
+    # get all the workflows for 
+    L = get_case_workflows(case, database, block_table)
+           
+    D = {i['wfrun_id']: int(i['selected']) for i in data if i['wfrun_id'] in L}
+
+    return D
+
+       
     
 def update_wf_selection(workflows, selected_wf, database, table = 'Workflows'):
     '''
-    (list, list, str, str) -> None
+    (dict, list, str, str) -> None
     
     Update the selected status of workflows 
     
@@ -1301,6 +1336,8 @@ def update_wf_selection(workflows, selected_wf, database, table = 'Workflows'):
     - table (str): Table storing workflows information
     '''
     
+    # get selection status of all workfows for a fiven project
+        
     # update selected status
     conn = connect_to_db(database)
     cur = conn.cursor()
@@ -1309,8 +1346,10 @@ def update_wf_selection(workflows, selected_wf, database, table = 'Workflows'):
             status = 1
         else:
             status = 0
-        cur.execute('UPDATE Workflows SET selected = \"{0}\" WHERE wfrun_id = \"{1}\"'.format(status, i))
-        conn.commit()
+        # update only if status has changed
+        if workflows[i] != status:
+            cur.execute('UPDATE Workflows SET selected = \"{0}\" WHERE wfrun_id = \"{1}\"'.format(status, i))
+            conn.commit()
     conn.close()
             
                
