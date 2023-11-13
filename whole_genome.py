@@ -1186,74 +1186,6 @@ def get_selected_workflows(project_name, database, table = 'Workflows'):
     return D
 
     
-def get_selected_blocks(project_name, database, table = 'WGS_blocks'):
-    '''
-    (str, str, str) -> dict 
-    
-    Returns a dictionary with the selected status of each analysis block the given project
-                  
-    Parameters
-    ----------
-    - project_name (str): Name of project of interest
-    - database (str): Path to the sqlite database
-    - table (str): Table with workflow information
-    '''
-                
-    conn = connect_to_db(database)
-    data = conn.execute("SELECT DISTINCT case_id, samples, anchor_wf, selected, release_status, complete, clean FROM {0} WHERE project_id = '{1}'".format(table, project_name)).fetchall()
-    conn.close()
-
-    D = {}
-    
-    for i in data:
-        case = i['case_id']
-        samples = i['samples']
-        anchor_wf = i['anchor_wf']
-        selected = int(i['selected'])
-        clean = int(i['clean'])
-        release_status = int(i['release_status'])
-        complete = int(i['complete'])
-        if case not in D:
-            D[case] = {}
-        if samples not in D[case]:
-            D[case][samples] = {}
-        D[case][samples][anchor_wf] = {'selected': selected, 'clean': clean, 'complete': complete, 'release_status': release_status}
-        
-    return D    
-
-
-def review_wgs_blocks(project_name, database):
-    '''
-    (str, str) -> dict 
-    
-    Returns a dictionary with status for analysis blocks for each case in project
-                  
-    Parameters
-    ----------
-    - project_name (str): Name of project of interest
-    - database (str): Path to the sqlite database
-    '''
-    
-    selected = get_selected_blocks(project_name, database, 'WGS_blocks')
-    
-    D = {}
-    
-    for case in selected:
-        if case not in D:
-            D[case] = []
-        for samples in selected[case]:
-            for anchor_wf in selected[case][samples]:
-                if selected[case][samples][anchor_wf]['selected']:
-                    D[case].append(samples + '.' + anchor_wf) 
-                else:
-                    if selected[case][samples][anchor_wf]['clean'] and \
-                    selected[case][samples][anchor_wf]['complete'] and \
-                    selected[case][samples][anchor_wf]['release_status']:
-                        D[case].append('ready')
-                    else:
-                        D[case].append('review')
-                D[case] = sorted(list(set(D[case])))
-    return D
 
 
 
@@ -1352,6 +1284,164 @@ def update_wf_selection(workflows, selected_wf, database, table = 'Workflows'):
             conn.commit()
     conn.close()
             
-               
+ 
+def get_wgs_blocks(project, database, table = 'WGS_blocks'):
+    '''
+    (str, str, str) -> dict
     
+    Returns a dictionary with analysis block names for each case in project
     
+    Parameters
+    ----------
+    - project (str): Name of project of interest
+    - database (str): Path to the sqlite database
+    - table (str): Table with analysis blocks
+    '''
+
+    conn = connect_to_db(database)    
+    cur = conn.cursor()
+    cur.execute("SELECT DISTINCT * FROM {0} WHERE project_id = '{1}'".format(table, project))
+    data = cur.fetchall()
+    conn.close()
+    
+    D = {}
+    
+    for i in data:
+        case, samples, anchor = i['case_id'], i['samples'], i['anchor_wf']
+        workflows = i['workflows'].split(';')
+        clean, complete, release_status = int(i['clean']), int(i['complete']), int(i['release_status'])
+        if case not in D:
+            D[case] = {}
+        if samples not in D[case]:
+            D[case][samples] = {}
+        assert anchor not in D[case][samples]
+        D[case][samples][anchor] = {'workflows': workflows, 'clean': clean,
+                                    'complete': complete, 'release_status': release_status}
+            
+    return D
+    
+             
+def get_block_counts(analysis_blocks):
+    '''
+    (dict) -> dict
+    
+    Returns a dictionary with block counts for each case in given project
+    
+    Parameters
+    ----------
+    - analysis_blocks (dict): Dictionary with analysis blocks for a given project
+    '''
+    
+    D = {}
+    for i in analysis_blocks:
+        total = 0
+        for j in analysis_blocks[i]:
+            total += len(analysis_blocks[i][j])
+        D[i] = total
+    return D
+
+
+
+def get_selected_blocks(project_name, database, table = 'WGS_blocks'):
+    '''
+    (str, str, str) -> dict 
+    
+    Returns a dictionary with the selected status of each analysis block the given project
+                  
+    Parameters
+    ----------
+    - project_name (str): Name of project of interest
+    - database (str): Path to the sqlite database
+    - table (str): Table with workflow information
+    '''
+                
+    conn = connect_to_db(database)
+    data = conn.execute("SELECT DISTINCT case_id, samples, anchor_wf, selected, release_status, complete, clean FROM {0} WHERE project_id = '{1}'".format(table, project_name)).fetchall()
+    conn.close()
+
+    D = {}
+    
+    for i in data:
+        case = i['case_id']
+        samples = i['samples']
+        anchor_wf = i['anchor_wf']
+        selected = int(i['selected'])
+        clean = int(i['clean'])
+        release_status = int(i['release_status'])
+        complete = int(i['complete'])
+        if case not in D:
+            D[case] = {}
+        if samples not in D[case]:
+            D[case][samples] = {}
+        D[case][samples][anchor_wf] = {'selected': selected, 'clean': clean, 'complete': complete, 'release_status': release_status}
+        
+    return D    
+
+
+def review_wgs_blocks(blocks, selected_workflows):
+    '''
+    (dict, dict) -> dict 
+    
+    Returns a dictionary with status for analysis blocks for each case in project
+                  
+    Parameters
+    ----------
+    - project_name (str): Name of project of interest
+    - database (str): Path to the sqlite database
+    '''
+    
+    D = {}
+        
+    for case in blocks:
+        if case not in D:
+            D[case] = {}
+        for samples in blocks[case]:
+            for anchor in blocks[case][samples]:
+                # do not include call-ready workflows to determine selection/review status
+                # these may be shared across multiple blocks
+                L = [selected_workflows[i] for i in blocks[case][samples][anchor]['workflows'] if i not in anchor] 
+                if any(L):
+                    D[case][samples] = anchor
+                else:
+                    if blocks[case][samples][anchor]['clean'] and \
+                      blocks[case][samples][anchor]['complete'] and \
+                      blocks[case][samples][anchor]['release_status']:
+                          D[case][samples] = 'ready'
+                    else:
+                        D[case][samples] = 'review'
+    return D
+
+# def review_wgs_blocks(project_name, database):
+#     '''
+#     (str, str) -> dict 
+    
+#     Returns a dictionary with status for analysis blocks for each case in project
+                  
+#     Parameters
+#     ----------
+#     - project_name (str): Name of project of interest
+#     - database (str): Path to the sqlite database
+#     '''
+    
+#     selected = get_selected_blocks(project_name, database, 'WGS_blocks')
+    
+#     D = {}
+    
+#     for case in selected:
+#         if case not in D:
+#             D[case] = []
+#         for samples in selected[case]:
+#             for anchor_wf in selected[case][samples]:
+#                 if selected[case][samples][anchor_wf]['selected']:
+#                     D[case].append(samples + '.' + anchor_wf) 
+#                 else:
+#                     if selected[case][samples][anchor_wf]['clean'] and \
+#                     selected[case][samples][anchor_wf]['complete'] and \
+#                     selected[case][samples][anchor_wf]['release_status']:
+#                         D[case].append('ready')
+#                     else:
+#                         D[case].append('review')
+#                 D[case] = sorted(list(set(D[case])))
+#     return D
+
+  

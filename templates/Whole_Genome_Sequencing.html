@@ -23,12 +23,13 @@
     <p>{% block title %}{{ project['project_id'] }} {% endblock %}
       {% if cases %}
         <span style="font-size:30px; font-style:normal;"> WGS workflow data for <span id ="count"> {{ cases|length }} </span> cases</span>
+        <button id="download_button" style="margin-top:20px;margin-left:100px"><a href=#>Download json</a></button>
       {% else %}
         <span style="font-size:30px; font-style:normal;"> No cases to display</span>
       {% endif %}  
     </p>   
     
-</div> 
+  </div> 
 
   {% if cases %}
   
@@ -36,13 +37,16 @@
      <input type="text" id="search_table"  onkeyup="searchFunction()" placeholder="Search.." title="Type in a keyword">
    </div>
 
+  
+  
   <table id="project_table">
    <thead>
      <th>Cases</th>
      <th>Samples</th>
-     <th>Count of call-ready workflows</th>
-     <th>Count of downstream workflows</th>
+     <th>Call-ready workflows</th>
+     <th>Downstream workflows</th>
      <th>Analysis blocks</th>
+     <th>Block status</th>
    </thead>     
 
    {% for i in samples %}
@@ -62,17 +66,23 @@
        <td>
          <a class="project_links" href="{{ url_for('wgs_case', project_name=project['project_id'], case=i)}}">{{cases[i]['downstream'] | length}}</a>
        </td>
-       <td>       
+       <td>
+         {% if i in block_counts %}
+           <a class="project_links" href="{{ url_for('wgs_case', project_name=project['project_id'], case=i)}}">{{block_counts[i]}}</a>
+         {% else %}
+           <a class="project_links" href="{{ url_for('wgs_case', project_name=project['project_id'], case=i)}}"> 0 </a>
+         {% endif %} 
+       </td>       
+       <td>
          <dl>
-         {% for j in block_status[i] %}
-           <dt>
-             {% if j in ['ready', 'review'] %}
-               <a class="project_links" href="{{ url_for('wgs_case', project_name=project['project_id'], case=i)}}">{{j}}</a>  
-             {% else %}
-               <a class="project_links" href="{{ url_for('wgs_case', project_name=project['project_id'], case=i)}}">{{j | shorten_workflow_id}}</a>
-             {% endif %}
-           </dt>
-         {% endfor %}
+           {% for j in block_status[i] %}
+             <dt>
+               <a class="project_links" href="{{ url_for('wgs_case', project_name=project['project_id'], case=i)}}">
+                 <div class="tooltip">{{block_status[i][j]}}<span class="tooltiptext">{{j}}</span></div>
+               </a>
+             </dt>
+             <br>
+           {% endfor %}  
          </dl>
        </td>       
      </tr>

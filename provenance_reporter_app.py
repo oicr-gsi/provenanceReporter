@@ -29,7 +29,8 @@ from utilities import connect_to_db, get_miso_sample_link,\
 from whole_genome import get_call_ready_cases, map_workflows_to_parent, \
     get_amount_data, create_block_json, get_parent_workflows, get_workflows_analysis_date, \
     get_workflow_file_count, get_WGTS_blocks_info, get_sequencing_platform, get_selected_workflows, \
-    review_wgs_blocks, get_case_workflows, update_wf_selection, get_workflow_selection_status    
+    review_wgs_blocks, get_case_workflows, update_wf_selection, get_workflow_selection_status, \
+    get_block_counts, get_wgs_blocks
 from whole_transcriptome import get_WT_call_ready_cases, get_star_case, get_WT_case_call_ready_samples, \
     map_workflows_to_samples, find_WT_analysis_blocks, map_samples_to_star_runs
 from project import get_project_info, get_cases, get_sample_counts, count_libraries, \
@@ -202,9 +203,15 @@ def whole_genome_sequencing(project_name):
     # get samples and libraries and workflow ids for each case
     cases = get_call_ready_cases(project_name, 'novaseq', 'WG', database)
     samples = sorted(list(cases.keys()))
+    # get the block counts
+    blocks = get_wgs_blocks(project_name, database, 'WGS_blocks')
+    block_counts = get_block_counts(blocks)
+       
     # get analysis block status
-    block_status = review_wgs_blocks(project_name, database)
-        
+    # extract selected status of each workflow
+    selected = get_selected_workflows(project_name, database, 'Workflows')
+    block_status = review_wgs_blocks(blocks, selected)
+    
    
     return render_template('Whole_Genome_Sequencing.html',
                            routes = routes,
@@ -212,7 +219,8 @@ def whole_genome_sequencing(project_name):
                            samples=samples,
                            cases=cases,
                            pipelines=pipelines,
-                           block_status = block_status
+                           block_status = block_status,
+                           block_counts = block_counts
                            )
 
 
@@ -346,25 +354,6 @@ def wt_case(project_name, case):
 
 
 
-@app.route('/check_workflows/<project_name>/<case>/<pair>/<anchor_wf>/<table>')
-def check_wgs_box(project_name, case, pair, anchor_wf, table, methods=['POST', 'GET']):
-    
-    database = 'merged.db'
-    # get the list of checked workflows        
-    workflows = request.form.getlist('workflow')
-    
-    print(workflows)
-    
-    if request.method == 'POST' and 'workflows' in request.form and workflows:
-        # update selected status
-        conn = connect_to_db(database)    
-        cur = conn.cursor()
-        for i in workflows:
-            cur.execute('UPDATE Workflows SET selected = \"1\" WHERE wfrun_id = \"{0}\"'.format(i))
-            conn.commit()
-        conn.close()
-
-    return redirect(url_for('WGS_case.html'))
     
 
 
