@@ -1400,13 +1400,16 @@ def review_wgs_blocks(blocks, selected_workflows):
                 # do not include call-ready workflows to determine selection/review status
                 # these may be shared across multiple blocks
                 L = [selected_workflows[i] for i in blocks[case][samples][anchor]['workflows'] if i not in anchor] 
+                
                 if any(L):
                     D[case][samples] = anchor
+                    break
                 else:
                     if blocks[case][samples][anchor]['clean'] and \
                       blocks[case][samples][anchor]['complete'] and \
                       blocks[case][samples][anchor]['release_status']:
                           D[case][samples] = 'ready'
+                          break
                     else:
                         D[case][samples] = 'review'
     return D

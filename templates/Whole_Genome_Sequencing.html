@@ -78,7 +78,11 @@
            {% for j in block_status[i] %}
              <dt>
                <a class="project_links" href="{{ url_for('wgs_case', project_name=project['project_id'], case=i)}}">
-                 <div class="tooltip">{{block_status[i][j]}}<span class="tooltiptext">{{j}}</span></div>
+                 {% if j != 'review' and j != 'ready' %}
+                   <div class="tooltip">{{block_status[i][j] | shorten_workflow_id}}<span class="tooltiptext">{{j}}</span></div>
+                 {% else %}
+                    <div class="tooltip">{{block_status[i][j]}}<span class="tooltiptext">{{j}}</span></div>
+                 {% endif %}
                </a>
              </dt>
              <br>

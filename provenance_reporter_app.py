@@ -212,7 +212,6 @@ def whole_genome_sequencing(project_name):
     selected = get_selected_workflows(project_name, database, 'Workflows')
     block_status = review_wgs_blocks(blocks, selected)
     
-   
     return render_template('Whole_Genome_Sequencing.html',
                            routes = routes,
                            project=project,
