@@ -30,7 +30,7 @@ from whole_genome import get_call_ready_cases, map_workflows_to_parent, \
     get_amount_data, create_block_json, get_parent_workflows, get_workflows_analysis_date, \
     get_workflow_file_count, get_WGTS_blocks_info, get_sequencing_platform, get_selected_workflows, \
     review_wgs_blocks, get_case_workflows, update_wf_selection, get_workflow_selection_status, \
-    get_block_counts, get_wgs_blocks
+    get_block_counts, get_wgs_blocks, create_project_block_json
 from whole_transcriptome import get_WT_call_ready_cases, get_star_case, get_WT_case_call_ready_samples, \
     map_workflows_to_samples, find_WT_analysis_blocks, map_samples_to_star_runs
 from project import get_project_info, get_cases, get_sample_counts, count_libraries, \
@@ -45,8 +45,9 @@ routes = {'Whole Genome': 'whole_genome_sequencing', 'Whole Transcriptome': 'who
 
 app = Flask(__name__)
 #app.config['SECRET_KEY'] = secret_key_generator(10)
-#app.config['SECRET_KEY'] = 'pinkipou'
 app.secret_key = secret_key_generator(10)
+
+
 
 @app.template_filter()
 def find_workflow_id(generic_name, bmpp_children_workflows, library):
@@ -356,53 +357,6 @@ def wt_case(project_name, case):
     
 
 
-# @app.route('/download_block/<project_name>/<case>/<pair>/<anchor_wf>/<table>')
-# def submit_block_data(project_name, case, pair, anchor_wf, table, methods=('GET', 'POST')):
-    
-    
-#     database = 'merged.db'
-    
-    
-    
-  
-    
-    
-
-    
-    
-#     # get the WGS blocks
-#     blocks = get_WGTS_blocks_info(project_name, case, database, table)
-#     # get the workflow names
-#     workflow_names = get_workflow_names(project_name, database)
-#     # get selected workflows
-#     selected_workflows = get_selected_workflows(project_name, database)
-#     # create json with workflow information for block for DARE
-#     block_data = create_block_json(project_name, blocks, pair, anchor_wf, workflow_names)
-    
-#     pipeline = table.split('_')[0]
-    
-#     pair_name = '.'.join(map(lambda x: x.strip(), pair.split('|')))
-    
-#     if block_data:
-        
-#         # send the json to outoutfile                    
-#         return Response(
-#             response=json.dumps(block_data),
-#             mimetype="application/json",
-#             status=200,
-#             headers={"Content-disposition": "attachment; filename={0}.{1}.{2}.{3}.{4}.json".format(project_name, pipeline, case, pair_name, anchor_wf)})
-        
-#     else:
-        
-    
-    
-#     return redirect(url_for('index'))
-#     return redirect('/')
-
-#     return render_template('create.html')
-
-        
-
 @app.route('/download_block/<project_name>/<case>/<pair>/<anchor_wf>/<table>')
 def download_block_data(project_name, case, pair, anchor_wf, table):
         
@@ -426,6 +380,42 @@ def download_block_data(project_name, case, pair, anchor_wf, table):
         mimetype="application/json",
         status=200,
         headers={"Content-disposition": "attachment; filename={0}.{1}.{2}.{3}.{4}.json".format(project_name, pipeline, case, pair_name, anchor_wf)})
+
+
+
+
+
+
+@app.route('/download_analysis_block/<project_name>/')
+def download_wgs_blocks(project_name):
+        
+    
+    ## replace WG with library type, 
+    
+    
+    database = 'merged.db'
+    
+    # get blocks
+    blocks = get_wgs_blocks(project_name, database, 'WGS_blocks')
+    # get the workflow names
+    workflow_names = get_workflow_names(project_name, database)
+    # get the selection status of each workflow
+    selected = get_selected_workflows(project_name, database, 'Workflows')
+    # get the block status
+    block_status = review_wgs_blocks(blocks, selected)
+    # form json
+    block_data = create_project_block_json(blocks, block_status, selected, workflow_names)
+        
+    # send the json to outoutfile                    
+    return Response(
+        response=json.dumps(block_data),
+        mimetype="application/json",
+        status=200,
+        headers={"Content-disposition": "attachment; filename={0}.WGS.json".format(project_name)})
+
+
+
+
 
 
 

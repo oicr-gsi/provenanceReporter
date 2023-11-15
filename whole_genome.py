@@ -895,6 +895,49 @@ def create_block_json(project_name, blocks, block, anchor_workflow, workflow_nam
     return block_data                
 
 
+
+def create_project_block_json(blocks, block_status, selected_workflows, workflow_names):
+    '''
+    (str, dict, str, str, dict, dict)
+    
+    Returns a dictionary with workflow information for a given block (ie, sample pair)
+    and anchor parent workflow (bmpp or star)
+    
+    Parameters
+    ----------
+    - project_name (str): Name of project of interest
+    - blocks (dict): Dictionary with block information
+    - block (str): Sample pair in blocks
+    - anchor_workflow (str): bamMergePreprocessing parent workflow(s) or star_call_ready parent workflow
+    - workflow_names (dict): Dictionary with workflow name and version for each workflow in project
+    - selected_workflows (dict): Dictionary with selected status of each workflow in project
+    '''
+    
+    D = {}
+    
+    for case in blocks:
+        for samples in blocks[case]:
+            # check the selection status of the block
+            if block_status[case][samples] not in ['ready', 'review']:
+                # block already reviewed and workflows selected
+                anchor_wf = block_status[case][samples]
+                for workflow in blocks[case][samples][anchor_wf]['workflows']:
+                    # check workflow status
+                    if selected_workflows[workflow]:
+                        if case not in D:
+                            D[case] = {}
+                        sample_id = '.'.join(list(map(lambda x: x.strip(), samples.split('|'))))
+                        if sample_id not in D[case]:
+                            D[case][sample_id] = {}
+                        workflow_name = workflow_names[workflow][0]
+                        workflow_version = workflow_names[workflow][1]
+                        if workflow_name not in D[case][sample_id]:
+                            D[case][sample_id][workflow_name] = []
+                        D[case][sample_id][workflow_name].append({'workflow_id': workflow, 'workflow_version': workflow_version})
+    
+    return D
+
+
 def get_call_ready_cases(project_name, platform, library_type, database):
     '''
     (str, str, str, str) -> dict

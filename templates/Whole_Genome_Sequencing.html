@@ -23,7 +23,7 @@
     <p>{% block title %}{{ project['project_id'] }} {% endblock %}
       {% if cases %}
         <span style="font-size:30px; font-style:normal;"> WGS workflow data for <span id ="count"> {{ cases|length }} </span> cases</span>
-        <button id="download_button" style="margin-top:20px;margin-left:100px"><a href=#>Download json</a></button>
+        <button id="download_button" style="margin-top:20px;margin-left:100px"><a href="{{url_for('download_wgs_blocks', project_name=project['project_id'])}}">Download json</a></button>
       {% else %}
         <span style="font-size:30px; font-style:normal;"> No cases to display</span>
       {% endif %}  
