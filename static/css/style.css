@@ -462,7 +462,11 @@ button.select_button:focus {
 }
 
 
-
+.checkbox {
+  accent-color: #196719;
+  height: 18px;
+  width: 18px;
+}
 
 
 

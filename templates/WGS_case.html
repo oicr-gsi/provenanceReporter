@@ -55,7 +55,7 @@
                  <td><div class="tooltip">Release Status:<span class="tooltiptext">Input raw sequences released?</span></div> <span style="font-size:32px;color:#ff3300;">&#10006;</span></td>
                {% endif %}
                  <td>
-                   <button type = "submit" value="submit">Select workflows</button>
+                   <button class="select_button" type = "submit" value="submit">Select workflows</button>
                  </td>
                  <td>
                    <button id="download_button"><a href="{{url_for('download_block_data', project_name=project['project_id'], case=case, pair=pair, anchor_wf=block['anchor_wf'], table='WGS_blocks')}}">Download json</a></button>
@@ -103,9 +103,9 @@
               </td>
               <td>
                 {% if selected[bmpp_run] %}
-                    <input type="checkbox" name="workflow" value="{{bmpp_run}}" id="workflow" checked/>
+                    <input class="checkbox" type="checkbox" name="workflow" value="{{bmpp_run}}" id="workflow" checked/>
                   {% else %}
-                    <input type="checkbox" name="workflow" value="{{bmpp_run}}" id="workflow"/>  
+                    <input class="checkbox" type="checkbox" name="workflow" value="{{bmpp_run}}" id="workflow"/>  
                   {% endif %}    
               </td>     
             </tr>
@@ -148,9 +148,9 @@
              <td>{{creation_dates[workflow_id] | readable_time}}</td>
              <td>
                {% if selected[workflow_id] %}
-                 <input type="checkbox" name="workflow" value="{{workflow_id}}" id="workflow" checked/>
+                 <input class="checkbox" type="checkbox" name="workflow" value="{{workflow_id}}" id="workflow" checked/>
                {% else %}
-                 <input type="checkbox" name="workflow" value="{{workflow_id}}" id="workflow"/>  
+                 <input class="checkbox" type="checkbox" name="workflow" value="{{workflow_id}}" id="workflow"/>  
                {% endif %}    
              </td>     
            </tr>
