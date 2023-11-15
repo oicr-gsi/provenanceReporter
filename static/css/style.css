@@ -247,6 +247,29 @@ img {
 }
 
 
+.select_button {
+  background-color: #196719;
+  border: none;
+  color: white;
+  padding: 10px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-blocks;
+  font-size: 16px;
+  margin: 4px 2px;
+  cursor: pointer;
+  border-radius: 8px;
+  margin-left: 25px 
+}
+
+button.select_button:focus {
+  background-color: #ff3333;
+}
+
+
+
+
+
 #miso_button {
   background-color: #145214;
   border: none;
@@ -418,3 +441,18 @@ img {
 .tooltip:hover .tooltiptext {
   visibility: visible;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
