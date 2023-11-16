@@ -47,33 +47,42 @@
      <th>Downstream workflows</th>
      <th>Analysis blocks</th>
      <th>Block status</th>
+     <th>Sample pairs</th>
+     <th>Block status</th>
    </thead>     
 
    {% for i in samples %}
+     {% if i in block_status %}
+        {% set rowNum = block_status[i] | length %}
+        {% set myList = block_status[i].keys() | list | sort %}
+     {% else %}
+        {% set rowNum = 1 %}
+        {% set myList = [] %}
+     {% endif %}
      <tr>
-       <td>
+       <td rowspan="{{rowNum}}">
          <a class="project_links" href="{{ url_for('wgs_case', project_name=project['project_id'], case=i)}}">{{i}}</a>
        </td>
-       <td>
+       <td rowspan="{{rowNum}}">
          {% for item in cases[i]['samples'] %}
            <a class="project_links" href="{{ url_for('wgs_case', project_name=project['project_id'], case=i)}}">{{item}}</a>
            <br>
          {% endfor %}       
        </td>
-       <td>
+       <td rowspan="{{rowNum}}">
          <a class="project_links" href="{{ url_for('wgs_case', project_name=project['project_id'], case=i)}}">{{cases[i]['bmpp'] | length}}</a>
        </td>
-       <td>
+       <td rowspan="{{rowNum}}">
          <a class="project_links" href="{{ url_for('wgs_case', project_name=project['project_id'], case=i)}}">{{cases[i]['downstream'] | length}}</a>
        </td>
-       <td>
+       <td rowspan="{{rowNum}}">
          {% if i in block_counts %}
            <a class="project_links" href="{{ url_for('wgs_case', project_name=project['project_id'], case=i)}}">{{block_counts[i]}}</a>
          {% else %}
            <a class="project_links" href="{{ url_for('wgs_case', project_name=project['project_id'], case=i)}}"> 0 </a>
          {% endif %} 
        </td>       
-       <td>
+       <td rowspan="{{rowNum}}">
          <dl>
            {% for j in block_status[i] %}
              <dt>
@@ -89,7 +98,54 @@
            {% endfor %}  
          </dl>
        </td>       
-     </tr>
+       <td>
+          {% if myList %}
+            <a class="project_links" href="{{ url_for('wgs_case', project_name=project['project_id'], case=i)}}">
+              {{myList.0}}
+            </a>        
+          {% else %}
+            NA       
+          {% endif %}       
+       </td>
+       <td>
+         {% if myList %}
+           <a class="project_links" href="{{ url_for('wgs_case', project_name=project['project_id'], case=i)}}">
+             {% if block_status[i][myList.0] != 'review' and block_status[i][myList.0] != 'ready' %}
+               {{block_status[i][myList.0] | shorten_workflow_id}}
+             {% else %}
+               {{block_status[i][myList.0]}}
+             {% endif %}           
+           </a>         
+         {% else %}
+           <a class="project_links" href="{{ url_for('wgs_case', project_name=project['project_id'], case=i)}}"> 
+             NA
+           </a>
+         {% endif %}
+       </td> 
+
+       {% if myList %}
+         {% for j in myList[1:] %}
+           <tr>          
+             <td>
+               <a class="project_links" href="{{ url_for('wgs_case', project_name=project['project_id'], case=i)}}">
+                 {{j}}
+               </a>
+             </td>
+             <td>
+               <a class="project_links" href="{{ url_for('wgs_case', project_name=project['project_id'], case=i)}}">
+                 {% if block_status[i][j] != 'review' and block_status[i][j] != 'ready' %}
+                   {{block_status[i][j] | shorten_workflow_id}}
+                 {% else %}
+                   {{block_status[i][j]}}
+                 {% endif %}
+               </a>
+             </td>
+           </tr>
+         {% endfor %}
+       {% endif %}
+ 
+    </tr>
+
    {% endfor %}               
    </table>
 
