@@ -151,6 +151,8 @@ def project_page(project_name):
     pipelines = get_pipelines(project_name, database)
     # get case information
     cases = get_cases(project_name, database)
+    # sort by donor id
+    cases = sorted(cases, key=lambda d: d['case_id']) 
     # get the species
     species = ', '.join(sorted(list(set([i['species'] for i in cases]))))
     # get library and sample counts
