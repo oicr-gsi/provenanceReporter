@@ -45,9 +45,9 @@
      <th>Samples</th>
      <th>Call-ready workflows</th>
      <th>Downstream workflows</th>
-     <th>Analysis blocks</th>
-     <th>Block status</th>
+     <th>Blocks</th>
      <th>Sample pairs</th>
+     <th>Analysis blocks</th>
      <th>Block status</th>
    </thead>     
 
@@ -81,26 +81,10 @@
        </td>
        <td rowspan="{{rowNum}}">
          {% if i in block_counts %}
-           <a class="project_links" href="{{ url_for('wgs_case', project_name=project['project_id'], case=i)}}">{{block_counts[i]}}</a>
+           <a class="project_links" href="{{ url_for('wgs_case', project_name=project['project_id'], case=i)}}">{{block_counts[i].values() | sum}}</a>
          {% else %}
            <a class="project_links" href="{{ url_for('wgs_case', project_name=project['project_id'], case=i)}}"> 0 </a>
          {% endif %} 
-       </td>       
-       <td rowspan="{{rowNum}}">
-         <dl>
-           {% for j in block_status[i] %}
-             <dt>
-               <a class="project_links" href="{{ url_for('wgs_case', project_name=project['project_id'], case=i)}}">
-                 {% if j != 'review' and j != 'ready' %}
-                   <div class="tooltip">{{block_status[i][j] | shorten_workflow_id}}<span class="tooltiptext">{{j}}</span></div>
-                 {% else %}
-                    <div class="tooltip">{{block_status[i][j]}}<span class="tooltiptext">{{j}}</span></div>
-                 {% endif %}
-               </a>
-             </dt>
-             <br>
-           {% endfor %}  
-         </dl>
        </td>       
        <td>
           {% if myList %}
@@ -111,6 +95,17 @@
             NA       
           {% endif %}       
        </td>
+       
+       <td>
+          {% if myList %}
+            <a class="project_links" href="{{ url_for('wgs_case', project_name=project['project_id'], case=i)}}">
+              {{block_counts[i][myList.0]}}
+            </a>        
+          {% else %}
+            0       
+          {% endif %}       
+       </td>
+       
        <td>
          {% if myList %}
            <a class="project_links" href="{{ url_for('wgs_case', project_name=project['project_id'], case=i)}}">
@@ -134,6 +129,11 @@
                <a class="project_links" href="{{ url_for('wgs_case', project_name=project['project_id'], case=i)}}">
                  {{j}}
                </a>
+             </td>
+             <td>
+               <a class="project_links" href="{{ url_for('wgs_case', project_name=project['project_id'], case=i)}}">
+                 {{block_counts[i][j]}}
+               </a>        
              </td>
              <td>
                <a class="project_links" href="{{ url_for('wgs_case', project_name=project['project_id'], case=i)}}">
