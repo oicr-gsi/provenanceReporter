@@ -64,10 +64,14 @@
          <a class="project_links" href="{{ url_for('wgs_case', project_name=project['project_id'], case=i)}}">{{i}}</a>
        </td>
        <td rowspan="{{rowNum}}">
-         {% for item in cases[i]['samples'] %}
-           <a class="project_links" href="{{ url_for('wgs_case', project_name=project['project_id'], case=i)}}">{{item}}</a>
-           <br>
-         {% endfor %}       
+         <dl>
+           {% for item in cases[i]['samples'] %}
+             <dt>
+               <a class="project_links" href="{{ url_for('wgs_case', project_name=project['project_id'], case=i)}}">{{item}}</a>
+             </dt>
+             <br>
+           {% endfor %}
+         </dl>       
        </td>
        <td rowspan="{{rowNum}}">
          <a class="project_links" href="{{ url_for('wgs_case', project_name=project['project_id'], case=i)}}">{{cases[i]['bmpp'] | length}}</a>
