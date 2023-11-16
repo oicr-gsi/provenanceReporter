@@ -1368,7 +1368,7 @@ def get_block_counts(analysis_blocks):
     '''
     (dict) -> dict
     
-    Returns a dictionary with block counts for each case in given project
+    Returns a dictionary with block counts for each case and sample pairs in given project
     
     Parameters
     ----------
@@ -1376,12 +1376,15 @@ def get_block_counts(analysis_blocks):
     '''
     
     D = {}
+    
     for i in analysis_blocks:
-        total = 0
         for j in analysis_blocks[i]:
-            total += len(analysis_blocks[i][j])
-        D[i] = total
-    return D
+            if i not in D:
+                D[i] = {}
+            assert j not in D[i]
+            D[i][j] = len(analysis_blocks[i][j])
+    return D  
+
 
 
 
