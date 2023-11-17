@@ -39,7 +39,7 @@
 
   
   
-  <table id="project_table">
+  <table id="wgs_table">
    <thead>
      <th>Cases</th>
      <th>Samples</th>
@@ -59,7 +59,8 @@
         {% set rowNum = 1 %}
         {% set myList = [] %}
      {% endif %}
-     <tr>
+     <tbody>     
+      <tr>
        <td rowspan="{{rowNum}}">
          <a class="project_links" href="{{ url_for('wgs_case', project_name=project['project_id'], case=i)}}">{{i}}</a>
        </td>
@@ -121,7 +122,8 @@
            </a>
          {% endif %}
        </td> 
-
+     
+     
        {% if myList %}
          {% for j in myList[1:] %}
            <tr>          
@@ -149,6 +151,7 @@
        {% endif %}
  
     </tr>
+    </tbody>
 
    {% endfor %}               
    </table>
