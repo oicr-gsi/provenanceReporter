@@ -5,7 +5,7 @@ Created on Fri Jun  9 10:42:36 2023
 @author: rjovelin
 """
 
-
+import os
 from utilities import connect_to_db, convert_epoch_time, remove_non_analysis_workflows,\
     get_children_workflows, get_workflow_names, get_donors
 from networks import get_node_labels, make_adjacency_matrix, plot_workflow_network
@@ -1591,12 +1591,16 @@ def get_release_status(project_name, database, table='FilesQC'):
     
     # get the workflow output files sorted by sample
     conn = connect_to_db(database)
-    data = conn.execute("SELECT DISTINCT file_swid, status FROM {0} WHERE project_id = '{1}'".format(table, project_name)).fetchall()
+    data = conn.execute("SELECT DISTINCT file_swid, status, ticket FROM {0} WHERE project_id = '{1}'".format(table, project_name)).fetchall()
     conn.close()
     
     D = {}
     for i in data:
-        D[i['file_swid']] = i['status']
+        if 'GDR' in i['ticket']:
+            ticket = os.path.join('https://jira.oicr.on.ca/browse/', os.path.basename(i['ticket']))
+        else:
+            ticket = ''
+        D[i['file_swid']] ={'status': i['status'], 'ticket': ticket}
     
     return D
     

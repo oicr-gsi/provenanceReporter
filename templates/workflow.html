@@ -42,7 +42,11 @@
            <td rowspan="{{rowNum}}">{{ i }}</td>
            <td>{{ files[i].0.0 }}</td>
            {% if files[i].0.1 in release_status %}
-             <td>{{release_status[files[i].0.1]}}</td>
+             {% if release_status[files[i].0.1]['ticket'] %}
+               <td><a class="miso_link" href={{release_ticket[files[i].0.1]['ticket']}} target="_blank">{{release_status[files[i].0.1]['status']}}</a></td>
+             {% else %}
+               <td>{{release_status[files[i].0.1]['status']}}</td>
+             {% endif %}
            {% else %}
              <td>NA</td>
            {% endif %}
@@ -50,7 +54,11 @@
              <tr>
                <td>{{ j.0 }}</td>
                {% if j.1 in release_status %}
-                 <td>{{release_status[j.1]}}</td>
+                 {% if release_status[j.1]['ticket'] %}
+                   <td><a class="miso_link" href="{{release_ticket[j.1]['ticket']}} target="_blank">{{release_status[j.1]['status']}}</a></td>
+                 {% else %}
+                   <td>{{release_status[j.1]['status']}}</td>
+                 {% endif %}
                {% else %}
                  <td>NA</td>
                {% endif %}
