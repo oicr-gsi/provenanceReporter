@@ -30,7 +30,7 @@ from whole_genome import get_call_ready_cases, map_workflows_to_parent, \
     get_amount_data, create_block_json, get_parent_workflows, get_workflows_analysis_date, \
     get_workflow_file_count, get_WGTS_blocks_info, get_sequencing_platform, get_selected_workflows, \
     review_wgs_blocks, get_case_workflows, update_wf_selection, get_workflow_selection_status, \
-    get_block_counts, get_wgs_blocks, create_project_block_json
+    get_block_counts, get_wgs_blocks, create_project_block_json, get_workflow_output, get_release_status
 from whole_transcriptome import get_WT_call_ready_cases, get_star_case, get_WT_case_call_ready_samples, \
     map_workflows_to_samples, find_WT_analysis_blocks, map_samples_to_star_runs
 from project import get_project_info, get_cases, get_sample_counts, count_libraries, \
@@ -214,6 +214,10 @@ def whole_genome_sequencing(project_name):
     # extract selected status of each workflow
     selected = get_selected_workflows(project_name, database, 'Workflows')
     block_status = review_wgs_blocks(blocks, selected)
+    # make a list of donor ids with block status
+    
+    
+    
     
     return render_template('Whole_Genome_Sequencing.html',
                            routes = routes,
@@ -287,6 +291,56 @@ def wgs_case(project_name, case):
                            parents=parents,
                            selected = selected
                            )
+
+
+
+@app.route('/<project_name>/whole_genome_sequencing/<case>/<workflow_id>')
+def workflow(project_name, case, workflow_id):
+    
+    
+    database = 'merged.db'
+    
+    # get the project info for project_name from db
+    project = get_project_info(project_name, database)
+    # get the workflow names
+    workflow_names = get_workflow_names(project_name, database)
+    
+    # find the parents of each workflow
+    parents = get_parent_workflows(project_name, database)
+    # find the children of each workflow
+    
+    
+    
+    # get input worflow sequences
+    
+    
+    # get workflow output files
+    files = get_workflow_output(project_name, case, workflow_id, database, 
+                                       'Files', 'Workflow_Inputs', 'Libraries')
+    # get the file release status
+    release_status = get_release_status(project_name, database, 'FilesQC')
+    
+    return render_template('workflow.html',
+                           project=project,
+                           case=case,
+                           parents=parents,
+                           workflow_id=workflow_id,
+                           workflow_names=workflow_names,
+                           files=files,
+                           release_status=release_status                        
+                           )
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 @app.route('/<project_name>/whole_transcriptome')

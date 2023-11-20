@@ -1,0 +1,71 @@
+{% extends 'project_base.html' %}
+
+
+{% block link %}
+ <a href="{{ url_for('project_page', project_name=project['project_id']) }}">{{ project['project_id'] }}</a>
+ <a href="{{ url_for('wgs_case', project_name=project['project_id'], case=case) }}">Analysis Blocks</a> 
+{% endblock %}
+
+
+{% block content %}
+
+<table id="block_header_table">
+  <tr>
+    <th>Workflow id</td>
+    <th>Name</td>
+    <th>Version</td>
+  </tr>
+  <tr>
+    <td><span style="font-size:16px; font-style:normal;">{{ workflow_id }}</span></td>
+    <td><span style="font-size:16px; font-style:normal;">{{ workflow_names[workflow_id].0 }}</span></td>
+    <td><span style="font-size:16px; font-style:normal;">{{ workflow_names[workflow_id].1 }}</span></td>
+  </tr>
+</table>
+
+<br>
+
+<p style="font-size:22px; font-style:bold;"> Output files </p>     
+
+
+{% if files %}
+  <table id="wgs_table">
+    <tr>
+      <th>Samples</td>
+      <th>Files</td>
+      <th>Release status</td>
+    </tr>
+    {% set samples = files.keys() | sort %}
+    {% for i in samples %}
+       {% set rowNum = files[i] | length %}
+       <tbody>       
+         <tr>
+           <td rowspan="{{rowNum}}">{{ i }}</td>
+           <td>{{ files[i].0.0 }}</td>
+           {% if files[i].0.1 in release_status %}
+             <td>{{release_status[files[i].0.1]}}</td>
+           {% else %}
+             <td>NA</td>
+           {% endif %}
+           {% for j in files[i][1:] %}
+             <tr>
+               <td>{{ j.0 }}</td>
+               {% if j.1 in release_status %}
+                 <td>{{release_status[j.1]}}</td>
+               {% else %}
+                 <td>NA</td>
+               {% endif %}
+             </tr>        
+           {% endfor %}
+           </tr>
+       </tbody>    
+    {% endfor %}
+  </table>
+{% else %}
+  <p style="font-size:22px; font-style:bold;"> No output file to display </p>     
+{% endif %}
+
+
+<br>
+
+{% endblock %}
+

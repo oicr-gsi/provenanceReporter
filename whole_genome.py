@@ -1460,37 +1460,144 @@ def review_wgs_blocks(blocks, selected_workflows):
                         D[case][samples] = 'review'
     return D
 
-# def review_wgs_blocks(project_name, database):
-#     '''
-#     (str, str) -> dict 
-    
-#     Returns a dictionary with status for analysis blocks for each case in project
-                  
-#     Parameters
-#     ----------
-#     - project_name (str): Name of project of interest
-#     - database (str): Path to the sqlite database
-#     '''
-    
-#     selected = get_selected_blocks(project_name, database, 'WGS_blocks')
-    
-#     D = {}
-    
-#     for case in selected:
-#         if case not in D:
-#             D[case] = []
-#         for samples in selected[case]:
-#             for anchor_wf in selected[case][samples]:
-#                 if selected[case][samples][anchor_wf]['selected']:
-#                     D[case].append(samples + '.' + anchor_wf) 
-#                 else:
-#                     if selected[case][samples][anchor_wf]['clean'] and \
-#                     selected[case][samples][anchor_wf]['complete'] and \
-#                     selected[case][samples][anchor_wf]['release_status']:
-#                         D[case].append('ready')
-#                     else:
-#                         D[case].append('review')
-#                 D[case] = sorted(list(set(D[case])))
-#     return D
 
-  
+
+def get_workflow_input_sequences(project_name, workflow_id, database, workflow_input_table):
+    '''
+    (str, str, str, str) -> dict    
+    
+    
+    '''
+    
+    conn = connect_to_db(database)
+    data = conn.execute("SELECT DISTINCT * FROM {0} WHERE project_id = '{1}' AND wfrun_id = '{2}'".format(workflow_input_table, project_name, workflow_id)).fetchall()
+    conn.close()
+    
+    return data
+
+
+def map_limskey_to_library(project_name, workflow_id, database, table='Workflow_Inputs'):
+    '''
+    (str, str, str, str) -> dict
+    
+    Returns a dictionary mapping limskey ids to library ids
+    
+    Parameters
+    ----------
+    - project_name (str): Name of the project of interest
+    - workflow_id (str): Workflow unique identifier
+    - database (str): Path to the sqlite database
+    - table (str): Table storing the workflow input information
+    '''
+    
+    conn = connect_to_db(database)
+    data = conn.execute("SELECT DISTINCT library, limskey FROM {0} WHERE project_id = '{1}' AND wfrun_id = '{2}'".format(table, project_name, workflow_id)).fetchall()
+    conn.close()
+    
+    D = {}
+    for i in data:
+        D[i['library']] = i['limskey']
+    
+    return D
+    
+
+def map_library_to_sample(project_name, case, database, table = 'Libraries'):
+    '''
+    (str, str, str) -> dict
+    
+    Returns a dictionary mapping sample ids to library ids
+        
+    Parameters
+    ----------
+    - project_name (str): Name of the project of interest
+    - case (str): Donor identifier
+    - database (str): Path to the sqlite database
+    - table (str): Table storing the libraries information
+    '''
+    
+    conn = connect_to_db(database)
+    data = conn.execute("SELECT DISTINCT library, sample, tissue_type, tissue_origin, \
+                         library_type, group_id FROM {0} WHERE project_id = '{1}' AND sample = '{2}'".format(table, project_name, case)).fetchall()
+    
+    # data = conn.execute("SELECT DISTINCT library, sample, tissue_type, tissue_origin, \
+    #                     library_type, group_id FROM {0} WHERE project_id = '{1}'".format(table, project_name)).fetchall()
+    # conn.close()
+    
+    D = {}
+    for i in data:
+        library = i['library']
+        sample = [i['sample'], i['tissue_type'], i['tissue_origin'],
+                           i['library_type'], i['group_id']]
+        if not i['group_id']:
+            sample = sample[:-1]
+        sample = '_'.join(sample)    
+        if library in D:
+            assert D[library] == sample
+        else:
+            D[library] = sample
+        
+    return D
+
+
+def get_workflow_output(project_name, case, workflow_id, database, file_table = 'Files',
+                        workflow_input_table = 'Workflow_Inputs', library_table = 'Libraries'):
+    '''
+    
+    
+    
+    '''
+
+    # map library to limskey
+    libraries = map_limskey_to_library(project_name, workflow_id, database, workflow_input_table)
+    
+    # map libraries to samples
+    samples = map_library_to_sample(project_name, case, database, library_table)
+    
+    # get the workflow output files sorted by sample
+    conn = connect_to_db(database)
+    data = conn.execute("SELECT DISTINCT file, limskey, file_swid FROM {0} WHERE project_id = '{1}' AND wfrun_id = '{2}'".format(file_table, project_name, workflow_id)).fetchall()
+    conn.close()
+    
+    D = {}
+
+    for i in data:
+        file = i['file']
+        limskeys = i['limskey'].split(';')
+        fileswid = i['file_swid']
+        libs = []
+        for j in limskeys:
+            for k in libraries:
+                if libraries[k] == j:
+                    libs.append(k)
+        sample_names = ';'.join(sorted(list(set([samples[j] for j in libs]))))
+        if sample_names in D:
+            D[sample_names].append([file, fileswid])
+        else:
+            D[sample_names] = [[file, fileswid]]
+    return D
+
+
+def get_release_status(project_name, database, table='FilesQC'):
+    '''
+    (str) -> dict
+    
+    
+    Parameters
+    ----------
+    - project_name (str): Name of project of interest
+    - database (str): Path to the sqlite database
+    - table (str): Table storing the files QC status
+    '''
+    
+    # get the workflow output files sorted by sample
+    conn = connect_to_db(database)
+    data = conn.execute("SELECT DISTINCT file_swid, status FROM {0} WHERE project_id = '{1}'".format(table, project_name)).fetchall()
+    conn.close()
+    
+    D = {}
+    for i in data:
+        D[i['file_swid']] = i['status']
+    
+    return D
+    
+    
