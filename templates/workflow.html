@@ -47,7 +47,7 @@
            <td>{{ files[i].0.0 }}</td>
            {% if files[i].0.1 in release_status %}
              {% if release_status[files[i].0.1]['ticket'] %}
-               <td><a class="miso_link" href="{{release_ticket[files[i].0.1]['ticket']}}" target="_blank">{{release_status[files[i].0.1]['status']}}</a></td>
+               <td><a class="miso_link" href="{{release_status[files[i].0.1]['ticket']}}" target="_blank">{{release_status[files[i].0.1]['status']}}</a></td>
              {% else %}
                <td>{{release_status[files[i].0.1]['status']}}</td>
              {% endif %}
@@ -59,7 +59,7 @@
                <td>{{ j.0 }}</td>
                {% if j.1 in release_status %}
                  {% if release_status[j.1]['ticket'] %}
-                   <td><a class="miso_link" href="{{release_ticket[j.1]['ticket']}}" target="_blank">{{release_status[j.1]['status']}}</a></td>
+                   <td><a class="miso_link" href="{{release_status[j.1]['ticket']}}" target="_blank">{{release_status[j.1]['status']}}</a></td>
                  {% else %}
                    <td>{{release_status[j.1]['status']}}</td>
                  {% endif %}
