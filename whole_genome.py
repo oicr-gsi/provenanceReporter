@@ -1496,7 +1496,7 @@ def map_limskey_to_library(project_name, workflow_id, database, table='Workflow_
     
     D = {}
     for i in data:
-        D[i['library']] = i['limskey']
+        D[i['limskey']] = i['library']  
     
     return D
     
@@ -1539,23 +1539,24 @@ def map_library_to_sample(project_name, case, database, table = 'Libraries'):
     return D
 
 
-def get_workflow_output(project_name, case, workflow_id, database, file_table = 'Files',
-                        workflow_input_table = 'Workflow_Inputs', library_table = 'Libraries'):
+def get_workflow_output(project_name, case, workflow_id, database, libraries, samples, table = 'Files'):
     '''
+    (str, str, str, str, dict, dict, str)
+    
+    
+    - libraries (dict): Dictionary mapping libraries to limskeys
+    - samples (dict): Dictionary mapping libraries to samples
+    
     
     
     
     '''
 
-    # map library to limskey
-    libraries = map_limskey_to_library(project_name, workflow_id, database, workflow_input_table)
     
-    # map libraries to samples
-    samples = map_library_to_sample(project_name, case, database, library_table)
     
     # get the workflow output files sorted by sample
     conn = connect_to_db(database)
-    data = conn.execute("SELECT DISTINCT file, limskey, file_swid FROM {0} WHERE project_id = '{1}' AND wfrun_id = '{2}'".format(file_table, project_name, workflow_id)).fetchall()
+    data = conn.execute("SELECT DISTINCT file, limskey, file_swid FROM {0} WHERE project_id = '{1}' AND wfrun_id = '{2}'".format(table, project_name, workflow_id)).fetchall()
     conn.close()
     
     D = {}
@@ -1564,11 +1565,7 @@ def get_workflow_output(project_name, case, workflow_id, database, file_table = 
         file = i['file']
         limskeys = i['limskey'].split(';')
         fileswid = i['file_swid']
-        libs = []
-        for j in limskeys:
-            for k in libraries:
-                if libraries[k] == j:
-                    libs.append(k)
+        libs = list(set([libraries[j] for j in limskeys]))
         sample_names = ';'.join(sorted(list(set([samples[j] for j in libs]))))
         if sample_names in D:
             D[sample_names].append([file, fileswid])
@@ -1604,4 +1601,23 @@ def get_release_status(project_name, database, table='FilesQC'):
     
     return D
     
+
+def map_fileswid_to_filename(project_name, database, table='Files'):
+   '''
+
+
+   '''
+
+   # get the workflow output files sorted by sample
+   conn = connect_to_db(database)
+   data = conn.execute("SELECT DISTINCT file_swid, file FROM {0} WHERE project_id = '{1}'".format(table, project_name)).fetchall()
+   conn.close()
+
+   D = {}
+   for i in data:
+       D[i['file_swid']] = i['file']
+   
+   return D
+
+
     

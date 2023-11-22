@@ -9,30 +9,34 @@
 
 {% block content %}
 
+
 <table id="block_header_table">
   <tr>
-    <th>Workflow id</td>
-    <th>Name</td>
-    <th>Version</td>
+    <th>Workflow id</th>
+    <th>Name</th>
+    <th>Version</th>
   </tr>
   <tr>
-    <td><span style="font-size:16px; font-style:normal;">{{ workflow_id }}</span></td>
-    <td><span style="font-size:16px; font-style:normal;">{{ workflow_names[workflow_id].0 }}</span></td>
-    <td><span style="font-size:16px; font-style:normal;">{{ workflow_names[workflow_id].1 }}</span></td>
+    <td>{{ workflow_id }}</td>
+    <td>{{ workflow_names[workflow_id].0 }}</td>
+    <td>{{ workflow_names[workflow_id].1 }}</td>
   </tr>
 </table>
 
-<br>
 
-<p style="font-size:22px; font-style:bold;"> Output files </p>     
 
+
+
+
+
+<p style="font-size:22px; font-family: Arial, Helvetica, sans-serif; font-style:bold;"> Output files </p>     
 
 {% if files %}
   <table id="wgs_table">
     <tr>
-      <th>Samples</td>
-      <th>Files</td>
-      <th>Release status</td>
+      <th>Samples</th>
+      <th>Files</th>
+      <th>Release status</th>
     </tr>
     {% set samples = files.keys() | sort %}
     {% for i in samples %}
@@ -74,6 +78,89 @@
 
 
 <br>
+
+<p style="font-size:22px; font-family: Arial, Helvetica, sans-serif; font-style:bold;"> Input sequences </p>   
+
+<table id="wgs_table">
+  <tr>
+    <th>Samples</th>
+    <th>Libraries</th>
+    <th>Limskeys</th>
+    <th>File swids</th>
+    <th>Files</th>
+    <th>Release status</th>   
+  </tr>
+  {% for i in sequences %}
+    <tr>
+    {% for j in i %}
+      <td>{{j}}</td>
+    {% endfor %}
+    </tr>
+  {% endfor %}
+</table>
+
+  {% if parents %}  
+  <p style="font-size:22px; font-family: Arial, Helvetica, sans-serif; font-style:bold;"> Parent workflows </p> 
+
+  <table id="project_table">
+    <tr>
+      <th colspan="2">Parents</th>
+    </tr>
+    <tr>    
+      <th>Name</th>
+      <th>Workflow id</th>
+    </tr>
+    <tr>
+      {% set parent_workflows = parents.keys() | list | sort %}
+      {% if parent_workflows %}
+        {% for i in range(parent_workflows | length) %}
+          {% for j in range(parents[parent_workflows[i]] | length) %}
+            <tr>
+              <td>{{ parent_workflows[i] }}</td>
+              <td> {{ parents[parent_workflows[i]][j]}}</td>
+            </tr>
+          {% endfor %}
+        {% endfor %}
+      {% endif %}
+    </tr>
+  </table>
+
+{% endif %}  
+
+<br>
+
+
+{% if children %}  
+  <p style="font-size:22px; font-family: Arial, Helvetica, sans-serif; font-style:bold;"> Downstream workflows </p> 
+
+  <table id="project_table">
+    <tr>
+      <th colspan="2">Children</th>  
+    </tr>
+    <tr>
+      <th>Name</th>
+      <th>Workflow id</th>
+    </tr>  
+    <tr>
+      {% set children_workflows = children.keys() | list | sort %}
+      {% if children_workflows %}  
+        {% for i in range(children_workflows | length) %}
+          {% for j in range(children[children_workflows[i]] | length) %}
+            <tr>
+              <td>{{ children_workflows[i] }}</td>
+              <td> {{ children[children_workflows[i]][j] | shorten_workflow_id }}</td>
+            </tr>
+          {% endfor %}
+        {% endfor %}
+      {% endif %}
+    </tr>
+  </table>
+
+{% endif %}  
+
+<br>
+
+
 
 {% endblock %}
 
