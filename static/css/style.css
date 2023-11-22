@@ -357,6 +357,49 @@ button.select_button:focus {
 
 
 
+
+
+.review_button {
+  background-color: #ff3333;
+  border: none;
+  color: white;
+  padding: 7px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-blocks;
+  font-size: 16px;
+  cursor: pointer;
+  border-radius: 14px;
+  margin-left: 5px;
+  margin-right: 5px;
+  margin-top:5px;
+  margin-bottom:5px;
+  transition-duration: 0.0s; 
+}
+
+.review_button:hover {
+  background-color: #196719;
+  }
+
+button.review_button:focus {
+  background-color: #196719;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 #miso_button {
   background-color: #145214;
   border: none;
