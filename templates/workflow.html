@@ -98,8 +98,20 @@
   </tr>
   {% for i in sequences %}
     <tr>
-    {% for j in i %}
-      <td>{{j}}</td>
+    {% for j in range(i | length) %}
+      {% if j == 5 %}
+        {% if i[3] in release_status and release_status[i[3]]['ticket'] %}
+        <td>
+          <a class="miso_link" href="{{release_status[i[3]]['ticket']}}" target="_blank">
+            {{i[j]}}
+          </a>
+        </td>
+        {% else %}
+          <td>{{i[j]}}</td>
+        {% endif %}
+      {% else %}
+        <td>{{i[j]}}</td>
+      {% endif %}
     {% endfor %}
     </tr>
   {% endfor %}
