@@ -25,12 +25,16 @@ import io
 import base64
 
 from utilities import connect_to_db, get_miso_sample_link,\
-    get_pipelines, get_workflow_names, get_library_design, secret_key_generator
+    get_pipelines, get_workflow_names, get_library_design, secret_key_generator, \
+    get_children_workflows
 from whole_genome import get_call_ready_cases, map_workflows_to_parent, \
     get_amount_data, create_block_json, get_parent_workflows, get_workflows_analysis_date, \
     get_workflow_file_count, get_WGTS_blocks_info, get_sequencing_platform, get_selected_workflows, \
     review_wgs_blocks, get_case_workflows, update_wf_selection, get_workflow_selection_status, \
-    get_block_counts, get_wgs_blocks, create_project_block_json, get_workflow_output, get_release_status
+    get_block_counts, get_wgs_blocks, create_project_block_json, get_workflow_output, get_release_status, \
+    get_workflow_limskeys, get_file_release_status, map_fileswid_to_filename, \
+    map_limskey_to_library, map_library_to_sample    
+    
 from whole_transcriptome import get_WT_call_ready_cases, get_star_case, get_WT_case_call_ready_samples, \
     map_workflows_to_samples, find_WT_analysis_blocks, map_samples_to_star_runs
 from project import get_project_info, get_cases, get_sample_counts, count_libraries, \
@@ -307,16 +311,63 @@ def workflow(project_name, case, workflow_id):
     
     # find the parents of each workflow
     parents = get_parent_workflows(project_name, database)
+    if workflow_id in parents:
+        parents = parents[workflow_id]
+    else:
+        parents = {}
+    
+    
     # find the children of each workflow
+    D = get_children_workflows(project_name, database)
+    D = D[workflow_id]
+    children = {}
+    for i in D:
+        if i['wf'] in children:
+            children[i['wf']].append(i['children_id'])
+        else:
+            children[i['wf']] = [i['children_id']]
     
-    
+    # get the number of rows in table
+    rows, parent_rows, children_rows = 0, 0, 0
+    for i in parents:
+        parent_rows += len(parents[i])
+    for i in children:
+        children_rows += len(children[i])
+    rows = max([parent_rows, children_rows])
+    if parent_rows > children_rows:
+        parent_rows = rows
+    elif parent_rows < children_rows:
+        children_rows = rows
     
     # get input worflow sequences
-    
+    limskeys = get_workflow_limskeys(project_name, database, 'Workflow_Inputs')
+    limskeys = limskeys[workflow_id]
+    # get release status of input sequences, excluding fastq-import workflows
+    D = get_file_release_status(project_name, database)
+    sequence_status = {i:D[i] for i in limskeys}
+    # map file swids to file names
+    fastqs = map_fileswid_to_filename(project_name, database, 'Files')
+    # map library to limskey
+    libraries = map_limskey_to_library(project_name, workflow_id, database, 'Workflow_Inputs')
+    # map libraries to samples
+    samples = map_library_to_sample(project_name, case, database, 'Libraries')
+    sequences = []
+    for i in limskeys:
+        library = libraries[i]
+        sample = samples[library]
+        status = sequence_status[i]
+        swid1, status1 = status[0][0], status[0][1]
+        swid2, status2 = status[1][0], status[1][1]
+        file1, file2 = fastqs[swid1], fastqs[swid2]
+        seq = [[swid1, file1, status1], [swid2, file2, status2]]
+        seq.sort(key=lambda x: x[1])
+        for j in seq:
+            sequences.append([sample, library, i, j[0], j[1], j[2]])
+    sequences.sort(key=lambda x: x[0])
     
     # get workflow output files
-    files = get_workflow_output(project_name, case, workflow_id, database, 
-                                       'Files', 'Workflow_Inputs', 'Libraries')
+    files = get_workflow_output(project_name, case, workflow_id, database, libraries, samples, 'Files')
+    
     # get the file release status
     release_status = get_release_status(project_name, database, 'FilesQC')
     
@@ -324,10 +375,15 @@ def workflow(project_name, case, workflow_id):
                            project=project,
                            case=case,
                            parents=parents,
+                           children=children,
+                           parent_rows=parent_rows,
+                           children_rows=children_rows,
+                           rows=rows,
                            workflow_id=workflow_id,
                            workflow_names=workflow_names,
                            files=files,
-                           release_status=release_status                        
+                           release_status=release_status,
+                           sequences=sequences
                            )
 
 
