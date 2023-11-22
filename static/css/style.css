@@ -541,6 +541,7 @@ button.select_button:focus {
 
 .workflow {
   color: #196719;
+  text-decoration: none;
 }
 
 .workflow:hover {

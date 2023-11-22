@@ -83,7 +83,9 @@
            {% for bmpp_run in block['call_ready'] %}
             <tr>
               <td>
-                <a class="workflow" href="{{ url_for('workflow', project_name=project['project_id'], case=case, workflow_id=bmpp_run) }}">{{bmpp_run | shorten_workflow_id}}</a>
+                <a class="workflow" href="{{ url_for('workflow', project_name=project['project_id'], case=case, workflow_id=bmpp_run) }}">
+                  {{bmpp_run | shorten_workflow_id}}
+                </a>
               </td>
               <td>{{workflow_names[bmpp_run].0}}</td>
               <td>{{file_counts[bmpp_run]}}</td>
@@ -143,7 +145,12 @@
                  {% for i in parents[workflow_id] %}
                    <dt>
                      {% for k in parents[workflow_id][i] %}
-                       <div class="tooltip">{{k | shorten_workflow_id}}<span class="tooltiptext">{{i}}</span></div>
+                       <div class="tooltip">
+                         <a class="workflow" href="{{ url_for('workflow', project_name=project['project_id'], case=case, workflow_id=k) }}">
+                           {{k | shorten_workflow_id}}
+                             <span class="tooltiptext">{{i}}</span>
+                         </a>   
+                       </div>
                      {% endfor %}
                    </dt>
                  {% endfor %}
