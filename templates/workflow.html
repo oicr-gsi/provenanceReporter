@@ -2,8 +2,8 @@
 
 
 {% block link %}
- <a href="{{ url_for('project_page', project_name=project['project_id']) }}">{{ project['project_id'] }}</a>
- <a href="{{ url_for('wgs_case', project_name=project['project_id'], case=case) }}">Analysis Blocks</a> 
+  <a href="{{ url_for('project_page', project_name=project['project_id']) }}">{{ project['project_id'] }}</a>
+  <a href="{{ url_for('wgs_case', project_name=project['project_id'], case=case) }}">Analysis Blocks</a> 
 {% endblock %}
 
 
@@ -24,11 +24,6 @@
 </table>
 
 
-
-
-
-
-
 <p style="font-size:22px; font-family: Arial, Helvetica, sans-serif; font-style:bold;"> Output files </p>     
 
 {% if files %}
@@ -40,12 +35,23 @@
     </tr>
     {% set samples = files.keys() | sort %}
     {% for i in samples %}
-       {% set rowNum = files[i] | length %}
-       <tbody>       
-         <tr>
-           <td rowspan="{{rowNum}}">{{ i }}</td>
-           <td>{{ files[i].0.0 }}</td>
-           {% if files[i].0.1 in release_status %}
+      {% set rowNum = files[i] | length %}
+      <tbody>       
+        <tr>
+          {% if ';' in i %}
+          <td rowspan="{{rowNum}}">
+            <dl>
+              {% for k in i.split(';') %}
+                <dt>{{k}}</dt>
+              {% endfor %}
+            </dl>
+          </td>
+          {% else %}
+            <td rowspan="{{rowNum}}">{{ i }}</td>
+          {% endif %} 
+                
+          <td>{{ files[i].0.0 }}</td>
+          {% if files[i].0.1 in release_status %}
              {% if release_status[files[i].0.1]['ticket'] %}
                <td><a class="miso_link" href="{{release_status[files[i].0.1]['ticket']}}" target="_blank">{{release_status[files[i].0.1]['status']}}</a></td>
              {% else %}
@@ -68,7 +74,7 @@
                {% endif %}
              </tr>        
            {% endfor %}
-           </tr>
+        </tr>
        </tbody>    
     {% endfor %}
   </table>
