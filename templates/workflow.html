@@ -102,7 +102,7 @@
   {% if parents %}  
   <p style="font-size:22px; font-family: Arial, Helvetica, sans-serif; font-style:bold;"> Parent workflows </p> 
 
-  <table id="project_table">
+  <table id="workflow_table">
     <tr>
       <th colspan="2">Parents</th>
     </tr>
@@ -117,7 +117,11 @@
           {% for j in range(parents[parent_workflows[i]] | length) %}
             <tr>
               <td>{{ parent_workflows[i] }}</td>
-              <td> {{ parents[parent_workflows[i]][j]}}</td>
+              <td>
+                <a class="workflow" href="{{ url_for('workflow', project_name=project['project_id'], case=case, workflow_id=parents[parent_workflows[i]][j]) }}">
+                  {{ parents[parent_workflows[i]][j]}}
+                </a>
+              </td>
             </tr>
           {% endfor %}
         {% endfor %}
@@ -133,7 +137,7 @@
 {% if children %}  
   <p style="font-size:22px; font-family: Arial, Helvetica, sans-serif; font-style:bold;"> Downstream workflows </p> 
 
-  <table id="project_table">
+  <table id="workflow_table">
     <tr>
       <th colspan="2">Children</th>  
     </tr>
@@ -148,7 +152,11 @@
           {% for j in range(children[children_workflows[i]] | length) %}
             <tr>
               <td>{{ children_workflows[i] }}</td>
-              <td> {{ children[children_workflows[i]][j] | shorten_workflow_id }}</td>
+              <td>
+                <a class="workflow" href="{{ url_for('workflow', project_name=project['project_id'], case=case, workflow_id=children[children_workflows[i]][j]) }}">
+                  {{ children[children_workflows[i]][j]}}
+                </a>
+              </td>
             </tr>
           {% endfor %}
         {% endfor %}

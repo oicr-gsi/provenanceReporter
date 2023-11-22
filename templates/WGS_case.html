@@ -82,7 +82,9 @@
         
            {% for bmpp_run in block['call_ready'] %}
             <tr>
-              <td>{{bmpp_run | shorten_workflow_id}}</td>
+              <td>
+                <a class="workflow" href="{{ url_for('workflow', project_name=project['project_id'], case=case, workflow_id=bmpp_run) }}">{{bmpp_run | shorten_workflow_id}}</a>
+              </td>
               <td>{{workflow_names[bmpp_run].0}}</td>
               <td>{{file_counts[bmpp_run]}}</td>
               <td>{{amount_data[bmpp_run]}}</td>
@@ -130,7 +132,11 @@
        
            {% for workflow_id in block['callers'] %}
            <tr>
-             <td>{{workflow_id | shorten_workflow_id}}</td>
+             <td>
+              <a class="workflow" href="{{ url_for('workflow', project_name=project['project_id'], case=case, workflow_id=workflow_id) }}">
+                {{workflow_id | shorten_workflow_id}}
+              </a>
+             </td>
              <td>{{workflow_names[workflow_id].0}}</td>
              <td>
                <dl>
