@@ -319,13 +319,14 @@ def workflow(project_name, case, workflow_id):
     
     # find the children of each workflow
     D = get_children_workflows(project_name, database)
-    D = D[workflow_id]
     children = {}
-    for i in D:
-        if i['wf'] in children:
-            children[i['wf']].append(i['children_id'])
-        else:
-            children[i['wf']] = [i['children_id']]
+    if workflow_id in D:
+        D = D[workflow_id]
+        for i in D:
+            if i['wf'] in children:
+                children[i['wf']].append(i['children_id'])
+            else:
+                children[i['wf']] = [i['children_id']]
     
     # get the number of rows in table
     rows, parent_rows, children_rows = 0, 0, 0
