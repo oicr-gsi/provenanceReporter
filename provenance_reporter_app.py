@@ -30,10 +30,10 @@ from utilities import connect_to_db, get_miso_sample_link,\
 from whole_genome import get_call_ready_cases, map_workflows_to_parent, \
     get_amount_data, create_block_json, get_parent_workflows, get_workflows_analysis_date, \
     get_workflow_file_count, get_WGTS_blocks_info, get_sequencing_platform, get_selected_workflows, \
-    review_wgs_blocks, get_case_workflows, update_wf_selection, get_workflow_selection_status, \
-    get_block_counts, get_wgs_blocks, create_project_block_json, get_workflow_output, get_release_status, \
+    review_wgs_blocks, get_case_workflows, update_wf_selection, get_block_counts, \
+    get_wgs_blocks, create_project_block_json, get_workflow_output, get_release_status, \
     get_workflow_limskeys, get_file_release_status, map_fileswid_to_filename, \
-    map_limskey_to_library, map_library_to_sample    
+    map_limskey_to_library, map_library_to_sample, map_workflows_to_block    
     
 from whole_transcriptome import get_WT_call_ready_cases, get_star_case, get_WT_case_call_ready_samples, \
     map_workflows_to_samples, find_WT_analysis_blocks, map_samples_to_star_runs
@@ -272,10 +272,19 @@ def wgs_case(project_name, case):
         # get the list of checked workflows        
         selected_workflows = request.form.getlist('workflow')
         print(selected_workflows)
-        # get the selection status of all the workflows from all analysis blocks for the given case
-        workflows = get_workflow_selection_status(project_name, case, database, 'Workflows',
-                                                  'Workflow_Inputs', 'Libraries', 'WGS_blocks')
-        update_wf_selection(workflows, selected_workflows, database, 'Workflows')
+        # get the workflows of each block and sample pair for case
+        case_workflows = get_case_workflows(case, database, 'WGS_blocks')
+        # get the list of workflows for which status needs an update
+        workflows = map_workflows_to_block(selected_workflows, case_workflows)
+        update_wf_selection(workflows, selected_workflows, selected, database, 'Workflows')
+        
+        # # get the selection status of all the workflows from all analysis blocks for the given case
+        # workflows = get_workflow_selection_status(project_name, case, database, 'Workflows',
+        #                                           'Workflow_Inputs', 'Libraries', 'WGS_blocks')
+        
+        
+        
+        # update_wf_selection(workflows, selected_workflows, database, 'Workflows')
         
         return redirect(url_for('wgs_case', case=case, project_name=project_name))
     
