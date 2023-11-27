@@ -199,7 +199,7 @@ def sequencing(project_name):
 
 
 
-@app.route('/<project_name>/whole_genome_sequencing')
+@app.route('/<project_name>/whole_genome_sequencing/', methods=['POST', 'GET'])
 def whole_genome_sequencing(project_name):
     
     database = 'merged.db'
@@ -220,10 +220,24 @@ def whole_genome_sequencing(project_name):
     block_status = review_wgs_blocks(blocks, selected)
     # make a list of donor ids with block status
     
-    
-    
-    
-    return render_template('Whole_Genome_Sequencing.html',
+    if request.method == 'POST':
+        deliverable = request.form.get('deliverable')
+        # get the workflow names
+        workflow_names = get_workflow_names(project_name, database)
+                
+        if deliverable == 'selected':
+            block_data = create_project_block_json(blocks, block_status, selected, workflow_names)
+        else:
+            block_data = {}
+        
+        return Response(
+            response=json.dumps(block_data),
+            mimetype="application/json",
+            status=200,
+            headers={"Content-disposition": "attachment; filename={0}.WGS.json".format(project_name)})
+
+    else:
+        return render_template('Whole_Genome_Sequencing.html',
                            routes = routes,
                            project=project,
                            samples=samples,
@@ -232,8 +246,7 @@ def whole_genome_sequencing(project_name):
                            block_status = block_status,
                            block_counts = block_counts
                            )
-
-
+ 
 
 @app.route('/<project_name>/whole_genome_sequencing/<case>', methods = ['POST', 'GET'])
 def wgs_case(project_name, case):
@@ -502,42 +515,6 @@ def download_block_data(project_name, case, pair, anchor_wf, table):
         mimetype="application/json",
         status=200,
         headers={"Content-disposition": "attachment; filename={0}.{1}.{2}.{3}.{4}.json".format(project_name, pipeline, case, pair_name, anchor_wf)})
-
-
-
-
-
-
-@app.route('/download_analysis_block/<project_name>/')
-def download_wgs_blocks(project_name):
-        
-    
-    ## replace WG with library type, 
-    
-    
-    database = 'merged.db'
-    
-    # get blocks
-    blocks = get_wgs_blocks(project_name, database, 'WGS_blocks')
-    # get the workflow names
-    workflow_names = get_workflow_names(project_name, database)
-    # get the selection status of each workflow
-    selected = get_selected_workflows(project_name, database, 'Workflows')
-    # get the block status
-    block_status = review_wgs_blocks(blocks, selected)
-    # form json
-    block_data = create_project_block_json(blocks, block_status, selected, workflow_names)
-        
-    # send the json to outoutfile                    
-    return Response(
-        response=json.dumps(block_data),
-        mimetype="application/json",
-        status=200,
-        headers={"Content-disposition": "attachment; filename={0}.WGS.json".format(project_name)})
-
-
-
-
 
 
 

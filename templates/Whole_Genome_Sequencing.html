@@ -7,7 +7,7 @@
   {% for i in pipelines %}
     {% if i in routes %}
       {% if i == 'Whole Genome' %} 
-        <a class="selected" href="{{ url_for(routes[i], project_name=project['project_id']) }}">{{i}}</a>
+        <a href="{{ url_for(routes[i], project_name=project['project_id']) }}">{{i}}</a>
       {% elif i == 'Whole Transcriptome' %}
         <a href="{{ url_for(routes[i], project_name=project['project_id']) }}">{{i}}</a> 
       {% endif %}
@@ -23,7 +23,26 @@
     <p>{% block title %}{{ project['project_id'] }} {% endblock %}
       {% if cases %}
         <span style="font-size:30px; font-style:normal;"> WGS workflow data for <span id ="count"> {{ cases|length }} </span> cases</span>
-        <button id="download_button" style="margin-top:20px;margin-left:100px"><a href="{{url_for('download_wgs_blocks', project_name=project['project_id'])}}">Download json</a></button>
+        
+        <div class="download-dropdown">
+          <button class="download-dropbtn">Download json</button>
+            <div class="download-dropdown-content">
+              <form method="POST" action ="">
+                {% if deliverable == 'selected' %}
+                  <label><input type="checkbox" name="deliverable" value="selected" id="deliverable" checked/>selected</label><br>      
+                {% else %}
+                  <label><input type="checkbox" name="deliverable" value="selected" id="deliverable"/>selected</label><br>      
+                {% endif %}
+                {% if deliverable == 'standard' %}
+                  <label><input type="checkbox" name="deliverable" value="standard" id="deliverable" checked/>standard</label><br>      
+                {% else %}
+                  <label><input type="checkbox" name="deliverable" value="standard" id="deliverable"/>standard</label><br>      
+                {% endif %}
+                <button class="select_button" type = "submit" value="submit">Download</button>
+              </form>          
+            </div>
+          </div>  
+        
       {% else %}
         <span style="font-size:30px; font-style:normal;"> No cases to display</span>
       {% endif %}  
