@@ -939,23 +939,22 @@ def create_block_json(project_name, blocks, block, anchor_workflow, workflow_nam
 
 
 
-def create_project_block_json(blocks, block_status, selected_workflows, workflow_names, deliverables=None, project_name=None, database=None):
+def create_project_block_json(project_name, database, blocks, block_status, selected_workflows, workflow_names, deliverables=None):
     '''
-    (str, dict, str, str, dict, dict, None | dict, None | str)
+    (str, str, dict, dict, dict, dict, None | dict)
     
     Returns a dictionary with workflow information for a given block (ie, sample pair)
     and anchor parent workflow (bmpp or star)
     
     Parameters
     ----------
-    - blocks (dict): Dictionary with block information
-    - block (str): Sample pair in blocks
-    - anchor_workflow (str): bamMergePreprocessing parent workflow(s) or star_call_ready parent workflow
-    - workflow_names (dict): Dictionary with workflow name and version for each workflow in project
-    - selected_workflows (dict): Dictionary with selected status of each workflow in project
-    - deliverables (None | dict): None or dictionary with file extensions of standard WGS deliverables
     - project_name (None | str): None or name of project of interest
     - database (None | str): None or path to the sqlite database
+    - blocks (dict): Dictionary with block information
+    - block_status (dict): Dictionary with review status of each block
+    - selected_workflows (dict): Dictionary with selected status of each workflow in project
+    - workflow_names (dict): Dictionary with workflow name and version for each workflow in project
+    - deliverables (None | dict): None or dictionary with file extensions of standard WGS deliverables
     '''
     
     D = {}
@@ -970,22 +969,27 @@ def create_project_block_json(blocks, block_status, selected_workflows, workflow
                     # get workflow name and version
                     workflow_name = workflow_names[workflow][0]
                     workflow_version = workflow_names[workflow][1]
-
+                    # get sample pairs matching the outputfiles sample keys
+                    sample_pair = ';'.join(sorted(list(map(lambda x: x.strip(), samples.split('|')))))
+                
                     # check workflow status
                     if selected_workflows[workflow]:
+                        # initiate dictionary
+                        if case not in D:
+                            D[case] = {}
+                        
+                        # get workflow output files
+                        # needed to sort outputs by sample pairs or by sample for call-ready workflows
+                        # even if all files are recorded
+                        libraries = map_limskey_to_library(project_name, workflow, database, 'Workflow_Inputs')
+                        sample_names = map_library_to_sample(project_name, case, database, 'Libraries')
+                        outputfiles = get_workflow_output(project_name, case, workflow, database, libraries, sample_names, 'Files')
+                        
                         # check that only workflows in standard WGS deliverables are used
                         if deliverables:
-                            
-                            # get workflow output files
-                            libraries = map_limskey_to_library(project_name, workflow, database, 'Workflow_Inputs')
-                            sample_names = map_library_to_sample(project_name, case, database, 'Libraries')
-                            outputfiles = get_workflow_output(project_name, case, workflow, database, libraries, sample_names, 'Files')
-                            sample_pair = ';'.join(sorted(list(map(lambda x: x.strip(), samples.split('|')))))
-                            
                             # keep track of the files to be released                                            
                             L = []
                             key = workflow_names[workflow][0].split('_')[0].lower()
-                            
                             if key in deliverables:
                                 if sample_pair in outputfiles:
                                     for i in outputfiles[sample_pair]:
@@ -1005,27 +1009,18 @@ def create_project_block_json(blocks, block_status, selected_workflows, workflow
                                                 if file_ending in file and file[file.rindex(file_ending):] == file_ending:
                                                     l.append(file)
                                         L.append(l)        
-                                    
-                        if case not in D:
-                            D[case] = {}
-                        if sample_pair in outputfiles:
-                            sample_id = '.'.join(list(map(lambda x: x.strip(), samples.split('|'))))
-                            if sample_id not in D[case]:
-                                D[case][sample_id] = {}
-                            if deliverables:
+                        
+                            if sample_pair in outputfiles:
+                                sample_id = '.'.join(list(map(lambda x: x.strip(), samples.split('|'))))
                                 if L:
+                                    if sample_id not in D[case]:
+                                        D[case][sample_id] = {}
                                     if workflow_name not in D[case][sample_id]:
                                         D[case][sample_id][workflow_name] = []
                                     D[case][sample_id][workflow_name].append({'workflow_id': workflow,
                                                                               'workflow_version': workflow_version,
                                                                               'files': L})
                             else:
-                                if workflow_name not in D[case][sample_id]:
-                                    D[case][sample_id][workflow_name] = []
-                                D[case][sample_id][workflow_name].append({'workflow_id': workflow, 'workflow_version': workflow_version})
-                                
-                        else:
-                            if deliverables:
                                 sample_id = sample_pair.split(';')
                                 for k in range(len(sample_id)):
                                     if L[k]:
@@ -1036,6 +1031,16 @@ def create_project_block_json(blocks, block_status, selected_workflows, workflow
                                         D[case][sample_id[k]][workflow_name].append({'workflow_id': workflow,
                                                                                      'workflow_version': workflow_version,
                                                                                      'files': L[k]})
+                            
+                        else:
+                            if sample_pair in outputfiles:
+                                sample_id = '.'.join(list(map(lambda x: x.strip(), samples.split('|'))))
+                                if sample_id not in D[case]:
+                                    D[case][sample_id] = {}
+                                if workflow_name not in D[case][sample_id]:
+                                    D[case][sample_id][workflow_name] = []
+                                D[case][sample_id][workflow_name].append({'workflow_id': workflow, 'workflow_version': workflow_version})
+                                
                             else:
                                 sample_id = sample_pair.split(';')
                                 for k in range(len(sample_id)):

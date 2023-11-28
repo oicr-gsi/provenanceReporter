@@ -226,12 +226,12 @@ def whole_genome_sequencing(project_name):
         workflow_names = get_workflow_names(project_name, database)
                 
         if deliverable == 'selected':
-            block_data = create_project_block_json(blocks, block_status, selected, workflow_names)
+            block_data = create_project_block_json(project_name, database, blocks, block_status, selected, workflow_names)
         elif deliverable == 'standard':
             # get the pipeline deliverables       
             deliverables = get_WGS_standard_deliverables()
-            block_data = create_project_block_json(blocks, block_status, selected, workflow_names, deliverables=deliverables, project_name=project_name, database=database)
-                
+            block_data = create_project_block_json(project_name, database, blocks, block_status, selected, workflow_names, deliverables)
+            
         return Response(
             response=json.dumps(block_data),
             mimetype="application/json",
