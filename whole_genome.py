@@ -967,6 +967,10 @@ def create_project_block_json(blocks, block_status, selected_workflows, workflow
                 # block already reviewed and workflows selected
                 anchor_wf = block_status[case][samples]
                 for workflow in blocks[case][samples][anchor_wf]['workflows']:
+                    # get workflow name and version
+                    workflow_name = workflow_names[workflow][0]
+                    workflow_version = workflow_names[workflow][1]
+
                     # check workflow status
                     if selected_workflows[workflow]:
                         # check that only workflows in standard WGS deliverables are used
@@ -981,28 +985,66 @@ def create_project_block_json(blocks, block_status, selected_workflows, workflow
                             # keep track of the files to be released                                            
                             L = []
                             key = workflow_names[workflow][0].split('_')[0].lower()
-                                                       
+                            
                             if key in deliverables:
-                                # collect only the specified files
-                                for i in outputfiles[sample_pair]:
-                                    file = i[0]
-                                    for file_ending in deliverables[key]:
-                                        if file_ending in file and file[file.rindex(file_ending):] == file_ending:
-                                            L.append(file)
-                                            
+                                if sample_pair in outputfiles:
+                                    for i in outputfiles[sample_pair]:
+                                        file = i[0]
+                                        for file_ending in deliverables[key]:
+                                            if file_ending in file and file[file.rindex(file_ending):] == file_ending:
+                                                L.append(file)
+                                else:
+                                    # collect only the specified files
+                                    # for call-ready workflows, collect files for individual sample
+                                    # instead of sample pairs
+                                    for k in sample_pair.split(';'):
+                                        l = []
+                                        for i in outputfiles[k]:
+                                            file = i[0]
+                                            for file_ending in deliverables[key]:
+                                                if file_ending in file and file[file.rindex(file_ending):] == file_ending:
+                                                    l.append(file)
+                                        L.append(l)        
+                                    
                         if case not in D:
                             D[case] = {}
-                        sample_id = '.'.join(list(map(lambda x: x.strip(), samples.split('|'))))
-                        if sample_id not in D[case]:
-                            D[case][sample_id] = {}
-                        workflow_name = workflow_names[workflow][0]
-                        workflow_version = workflow_names[workflow][1]
-                        if workflow_name not in D[case][sample_id]:
-                            D[case][sample_id][workflow_name] = []
-                        
-                        D[case][sample_id][workflow_name].append({'workflow_id': workflow, 'workflow_version': workflow_version})
-                        if deliverables:
-                            D[case][sample_id][workflow_name][-1]['files'] = L
+                        if sample_pair in outputfiles:
+                            sample_id = '.'.join(list(map(lambda x: x.strip(), samples.split('|'))))
+                            if sample_id not in D[case]:
+                                D[case][sample_id] = {}
+                            if deliverables:
+                                if L:
+                                    if workflow_name not in D[case][sample_id]:
+                                        D[case][sample_id][workflow_name] = []
+                                    D[case][sample_id][workflow_name].append({'workflow_id': workflow,
+                                                                              'workflow_version': workflow_version,
+                                                                              'files': L})
+                            else:
+                                if workflow_name not in D[case][sample_id]:
+                                    D[case][sample_id][workflow_name] = []
+                                D[case][sample_id][workflow_name].append({'workflow_id': workflow, 'workflow_version': workflow_version})
+                                
+                        else:
+                            if deliverables:
+                                sample_id = sample_pair.split(';')
+                                for k in range(len(sample_id)):
+                                    if L[k]:
+                                        if sample_id[k] not in D[case]:
+                                            D[case][sample_id[k]] = {}
+                                        if workflow_name not in D[case][sample_id[k]]:
+                                            D[case][sample_id[k]][workflow_name] = []
+                                        D[case][sample_id[k]][workflow_name].append({'workflow_id': workflow,
+                                                                                     'workflow_version': workflow_version,
+                                                                                     'files': L[k]})
+                            else:
+                                sample_id = sample_pair.split(';')
+                                for k in range(len(sample_id)):
+                                    if sample_id[k] not in D[case]:
+                                        D[case][sample_id[k]] = {}
+                                        if workflow_name not in D[case][sample_id[k]]:
+                                            D[case][sample_id[k]][workflow_name] = []
+                                        D[case][sample_id[k]][workflow_name].append({'workflow_id': workflow,
+                                                                                     'workflow_version': workflow_version})
     
     return D
 
@@ -1802,7 +1844,8 @@ def get_WGS_standard_deliverables():
     
     '''
     
-    deliverables = {'varianteffectpredictor': ['.mutect2.filtered.vep.vcf.gz',
+    deliverables = {'bammergepreprocessing': ['.bai', '.bam'],
+                    'varianteffectpredictor': ['.mutect2.filtered.vep.vcf.gz',
                                                '.mutect2.filtered.vep.vcf.gz.tbi',
                                                '.mutect2.filtered.maf.gz'],
                     'delly': ['.somatic_filtered.delly.merged.vcf.gz',
