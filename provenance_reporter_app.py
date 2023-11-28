@@ -33,7 +33,7 @@ from whole_genome import get_call_ready_cases, map_workflows_to_parent, \
     review_wgs_blocks, get_case_workflows, update_wf_selection, get_block_counts, \
     get_wgs_blocks, create_project_block_json, get_workflow_output, get_release_status, \
     get_workflow_limskeys, get_file_release_status, map_fileswid_to_filename, \
-    map_limskey_to_library, map_library_to_sample, map_workflows_to_block    
+    map_limskey_to_library, map_library_to_sample, map_workflows_to_block, get_WGS_standard_deliverables    
     
 from whole_transcriptome import get_WT_call_ready_cases, get_star_case, get_WT_case_call_ready_samples, \
     map_workflows_to_samples, find_WT_analysis_blocks, map_samples_to_star_runs
@@ -227,9 +227,11 @@ def whole_genome_sequencing(project_name):
                 
         if deliverable == 'selected':
             block_data = create_project_block_json(blocks, block_status, selected, workflow_names)
-        else:
-            block_data = {}
-        
+        elif deliverable == 'standard':
+            # get the pipeline deliverables       
+            deliverables = get_WGS_standard_deliverables()
+            block_data = create_project_block_json(blocks, block_status, selected, workflow_names, deliverables=deliverables, project_name=project_name, database=database)
+                
         return Response(
             response=json.dumps(block_data),
             mimetype="application/json",

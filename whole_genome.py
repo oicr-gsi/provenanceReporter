@@ -896,21 +896,66 @@ def create_block_json(project_name, blocks, block, anchor_workflow, workflow_nam
 
 
 
-def create_project_block_json(blocks, block_status, selected_workflows, workflow_names):
+# def create_project_block_json(blocks, block_status, selected_workflows, workflow_names):
+#     '''
+#     (str, dict, str, str, dict, dict)
+    
+#     Returns a dictionary with workflow information for a given block (ie, sample pair)
+#     and anchor parent workflow (bmpp or star)
+    
+#     Parameters
+#     ----------
+#     - project_name (str): Name of project of interest
+#     - blocks (dict): Dictionary with block information
+#     - block (str): Sample pair in blocks
+#     - anchor_workflow (str): bamMergePreprocessing parent workflow(s) or star_call_ready parent workflow
+#     - workflow_names (dict): Dictionary with workflow name and version for each workflow in project
+#     - selected_workflows (dict): Dictionary with selected status of each workflow in project
+#     '''
+    
+#     D = {}
+    
+#     for case in blocks:
+#         for samples in blocks[case]:
+#             # check the selection status of the block
+#             if block_status[case][samples] not in ['ready', 'review']:
+#                 # block already reviewed and workflows selected
+#                 anchor_wf = block_status[case][samples]
+#                 for workflow in blocks[case][samples][anchor_wf]['workflows']:
+#                     # check workflow status
+#                     if selected_workflows[workflow]:
+#                         if case not in D:
+#                             D[case] = {}
+#                         sample_id = '.'.join(list(map(lambda x: x.strip(), samples.split('|'))))
+#                         if sample_id not in D[case]:
+#                             D[case][sample_id] = {}
+#                         workflow_name = workflow_names[workflow][0]
+#                         workflow_version = workflow_names[workflow][1]
+#                         if workflow_name not in D[case][sample_id]:
+#                             D[case][sample_id][workflow_name] = []
+#                         D[case][sample_id][workflow_name].append({'workflow_id': workflow, 'workflow_version': workflow_version})
+    
+#     return D
+
+
+
+def create_project_block_json(blocks, block_status, selected_workflows, workflow_names, deliverables=None, project_name=None, database=None):
     '''
-    (str, dict, str, str, dict, dict)
+    (str, dict, str, str, dict, dict, None | dict, None | str)
     
     Returns a dictionary with workflow information for a given block (ie, sample pair)
     and anchor parent workflow (bmpp or star)
     
     Parameters
     ----------
-    - project_name (str): Name of project of interest
     - blocks (dict): Dictionary with block information
     - block (str): Sample pair in blocks
     - anchor_workflow (str): bamMergePreprocessing parent workflow(s) or star_call_ready parent workflow
     - workflow_names (dict): Dictionary with workflow name and version for each workflow in project
     - selected_workflows (dict): Dictionary with selected status of each workflow in project
+    - deliverables (None | dict): None or dictionary with file extensions of standard WGS deliverables
+    - project_name (None | str): None or name of project of interest
+    - database (None | str): None or path to the sqlite database
     '''
     
     D = {}
@@ -924,6 +969,27 @@ def create_project_block_json(blocks, block_status, selected_workflows, workflow
                 for workflow in blocks[case][samples][anchor_wf]['workflows']:
                     # check workflow status
                     if selected_workflows[workflow]:
+                        # check that only workflows in standard WGS deliverables are used
+                        if deliverables:
+                            
+                            # get workflow output files
+                            libraries = map_limskey_to_library(project_name, workflow, database, 'Workflow_Inputs')
+                            sample_names = map_library_to_sample(project_name, case, database, 'Libraries')
+                            outputfiles = get_workflow_output(project_name, case, workflow, database, libraries, sample_names, 'Files')
+                            sample_pair = ';'.join(sorted(list(map(lambda x: x.strip(), samples.split('|')))))
+                            
+                            # keep track of the files to be released                                            
+                            L = []
+                            key = workflow_names[workflow][0].split('_')[0].lower()
+                                                       
+                            if key in deliverables:
+                                # collect only the specified files
+                                for i in outputfiles[sample_pair]:
+                                    file = i[0]
+                                    for file_ending in deliverables[key]:
+                                        if file_ending in file and file[file.rindex(file_ending):] == file_ending:
+                                            L.append(file)
+                                            
                         if case not in D:
                             D[case] = {}
                         sample_id = '.'.join(list(map(lambda x: x.strip(), samples.split('|'))))
@@ -933,7 +999,10 @@ def create_project_block_json(blocks, block_status, selected_workflows, workflow
                         workflow_version = workflow_names[workflow][1]
                         if workflow_name not in D[case][sample_id]:
                             D[case][sample_id][workflow_name] = []
+                        
                         D[case][sample_id][workflow_name].append({'workflow_id': workflow, 'workflow_version': workflow_version})
+                        if deliverables:
+                            D[case][sample_id][workflow_name][-1]['files'] = L
     
     return D
 
@@ -1719,4 +1788,31 @@ def map_fileswid_to_filename(project_name, database, table='Files'):
    return D
 
 
+
+def get_WGS_standard_deliverables():
+    '''
+    (None) -> dict
+    
+    Returns a dictionary with the file extensions or file endings for each workflow
+    for which output files are released as part of the standard WGS package
+    
+    Parameters
+    ----------
+     None
+    
+    '''
+    
+    deliverables = {'varianteffectpredictor': ['.mutect2.filtered.vep.vcf.gz',
+                                               '.mutect2.filtered.vep.vcf.gz.tbi',
+                                               '.mutect2.filtered.maf.gz'],
+                    'delly': ['.somatic_filtered.delly.merged.vcf.gz',
+                      '.somatic_filtered.delly.merged.vcf.gz.tbi'],
+                    'sequenza': ['results.zip', 'summary.pdf', 'alternative_solutions.json'],
+                    'mavis': ['.tab', '.zip']}
+    
+    return deliverables
+
+    
+    
+    
     
