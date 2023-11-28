@@ -231,7 +231,9 @@ def whole_genome_sequencing(project_name):
             # get the pipeline deliverables       
             deliverables = get_WGS_standard_deliverables()
             block_data = create_project_block_json(project_name, database, blocks, block_status, selected, workflow_names, deliverables)
-            
+        else:
+            block_data = {}
+                
         return Response(
             response=json.dumps(block_data),
             mimetype="application/json",
