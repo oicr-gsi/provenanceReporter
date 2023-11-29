@@ -294,17 +294,7 @@ def wgs_case(project_name, case):
         # get the list of workflows for which status needs an update
         workflows = map_workflows_to_block(selected_workflows, case_workflows)
         update_wf_selection(workflows, selected_workflows, selected, database, 'Workflows')
-        
-        # # get the selection status of all the workflows from all analysis blocks for the given case
-        # workflows = get_workflow_selection_status(project_name, case, database, 'Workflows',
-        #                                           'Workflow_Inputs', 'Libraries', 'WGS_blocks')
-        
-        
-        
-        # update_wf_selection(workflows, selected_workflows, database, 'Workflows')
-        
         return redirect(url_for('wgs_case', case=case, project_name=project_name))
-    
     else:
         return render_template('WGS_case.html',
                            project=project,
@@ -496,8 +486,8 @@ def wt_case(project_name, case):
     
 
 
-@app.route('/download_block/<project_name>/<case>/<pair>/<anchor_wf>/<table>')
-def download_block_data(project_name, case, pair, anchor_wf, table):
+@app.route('/download_block/<project_name>/<case>/<pair>/<anchor_wf>/<table>/<selection>')
+def download_block_data(project_name, case, pair, anchor_wf, table, selection):
         
     database = 'merged.db'
     
@@ -508,7 +498,8 @@ def download_block_data(project_name, case, pair, anchor_wf, table):
     # get selected workflows
     selected_workflows = get_selected_workflows(project_name, database)
     # create json with workflow information for block for DARE
-    block_data = create_block_json(project_name, blocks, pair, anchor_wf, workflow_names, selected_workflows)
+    #block_data = create_block_json(project_name, blocks, pair, anchor_wf, workflow_names, selected_workflows, selection)
+    block_data = create_block_json(database, project_name, case, blocks, pair, anchor_wf, workflow_names, selected_workflows, selection)
     pipeline = table.split('_')[0]
     
     pair_name = '.'.join(map(lambda x: x.strip(), pair.split('|')))
@@ -518,7 +509,7 @@ def download_block_data(project_name, case, pair, anchor_wf, table):
         response=json.dumps(block_data),
         mimetype="application/json",
         status=200,
-        headers={"Content-disposition": "attachment; filename={0}.{1}.{2}.{3}.{4}.json".format(project_name, pipeline, case, pair_name, anchor_wf)})
+        headers={"Content-disposition": "attachment; filename={0}.{1}.{2}.{3}.{4}.{5}.json".format(project_name, pipeline, case, pair_name, anchor_wf, selection)})
 
 
 
