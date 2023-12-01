@@ -427,9 +427,23 @@ def whole_transcriptome(project_name):
     # get samples and libraries and workflow ids for each case
     cases = get_WT_call_ready_cases(project_name, 'novaseq', database, 'WT')
     samples = sorted(list(cases.keys()))
-
-    return render_template('Whole_transcriptome.html', routes = routes, project=project,
-                           samples=samples, cases=cases, pipelines=pipelines)
+    # get the block counts
+    blocks = get_wgs_blocks(project_name, database, 'WT_blocks')
+    block_counts = get_block_counts(blocks)
+    
+    # get analysis block status
+    # extract selected status of each workflow
+    selected = get_selected_workflows(project_name, database, 'Workflows')
+    block_status = review_wgs_blocks(blocks, selected)
+    
+    return render_template('Whole_transcriptome.html',
+                           routes = routes, project=project,
+                           samples=samples,
+                           cases=cases,
+                           pipelines=pipelines,
+                           blocks=blocks,
+                           block_counts=block_counts,
+                           block_status=block_status)
 
 
 @app.route('/<project_name>/whole_transcriptome/<case>')
