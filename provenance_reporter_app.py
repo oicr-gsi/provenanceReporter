@@ -472,8 +472,6 @@ def wt_case(project_name, case):
     amount_data = get_amount_data(project_name, database)
     # get the creation date of all workflows
     creation_dates = get_workflows_analysis_date(project_name, database)
-    # get the sequencing platform of each workflow
-    platforms = get_sequencing_platform(project_name, database)
     # find the parents of each workflow
     parents = get_parent_workflows(project_name, database)
     # extract selected status of each workflow
@@ -493,7 +491,6 @@ def wt_case(project_name, case):
                            file_counts=file_counts,
                            amount_data=amount_data,
                            creation_dates=creation_dates,
-                           platforms=platforms,
                            parents=parents,
                            selected=selected
                            )
