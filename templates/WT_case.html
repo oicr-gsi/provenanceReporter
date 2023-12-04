@@ -113,7 +113,6 @@
                 <th>file count</th>
                 <th>lane count</th>
                 <th>date</th>     
-                <th>platform</th>
                 <th>select</th>
               </thead>     
        
@@ -130,7 +129,12 @@
                     {% for i in parents[workflow_id] %}
                       <dt>
                         {% for k in parents[workflow_id][i] %}
-                          <div class="tooltip">{{k | shorten_workflow_id}}<span class="tooltiptext">{{i}}</span></div>
+                          <div class="tooltip">
+                            <a class="workflow" href="{{ url_for('workflow', project_name=project['project_id'], case=case, workflow_id=k) }}">
+                              {{k | shorten_workflow_id}}
+                            </a>  
+                            <span class="tooltiptext">{{i}}</span>
+                          </div>
                         {% endfor %}
                       </dt>
                     {% endfor %}
@@ -139,7 +143,6 @@
                 <td>{{file_counts[workflow_id]}}</td>              
                 <td>{{amount_data[workflow_id]}}</td>             
                 <td>{{creation_dates[workflow_id] | readable_time}}</td>
-                <td>{{platforms[workflow_id]}}</td>     
                 <td>
                   {% if selected[workflow_id] %}
                     <input class="checkbox" type="checkbox" name="workflow" value="{{workflow_id}}" id="workflow" checked/>
