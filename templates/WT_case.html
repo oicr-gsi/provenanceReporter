@@ -70,6 +70,7 @@
                 <th>lane count</th>
                 <th>date</th>      
                 <th>Tumour</th>
+                <th>Select</th>
               </thead>     
         
               {% for star_run in block['call_ready'] %}
@@ -91,6 +92,13 @@
                       {% endfor %}
                     </dl>
                   </td>
+                  <td>
+                    {% if selected[star_run] %}
+                      <input class="checkbox" type="checkbox" name="workflow" value="{{star_run}}" id="workflow" checked/>
+                    {% else %}
+                      <input class="checkbox" type="checkbox" name="workflow" value="{{star_run}}" id="workflow"/>  
+                    {% endif %}    
+                  </td>
                 </tr>
               {% endfor %}
             </table>
@@ -106,6 +114,7 @@
                 <th>lane count</th>
                 <th>date</th>     
                 <th>platform</th>
+                <th>select</th>
               </thead>     
        
             {% for workflow_id in block['callers'] %}
@@ -131,6 +140,13 @@
                 <td>{{amount_data[workflow_id]}}</td>             
                 <td>{{creation_dates[workflow_id] | readable_time}}</td>
                 <td>{{platforms[workflow_id]}}</td>     
+                <td>
+                  {% if selected[workflow_id] %}
+                    <input class="checkbox" type="checkbox" name="workflow" value="{{workflow_id}}" id="workflow" checked/>
+                  {% else %}
+                    <input class="checkbox" type="checkbox" name="workflow" value="{{workflow_id}}" id="workflow"/>  
+                  {% endif %}
+                </td>    
               </tr>
             {% endfor %}
             </table>
@@ -139,7 +155,7 @@
     <img src="data:image/png;base64,{{block['network']}}" alt="workflow_network" title="workflows" style="padding-right: 8px; padding-left:8px; width:25%; height:25%"/>
      
     </div>   
-
+  </form>  
   {% endfor %}
 
 

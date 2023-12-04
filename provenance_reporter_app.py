@@ -476,6 +476,11 @@ def wt_case(project_name, case):
     platforms = get_sequencing_platform(project_name, database)
     # find the parents of each workflow
     parents = get_parent_workflows(project_name, database)
+    # extract selected status of each workflow
+    selected = get_selected_workflows(project_name, database, 'Workflows')
+    
+    
+    
     
     return render_template('WT_case.html',
                            project=project,
@@ -489,7 +494,8 @@ def wt_case(project_name, case):
                            amount_data=amount_data,
                            creation_dates=creation_dates,
                            platforms=platforms,
-                           parents=parents
+                           parents=parents,
+                           selected=selected
                            )
 
 
