@@ -288,7 +288,6 @@ def wgs_case(project_name, case):
     if request.method == 'POST':
         # get the list of checked workflows        
         selected_workflows = request.form.getlist('workflow')
-        print(selected_workflows)
         # get the workflows of each block and sample pair for case
         case_workflows = get_case_workflows(case, database, 'WGS_blocks')
         # get the list of workflows for which status needs an update
@@ -404,18 +403,6 @@ def workflow(project_name, case, workflow_id):
                            )
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 @app.route('/<project_name>/whole_transcriptome')
 def whole_transcriptome(project_name):
     
@@ -446,7 +433,7 @@ def whole_transcriptome(project_name):
                            block_status=block_status)
 
 
-@app.route('/<project_name>/whole_transcriptome/<case>')
+@app.route('/<project_name>/whole_transcriptome/<case>', methods=['POST', 'GET'])
 def wt_case(project_name, case):
     
     
@@ -477,30 +464,31 @@ def wt_case(project_name, case):
     # extract selected status of each workflow
     selected = get_selected_workflows(project_name, database, 'Workflows')
     
-    
-    
-    
-    return render_template('WT_case.html',
-                           project=project,
-                           routes = routes,
-                           case=case,
-                           pipelines=pipelines,
-                           blocks=blocks,
-                           sample_pairs_names=sample_pairs_names,
-                           workflow_names=workflow_names,
-                           file_counts=file_counts,
-                           amount_data=amount_data,
-                           creation_dates=creation_dates,
-                           parents=parents,
-                           selected=selected
-                           )
+    if request.method == 'POST':
+        # get the list of checked workflows        
+        selected_workflows = request.form.getlist('workflow')
+        # get the workflows of each block and sample pair for case
+        case_workflows = get_case_workflows(case, database, 'WT_blocks')
+        # get the list of workflows for which status needs an update
+        workflows = map_workflows_to_block(selected_workflows, case_workflows)
+        update_wf_selection(workflows, selected_workflows, selected, database, 'Workflows')
+        return redirect(url_for('wt_case', case=case, project_name=project_name))
+    else:
+        return render_template('WT_case.html',
+                               project=project,
+                               routes = routes,
+                               case=case,
+                               pipelines=pipelines,
+                               blocks=blocks,
+                               sample_pairs_names=sample_pairs_names,
+                               workflow_names=workflow_names,
+                               file_counts=file_counts,
+                               amount_data=amount_data,
+                               creation_dates=creation_dates,
+                               parents=parents,
+                               selected=selected
+                               )
 
-
-
-
-
-
-    
 
 
 @app.route('/download_block/<project_name>/<case>/<pair>/<anchor_wf>/<table>/<selection>')
