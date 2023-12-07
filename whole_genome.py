@@ -1071,12 +1071,12 @@ def create_block_json(database, project_name, case, blocks, block, anchor_workfl
 
 
 
-def create_project_block_json(project_name, database, blocks, block_status, selected_workflows, workflow_names, deliverables=None):
+def create_WGS_project_block_json(project_name, database, blocks, block_status, selected_workflows, workflow_names, deliverables=None):
     '''
     (str, str, dict, dict, dict, dict, None | dict)
     
     Returns a dictionary with workflow information for a given block (ie, sample pair)
-    and anchor parent workflow (bmpp or star)
+    and anchor bmpp parent workflow
     
     Parameters
     ----------
@@ -1103,7 +1103,6 @@ def create_project_block_json(project_name, database, blocks, block_status, sele
                     workflow_version = workflow_names[workflow][1]
                     # get sample pairs matching the outputfiles sample keys
                     sample_pair = ';'.join(sorted(list(map(lambda x: x.strip(), samples.split('|')))))
-                
                     # check workflow status
                     if selected_workflows[workflow]:
                         # initiate dictionary
@@ -1141,7 +1140,7 @@ def create_project_block_json(project_name, database, blocks, block_status, sele
                                                 if file_ending in file and file[file.rindex(file_ending):] == file_ending:
                                                     l.append(file)
                                         L.append(l)        
-                        
+                                        
                             if sample_pair in outputfiles:
                                 sample_id = '.'.join(list(map(lambda x: x.strip(), samples.split('|'))))
                                 if L:
@@ -1184,6 +1183,8 @@ def create_project_block_json(project_name, database, blocks, block_status, sele
                                                                                      'workflow_version': workflow_version})
     
     return D
+
+
 
 
 def get_call_ready_cases(project_name, platform, library_type, database):
@@ -1529,11 +1530,16 @@ def map_workflows_to_block(selected_workflows, case_workflows):
     for sample_pair in case_workflows:
         for anchor in case_workflows[sample_pair]:
             I = set(selected_workflows).intersection(set(case_workflows[sample_pair][anchor]))
-            for i in anchor.split('.'):
-                if i in I:
-                    I.remove(i)
+            # for i in anchor.split('.'):
+            #     if i in I:
+            #         I.remove(i)
+            # if I:
+            #     L = case_workflows[sample_pair][anchor]
+    
             if I:
                 L = case_workflows[sample_pair][anchor]
+    
+    
     return L
 
 

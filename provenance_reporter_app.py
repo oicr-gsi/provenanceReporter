@@ -31,12 +31,13 @@ from whole_genome import get_call_ready_cases, map_workflows_to_parent, \
     get_amount_data, create_block_json, get_parent_workflows, get_workflows_analysis_date, \
     get_workflow_file_count, get_WGTS_blocks_info, get_sequencing_platform, get_selected_workflows, \
     review_wgs_blocks, get_case_workflows, update_wf_selection, get_block_counts, \
-    get_wgs_blocks, create_project_block_json, get_workflow_output, get_release_status, \
+    get_wgs_blocks, create_WGS_project_block_json, get_workflow_output, get_release_status, \
     get_workflow_limskeys, get_file_release_status, map_fileswid_to_filename, \
     map_limskey_to_library, map_library_to_sample, map_workflows_to_block, get_WGS_standard_deliverables    
     
 from whole_transcriptome import get_WT_call_ready_cases, get_star_case, get_WT_case_call_ready_samples, \
-    map_workflows_to_samples, find_WT_analysis_blocks, map_samples_to_star_runs
+    map_workflows_to_samples, find_WT_analysis_blocks, map_samples_to_star_runs, get_WT_standard_deliverables, \
+    create_WT_project_block_json
 from project import get_project_info, get_cases, get_sample_counts, count_libraries, \
      get_library_types, add_missing_donors, get_last_sequencing
 from sequencing import get_sequences, collect_sequence_info, platform_name
@@ -226,11 +227,11 @@ def whole_genome_sequencing(project_name):
         workflow_names = get_workflow_names(project_name, database)
                 
         if deliverable == 'selected':
-            block_data = create_project_block_json(project_name, database, blocks, block_status, selected, workflow_names)
+            block_data = create_WGS_project_block_json(project_name, database, blocks, block_status, selected, workflow_names)
         elif deliverable == 'standard':
             # get the pipeline deliverables       
             deliverables = get_WGS_standard_deliverables()
-            block_data = create_project_block_json(project_name, database, blocks, block_status, selected, workflow_names, deliverables)
+            block_data = create_WGS_project_block_json(project_name, database, blocks, block_status, selected, workflow_names, deliverables)
         else:
             block_data = {}
                 
@@ -403,7 +404,7 @@ def workflow(project_name, case, workflow_id):
                            )
 
 
-@app.route('/<project_name>/whole_transcriptome')
+@app.route('/<project_name>/whole_transcriptome', methods = ['POST', 'GET'])
 def whole_transcriptome(project_name):
     
     database = 'merged.db'
@@ -423,20 +424,40 @@ def whole_transcriptome(project_name):
     selected = get_selected_workflows(project_name, database, 'Workflows')
     block_status = review_wgs_blocks(blocks, selected)
     
-    return render_template('Whole_transcriptome.html',
-                           routes = routes, project=project,
-                           samples=samples,
-                           cases=cases,
-                           pipelines=pipelines,
-                           blocks=blocks,
-                           block_counts=block_counts,
-                           block_status=block_status)
+    if request.method == 'POST':
+        deliverable = request.form.get('deliverable')
+        # get the workflow names
+        workflow_names = get_workflow_names(project_name, database)
+        
+        if deliverable == 'selected':
+            block_data = create_WT_project_block_json(project_name, database, blocks, block_status, selected, workflow_names)
+        elif deliverable == 'standard':
+            # get the pipeline deliverables       
+            deliverables = get_WT_standard_deliverables()
+            block_data = create_WT_project_block_json(project_name, database, blocks, block_status, selected, workflow_names, deliverables)
+        else:
+            block_data = {}
+            
+        return Response(
+               response=json.dumps(block_data),
+               mimetype="application/json",
+               status=200,
+               headers={"Content-disposition": "attachment; filename={0}.WT.json".format(project_name)})
+    
+    else:
+        return render_template('Whole_transcriptome.html',
+                         routes = routes, project=project,
+                         samples=samples,
+                         cases=cases,
+                         pipelines=pipelines,
+                         blocks=blocks,
+                         block_counts=block_counts,
+                         block_status=block_status)
 
 
 @app.route('/<project_name>/whole_transcriptome/<case>', methods=['POST', 'GET'])
 def wt_case(project_name, case):
-    
-    
+        
     
     database = 'merged.db'
     expected_workflows = sorted(['arriba', 'rsem', 'star', 'starfusion', 'mavis'])  
