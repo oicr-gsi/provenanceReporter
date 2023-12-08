@@ -900,7 +900,7 @@ def name_WGS_blocks(ordered_blocks):
 
 
 
-def create_block_json(database, project_name, case, blocks, block, anchor_workflow, workflow_names, selected_workflows, selection):
+def create_WG_block_json(database, project_name, case, blocks, block, anchor_workflow, workflow_names, selected_workflows, selection):
     '''
     (str, str, dict, str, str, dict, dict, str)
     

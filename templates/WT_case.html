@@ -55,7 +55,13 @@
                   <button class="select_button" id="select" type = "submit" value="submit">Select workflows</button>
                 </td>
                 <td>
-                  <button id="download_button"><a href="{{url_for('download_block_data', project_name=project['project_id'], case=case, pair=pair, anchor_wf=block['anchor_wf'], table='WT_blocks', selection='all')}}">Download json</a></button>
+                  <div class="download-dropdown">
+                    <button class="download-dropbtn">Download json</button>
+                      <div class="download-dropdown-content">
+                        <button id="download_button"><a href="{{url_for('download_block_data', project_name=project['project_id'], pipeline='WT', case=case, pair=pair, anchor_wf=block['anchor_wf'], table='WT_blocks', selection='all')}}">all</a></button>
+                        <button id="download_button"><a href="{{url_for('download_block_data', project_name=project['project_id'], pipeline='WT', case=case, pair=pair, anchor_wf=block['anchor_wf'], table='WT_blocks', selection='standard')}}">standard</a></button>
+                      </div>
+                  </div>
                 </td>
               </tr>
             </table>

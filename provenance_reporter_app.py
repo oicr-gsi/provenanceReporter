@@ -28,7 +28,7 @@ from utilities import connect_to_db, get_miso_sample_link,\
     get_pipelines, get_workflow_names, get_library_design, secret_key_generator, \
     get_children_workflows
 from whole_genome import get_call_ready_cases, map_workflows_to_parent, \
-    get_amount_data, create_block_json, get_parent_workflows, get_workflows_analysis_date, \
+    get_amount_data, create_WG_block_json, get_parent_workflows, get_workflows_analysis_date, \
     get_workflow_file_count, get_WGTS_blocks_info, get_sequencing_platform, get_selected_workflows, \
     review_wgs_blocks, get_case_workflows, update_wf_selection, get_block_counts, \
     get_wgs_blocks, create_WGS_project_block_json, get_workflow_output, get_release_status, \
@@ -37,7 +37,7 @@ from whole_genome import get_call_ready_cases, map_workflows_to_parent, \
     
 from whole_transcriptome import get_WT_call_ready_cases, get_star_case, get_WT_case_call_ready_samples, \
     map_workflows_to_samples, find_WT_analysis_blocks, map_samples_to_star_runs, get_WT_standard_deliverables, \
-    create_WT_project_block_json
+    create_WT_project_block_json, create_WT_block_json
 from project import get_project_info, get_cases, get_sample_counts, count_libraries, \
      get_library_types, add_missing_donors, get_last_sequencing
 from sequencing import get_sequences, collect_sequence_info, platform_name
@@ -512,8 +512,8 @@ def wt_case(project_name, case):
 
 
 
-@app.route('/download_block/<project_name>/<case>/<pair>/<anchor_wf>/<table>/<selection>')
-def download_block_data(project_name, case, pair, anchor_wf, table, selection):
+@app.route('/download_block/<project_name>/<pipeline>/<case>/<pair>/<anchor_wf>/<table>/<selection>')
+def download_block_data(project_name, pipeline, case, pair, anchor_wf, table, selection):
         
     database = 'merged.db'
     
@@ -525,8 +525,11 @@ def download_block_data(project_name, case, pair, anchor_wf, table, selection):
     selected_workflows = get_selected_workflows(project_name, database)
     # create json with workflow information for block for DARE
     #block_data = create_block_json(project_name, blocks, pair, anchor_wf, workflow_names, selected_workflows, selection)
-    block_data = create_block_json(database, project_name, case, blocks, pair, anchor_wf, workflow_names, selected_workflows, selection)
-    pipeline = table.split('_')[0]
+    
+    if pipeline == 'WG':
+        block_data = create_WG_block_json(database, project_name, case, blocks, pair, anchor_wf, workflow_names, selected_workflows, selection)
+    elif pipeline == 'WT':
+        block_data = create_WT_block_json(database, project_name, case, blocks, pair, anchor_wf, workflow_names, selected_workflows, selection)
     
     pair_name = '.'.join(map(lambda x: x.strip(), pair.split('|')))
     
