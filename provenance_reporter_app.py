@@ -253,8 +253,8 @@ def whole_genome_sequencing(project_name):
                            )
  
 
-@app.route('/<project_name>/whole_genome_sequencing/<case>', methods = ['POST', 'GET'])
-def wgs_case(project_name, case):
+@app.route('/<project_name>/whole_genome_sequencing/<case>/<sample_pair>', methods = ['POST', 'GET'])
+def wgs_case(project_name, case, sample_pair):
     
     
     print('method', request.method)
@@ -289,10 +289,21 @@ def wgs_case(project_name, case):
     if request.method == 'POST':
         # get the list of checked workflows        
         selected_workflows = request.form.getlist('workflow')
+        
+        print('selected_workflows')
+        print(selected_workflows)
+        print('----')
+        
+        
         # get the workflows of each block and sample pair for case
         case_workflows = get_case_workflows(case, database, 'WGS_blocks')
         # get the list of workflows for which status needs an update
         workflows = map_workflows_to_block(selected_workflows, case_workflows)
+        
+        print('block workflows')
+        print(workflows)
+        
+        
         update_wf_selection(workflows, selected_workflows, selected, database, 'Workflows')
         return redirect(url_for('wgs_case', case=case, project_name=project_name))
     else:
@@ -309,7 +320,8 @@ def wgs_case(project_name, case):
                            creation_dates=creation_dates,
                            platforms=platforms,
                            parents=parents,
-                           selected = selected
+                           selected = selected,
+                           sample_pair=sample_pair
                            )
 
 
@@ -488,10 +500,20 @@ def wt_case(project_name, case):
     if request.method == 'POST':
         # get the list of checked workflows        
         selected_workflows = request.form.getlist('workflow')
+        
+        print('selected_workflows')
+        print(selected_workflows)
+        print('----')
+        
         # get the workflows of each block and sample pair for case
         case_workflows = get_case_workflows(case, database, 'WT_blocks')
         # get the list of workflows for which status needs an update
         workflows = map_workflows_to_block(selected_workflows, case_workflows)
+        
+        print('block workflows')
+        print(workflows)
+        
+        
         update_wf_selection(workflows, selected_workflows, selected, database, 'Workflows')
         return redirect(url_for('wt_case', case=case, project_name=project_name))
     else:
