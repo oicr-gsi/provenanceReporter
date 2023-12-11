@@ -76,26 +76,26 @@
         <tbody>
           <tr>
             <td rowspan="{{rowNum}}">
-              <a class="project_links" href="{{ url_for('wt_case', project_name=project['project_id'], case=i)}}">{{i}}</a>
+              {{i}}
             </td>
             <td rowspan="{{rowNum}}">
-              <a class="project_links" href="{{ url_for('wt_case', project_name=project['project_id'], case=i)}}">{{cases[i]['star'] | length}}</a>
+              {{cases[i]['star'] | length}}
             </td>
             <td rowspan="{{rowNum}}">
-              <a class="project_links" href="{{ url_for('wt_case', project_name=project['project_id'], case=i)}}">{{cases[i]['downstream'] | length}}</a>
+              {{cases[i]['downstream'] | length}}
             </td>
             <td>
             {% if myList %}
-              <a class="project_links" href="{{ url_for('wt_case', project_name=project['project_id'], case=i)}}">{{myList.0}}</a>
+              {{myList.0}}
             {% else %}
-              <a class="project_links" href="{{ url_for('wt_case', project_name=project['project_id'], case=i)}}">NA</a>
+              NA
             {% endif %}
             </td>
             <td>
               {% if myList %}
-                <a class="project_links" href="{{ url_for('wt_case', project_name=project['project_id'], case=i)}}">{{block_counts[i][myList.0]}}</a>
+                {{block_counts[i][myList.0]}}
               {% else %}
-                <a class="project_links" href="{{ url_for('wt_case', project_name=project['project_id'], case=i)}}">0</a>
+                0
               {% endif %} 
             </td>    
             <td>
@@ -108,9 +108,7 @@
                   {% endif %}           
                 </a>         
               {% else %}
-                <a class="project_links" href="{{ url_for('wt_case', project_name=project['project_id'], case=i)}}"> 
-                  NA
-                </a>
+                NA
               {% endif %}
             </td> 
           </tr>  
@@ -119,14 +117,10 @@
             {% for j in myList[1:] %}
               <tr>          
                 <td>
-                  <a class="project_links" href="{{ url_for('wt_case', project_name=project['project_id'], case=i)}}">
-                    {{j}}
-                  </a>
+                  {{j}}
                 </td>
                 <td>
-                  <a class="project_links" href="{{ url_for('wt_case', project_name=project['project_id'], case=i)}}">
-                    {{block_counts[i][j]}}
-                  </a>        
+                  {{block_counts[i][j]}}
                 </td>
                 <td>
                   <a class="project_links" href="{{ url_for('wt_case', project_name=project['project_id'], case=i)}}">
