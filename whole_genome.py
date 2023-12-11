@@ -1514,33 +1514,107 @@ def get_case_workflows(case, database, table = 'WGS_blocks'):
     return D
 
 
-def map_workflows_to_block(selected_workflows, case_workflows):
-    '''
-    (list, dict) -> list
+# def map_workflows_to_block(selected_workflows, case_workflows):
+#     '''
+#     (list, dict) -> list
     
-    Returns a list of workflows for which selection status need to be updated
+#     Returns a list of workflows for which selection status need to be updated
         
-    Parameters
-    ----------
-    - selected_workflows (list): List of selected workflows from the application form for a given case
-    - case_workflows (dict): Dictionary with workflows for each block and sample pair for a given case                             
-    '''
+#     Parameters
+#     ----------
+#     - selected_workflows (list): List of selected workflows from the application form for a given case
+#     - case_workflows (dict): Dictionary with workflows for each block and sample pair for a given case                             
+#     '''
 
-    L = []
-    for sample_pair in case_workflows:
-        for anchor in case_workflows[sample_pair]:
-            I = set(selected_workflows).intersection(set(case_workflows[sample_pair][anchor]))
-            # for i in anchor.split('.'):
-            #     if i in I:
-            #         I.remove(i)
-            # if I:
-            #     L = case_workflows[sample_pair][anchor]
+#     L = []
+#     for sample_pair in case_workflows:
+#         for anchor in case_workflows[sample_pair]:
+#             I = set(selected_workflows).intersection(set(case_workflows[sample_pair][anchor]))
+#             # remove anchor workflows because could be shared amonf different blocks
+#             for i in anchor.split('.'):
+#                 if i in I:
+#                     I.remove(i)
+#             if I:
+#                 L = case_workflows[sample_pair][anchor]
+      
+#     return L
+
+
+# def map_workflows_to_block(selected_workflows, case_workflows, sample_pair):
+#     '''
+#     (list, dict, str) -> list
     
-            if I:
-                L = case_workflows[sample_pair][anchor]
+#     Returns a list of workflows for which selection status need to be updated
+        
+#     Parameters
+#     ----------
+#     - selected_workflows (list): List of selected workflows from the application form for a given case
+#     - case_workflows (dict): Dictionary with workflows for each block and sample pair for a given case                             
+#     - sample_pair (str): Sample pair or tumor sample of interest with block data
+#     '''
+
+#     # L = []
+#     # for anchor in case_workflows[sample_pair]:
+#     #     I = set(selected_workflows).intersection(set(case_workflows[sample_pair][anchor]))
+#     #     # remove anchor workflows because could be shared amonf different blocks
+#     #     for i in anchor.split('.'):
+#     #         if i in I:
+#     #             I.remove(i)
+#     #     if I:
+#     #         L = case_workflows[sample_pair][anchor]
+    
+#     L = []
+#     for anchor in case_workflows[sample_pair]:
+#         L.extend(case_workflows[sample_pair][anchor])
+    
+#     return L
     
     
-    return L
+
+
+
+# def update_wf_selection(workflows, selected_workflows, selection_status, database, table='Workflows'):
+#     '''
+#     (list, list, dict, str, str)
+    
+#     Update the selection status of workflows 
+    
+#     Parameters
+#     ----------
+#     - workflows (list): List of workflows from a single analysis block for which 
+#                         status needs to be updated
+#     - selected_workflows (list): List of selected workflows from the application form for a given case
+#     - selection_status (dict): Selection status of all workflows for a given project
+#     - database (str): Path to the sqlite database
+#     - table (str): Table storing workflows information
+#     '''
+    
+#     # update selected status
+#     conn = connect_to_db(database)
+#     cur = conn.cursor()
+#     for i in workflows:
+        
+#         print('xxxx')
+#         print(i)
+#         print(i in selected_workflows)
+        
+#         if i in selected_workflows:
+#             status = 1
+#         else:
+#             status = 0
+        
+#         print('new status', status)
+#         print('current status', selection_status[i])
+        
+        
+#         print('xxxx')
+        
+        
+#         # update only if status has changed
+#         if selection_status[i] != status:
+#             cur.execute('UPDATE Workflows SET selected = \"{0}\" WHERE wfrun_id = \"{1}\"'.format(status, i))
+#             conn.commit()
+#     conn.close()
 
 
 
@@ -1564,18 +1638,28 @@ def update_wf_selection(workflows, selected_workflows, selection_status, databas
     conn = connect_to_db(database)
     cur = conn.cursor()
     for i in workflows:
+        
+        print('xxxx')
+        print(i)
+        print(i in selected_workflows)
+        
         if i in selected_workflows:
             status = 1
         else:
             status = 0
+        
+        print('new status', status)
+        print('current status', selection_status[i])
+        
+        
+        print('xxxx')
+        
+        
         # update only if status has changed
         if selection_status[i] != status:
             cur.execute('UPDATE Workflows SET selected = \"{0}\" WHERE wfrun_id = \"{1}\"'.format(status, i))
             conn.commit()
     conn.close()
-
-
-
 
 
 

@@ -100,7 +100,7 @@
             </td>    
             <td>
               {% if myList %}
-                <a class="project_links" href="{{ url_for('wt_case', project_name=project['project_id'], case=i)}}">
+                <a class="project_links" href="{{ url_for('wt_case', project_name=project['project_id'], case=i, tumor_sample=myList[0])}}">
                   {% if block_status[i][myList.0] != 'review' and block_status[i][myList.0] != 'ready' %}
                     {{block_status[i][myList.0] | shorten_workflow_id}}
                   {% else %}
@@ -123,7 +123,7 @@
                   {{block_counts[i][j]}}
                 </td>
                 <td>
-                  <a class="project_links" href="{{ url_for('wt_case', project_name=project['project_id'], case=i)}}">
+                  <a class="project_links" href="{{ url_for('wt_case', project_name=project['project_id'], case=i, tumor_sample=j)}}">
                     {% if block_status[i][j] != 'review' and block_status[i][j] != 'ready' %}
                       {{block_status[i][j] | shorten_workflow_id}}
                     {% else %}

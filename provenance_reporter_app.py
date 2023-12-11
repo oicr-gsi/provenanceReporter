@@ -473,8 +473,8 @@ def whole_transcriptome(project_name):
                          block_status=block_status)
 
 
-@app.route('/<project_name>/whole_transcriptome/<case>', methods=['POST', 'GET'])
-def wt_case(project_name, case):
+@app.route('/<project_name>/whole_transcriptome/<case>/<tumor_sample>', methods=['POST', 'GET'])
+def wt_case(project_name, case, tumor_sample):
         
     
     database = 'merged.db'
@@ -489,7 +489,7 @@ def wt_case(project_name, case):
     # get the WT blocks
     blocks = get_WGTS_blocks_info(project_name, case, database, 'WT_blocks')
     # sort sample pairs names
-    sample_pairs_names = sorted(list(blocks.keys()))
+    sample_names = sorted(list(blocks.keys()))
     # get the workflow names
     workflow_names = get_workflow_names(project_name, database)
     # get the file count of each workflow in project
@@ -518,8 +518,8 @@ def wt_case(project_name, case):
         # may include workflows from different blocks for a sample
         # this ensures blocks are mutually exclusive within a sample but not within a case
         workflows = []
-        for i in case_workflows[sample]:
-            workflows.extend(case_workflows[sample][i])
+        for i in case_workflows[tumor_sample]:
+            workflows.extend(case_workflows[tumor_sample][i])
         
         
         print('block workflows')
@@ -527,7 +527,7 @@ def wt_case(project_name, case):
         
         
         update_wf_selection(workflows, selected_workflows, selected, database, 'Workflows')
-        return redirect(url_for('wt_case', case=case, project_name=project_name))
+        return redirect(url_for('wt_case', case=case, project_name=project_name, tumor_sample=tumor_sample))
     else:
         return render_template('WT_case.html',
                                project=project,
@@ -535,13 +535,14 @@ def wt_case(project_name, case):
                                case=case,
                                pipelines=pipelines,
                                blocks=blocks,
-                               sample_pairs_names=sample_pairs_names,
+                               sample_names=sample_names,
                                workflow_names=workflow_names,
                                file_counts=file_counts,
                                amount_data=amount_data,
                                creation_dates=creation_dates,
                                parents=parents,
-                               selected=selected
+                               selected=selected,
+                               tumor_sample=tumor_sample
                                )
 
 

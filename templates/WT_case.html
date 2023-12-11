@@ -20,158 +20,160 @@
     <p><span style="font-size:16px; font-style:normal;"> Select analysis blocks for each sample pair. An analysis block includes parent call-ready workflows and all downstream caller-workflows.</span></p>  
   </div> 
 
-  {% for pair in sample_pairs_names %}
-    <div class="somatic_block">
-      <p style="font-size:22px; font-style:bold;"> Samples: {{pair}} </p>
-      {% for block in blocks[pair] %}
-        <form method="POST", action="">
-          <div class="somatic_block">
-            <table id="block_header_table">
-              <tr>
-                <td><span style="font-size:16px; font-style:normal;">{{ block['name'] }}</span></td>
-                <td>Date: {{block['date'].split().0}} </td>
-                <td>
-                  {% if block['complete'] %}
-                    <div class="tooltip">Complete:<span class="tooltiptext">All expected workflows?</span></div> <span style="font-size:32px;color:#70db70">&#10004;</span> 
-                  {% else %}
-                  <div class="tooltip">Complete:<span class="tooltiptext">All expected workflows?</span></div> <span style="font-size:32px;color:#ff3300;">&#10006;</span>
-                  {% endif %}  
-                </td>  
-                <td>
-                  {% if block['extra'] %}
-                    <div class="tooltip">Clean:<span class="tooltiptext">Only expected workflows?</span></div> <span style="font-size:32px;color:#70db70">&#10004;</span>
-                  {% else %}
-                    <div class="tooltip">Clean:<span class="tooltiptext">Only expected workflows?</span></div> <span style="font-size:32px;color:#ff3300;">&#10006;</span>
-                  {% endif %}
-                </td>
-                <td>
-                  {% if block['release_status'] %}
-                    <div class="tooltip">Release Status:<span class="tooltiptext">Input raw sequences released?</span></div> <span style="font-size:32px;color:#70db70">&#10004;</span>
-                  {% else %}
-                    <div class="tooltip">Release Status:<span class="tooltiptext">Input raw sequences released?</span></div> <span style="font-size:32px;color:#ff3300;">&#10006;</span>
-                  {% endif %}
-                </td>  
-                <td>
-                  <button class="select_button" id="select" type = "submit" value="submit">Select workflows</button>
-                </td>
-                <td>
-                  <div class="download-dropdown">
-                    <button class="download-dropbtn">Download json</button>
-                      <div class="download-dropdown-content">
-                        <button id="download_button"><a href="{{url_for('download_block_data', project_name=project['project_id'], pipeline='WT', case=case, pair=pair, anchor_wf=block['anchor_wf'], table='WT_blocks', selection='all')}}">all</a></button>
-                        <button id="download_button"><a href="{{url_for('download_block_data', project_name=project['project_id'], pipeline='WT', case=case, pair=pair, anchor_wf=block['anchor_wf'], table='WT_blocks', selection='standard')}}">standard</a></button>
-                      </div>
-                  </div>
-                </td>
-              </tr>
-            </table>
+  {% for sample in sample_names %}
+    {% if sample == tumor_sample %}
+      <div class="somatic_block">
+        <p style="font-size:22px; font-style:bold;"> Samples: {{sample}} </p>
+        {% for block in blocks[sample] %}
+          <form method="POST", action="">
+            <div class="somatic_block">
+              <table id="block_header_table">
+                <tr>
+                  <td><span style="font-size:16px; font-style:normal;">{{ block['name'] }}</span></td>
+                  <td>Date: {{block['date'].split().0}} </td>
+                  <td>
+                    {% if block['complete'] %}
+                      <div class="tooltip">Complete:<span class="tooltiptext">All expected workflows?</span></div> <span style="font-size:32px;color:#70db70">&#10004;</span> 
+                    {% else %}
+                    <div class="tooltip">Complete:<span class="tooltiptext">All expected workflows?</span></div> <span style="font-size:32px;color:#ff3300;">&#10006;</span>
+                    {% endif %}  
+                  </td>  
+                  <td>
+                    {% if block['extra'] %}
+                      <div class="tooltip">Clean:<span class="tooltiptext">Only expected workflows?</span></div> <span style="font-size:32px;color:#70db70">&#10004;</span>
+                    {% else %}
+                      <div class="tooltip">Clean:<span class="tooltiptext">Only expected workflows?</span></div> <span style="font-size:32px;color:#ff3300;">&#10006;</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if block['release_status'] %}
+                      <div class="tooltip">Release Status:<span class="tooltiptext">Input raw sequences released?</span></div> <span style="font-size:32px;color:#70db70">&#10004;</span>
+                    {% else %}
+                      <div class="tooltip">Release Status:<span class="tooltiptext">Input raw sequences released?</span></div> <span style="font-size:32px;color:#ff3300;">&#10006;</span>
+                    {% endif %}
+                  </td>  
+                  <td>
+                    <button class="select_button" id="select" type = "submit" value="submit">Select workflows</button>
+                  </td>
+                  <td>
+                    <div class="download-dropdown">
+                      <button class="download-dropbtn">Download json</button>
+                        <div class="download-dropdown-content">
+                          <button id="download_button"><a href="{{url_for('download_block_data', project_name=project['project_id'], pipeline='WT', case=case, pair=tumor_sample, anchor_wf=block['anchor_wf'], table='WT_blocks', selection='all')}}">all</a></button>
+                          <button id="download_button"><a href="{{url_for('download_block_data', project_name=project['project_id'], pipeline='WT', case=case, pair=tumor_sample, anchor_wf=block['anchor_wf'], table='WT_blocks', selection='standard')}}">standard</a></button>
+                        </div>
+                    </div>
+                  </td>
+                </tr>
+              </table>
          
-            <p style="font-size:22px; font-style:bold;"> Call-ready workflows </p>     
+              <p style="font-size:22px; font-style:bold;"> Call-ready workflows </p>     
 
-            <table id="block_table">
-              <thead>
-                <th>workflow_run_id</th>
-                <th>workflow</th>
-                <th>file count</th>
-                <th>lane count</th>
-                <th>date</th>      
-                <th>Tumour</th>
-                <th>Select</th>
-              </thead>     
+              <table id="block_table">
+                <thead>
+                  <th>workflow_run_id</th>
+                  <th>workflow</th>
+                  <th>file count</th>
+                  <th>lane count</th>
+                  <th>date</th>      
+                  <th>Tumour</th>
+                  <th>Select</th>
+                </thead>     
         
-              {% for star_run in block['call_ready'] %}
+                {% for star_run in block['call_ready'] %}
+                  <tr>
+                    <td>
+                      <a class="workflow" href="{{ url_for('workflow', project_name=project['project_id'], case=case, workflow_id=star_run) }}">
+                        {{star_run | shorten_workflow_id}}
+                      </a>
+                    </td> 
+                  
+                    <td>{{workflow_names[star_run].0}}</td>
+                    <td>{{file_counts[star_run]}}</td>
+                    <td>{{amount_data[star_run]}}</td>
+                    <td>{{creation_dates[star_run] | readable_time}}</td>
+                    <td>
+                      <dl>
+                        {% for i in block['pairs'][star_run]['tumour'] %}
+                          <dt>{{i}}</dt>
+                        {% endfor %}
+                      </dl>
+                    </td>
+                    <td>
+                      {% if selected[star_run] %}
+                        <input class="checkbox" type="checkbox" name="workflow" value="{{star_run}}" id="workflow" checked/>
+                      {% else %}
+                        <input class="checkbox" type="checkbox" name="workflow" value="{{star_run}}" id="workflow"/>  
+                      {% endif %}    
+                    </td>
+                  </tr>
+                {% endfor %}
+              </table>
+     
+              <p style="font-size:22px; font-style:bold;"> Caller workflows </p>
+
+              <table id="block_table">
+                <thead>
+                  <th>workflow_run_id</th>
+                  <th>workflow</th>
+                  <th>parent</th>
+                  <th>file count</th>
+                  <th>lane count</th>
+                  <th>date</th>     
+                  <th>select</th>
+                </thead>     
+       
+              {% for workflow_id in block['callers'] %}
                 <tr>
                   <td>
-                    <a class="workflow" href="{{ url_for('workflow', project_name=project['project_id'], case=case, workflow_id=star_run) }}">
-                      {{star_run | shorten_workflow_id}}
+                    <a class="workflow" href="{{ url_for('workflow', project_name=project['project_id'], case=case, workflow_id=workflow_id) }}">
+                      {{workflow_id | shorten_workflow_id}}
                     </a>
-                  </td> 
-                  
-                  <td>{{workflow_names[star_run].0}}</td>
-                  <td>{{file_counts[star_run]}}</td>
-                  <td>{{amount_data[star_run]}}</td>
-                  <td>{{creation_dates[star_run] | readable_time}}</td>
+                  </td>
+                  <td>{{workflow_names[workflow_id].0}}</td>
                   <td>
                     <dl>
-                      {% for i in block['pairs'][star_run]['tumour'] %}
-                        <dt>{{i}}</dt>
+                      {% for i in parents[workflow_id] %}
+                        <dt>
+                          {% for k in parents[workflow_id][i] %}
+                            <div class="tooltip">
+                              <a class="workflow" href="{{ url_for('workflow', project_name=project['project_id'], case=case, workflow_id=k) }}">
+                                {{k | shorten_workflow_id}}
+                              </a>  
+                              <span class="tooltiptext">{{i}}</span>
+                            </div>
+                          {% endfor %}
+                        </dt>
                       {% endfor %}
                     </dl>
                   </td>
+                  <td>{{file_counts[workflow_id]}}</td>              
+                  <td>{{amount_data[workflow_id]}}</td>             
+                  <td>{{creation_dates[workflow_id] | readable_time}}</td>
                   <td>
-                    {% if selected[star_run] %}
-                      <input class="checkbox" type="checkbox" name="workflow" value="{{star_run}}" id="workflow" checked/>
+                    {% if selected[workflow_id] %}
+                      <input class="checkbox" type="checkbox" name="workflow" value="{{workflow_id}}" id="workflow" checked/>
                     {% else %}
-                      <input class="checkbox" type="checkbox" name="workflow" value="{{star_run}}" id="workflow"/>  
-                    {% endif %}    
-                  </td>
+                      <input class="checkbox" type="checkbox" name="workflow" value="{{workflow_id}}" id="workflow"/>  
+                    {% endif %}
+                  </td>    
                 </tr>
               {% endfor %}
-            </table>
-     
-            <p style="font-size:22px; font-style:bold;"> Caller workflows </p>
-
-            <table id="block_table">
-              <thead>
-                <th>workflow_run_id</th>
-                <th>workflow</th>
-                <th>parent</th>
-                <th>file count</th>
-                <th>lane count</th>
-                <th>date</th>     
-                <th>select</th>
-              </thead>     
+              </table>
        
-            {% for workflow_id in block['callers'] %}
-              <tr>
-                <td>
-                  <a class="workflow" href="{{ url_for('workflow', project_name=project['project_id'], case=case, workflow_id=workflow_id) }}">
-                    {{workflow_id | shorten_workflow_id}}
-                  </a>
-                </td>
-                <td>{{workflow_names[workflow_id].0}}</td>
-                <td>
-                  <dl>
-                    {% for i in parents[workflow_id] %}
-                      <dt>
-                        {% for k in parents[workflow_id][i] %}
-                          <div class="tooltip">
-                            <a class="workflow" href="{{ url_for('workflow', project_name=project['project_id'], case=case, workflow_id=k) }}">
-                              {{k | shorten_workflow_id}}
-                            </a>  
-                            <span class="tooltiptext">{{i}}</span>
-                          </div>
-                        {% endfor %}
-                      </dt>
-                    {% endfor %}
-                  </dl>
-                </td>
-                <td>{{file_counts[workflow_id]}}</td>              
-                <td>{{amount_data[workflow_id]}}</td>             
-                <td>{{creation_dates[workflow_id] | readable_time}}</td>
-                <td>
-                  {% if selected[workflow_id] %}
-                    <input class="checkbox" type="checkbox" name="workflow" value="{{workflow_id}}" id="workflow" checked/>
-                  {% else %}
-                    <input class="checkbox" type="checkbox" name="workflow" value="{{workflow_id}}" id="workflow"/>  
-                  {% endif %}
-                </td>    
-              </tr>
-            {% endfor %}
-            </table>
-       
-            <p style="font-size:22px; font-style:bold;"> Workflow relationships: </p>
-            <img src="data:image/png;base64,{{block['network']}}" alt="workflow_network" title="workflows" style="padding-right: 8px; padding-left:8px; width:25%; height:25%"/>
+              <p style="font-size:22px; font-style:bold;"> Workflow relationships: </p>
+              <img src="data:image/png;base64,{{block['network']}}" alt="workflow_network" title="workflows" style="padding-right: 8px; padding-left:8px; width:25%; height:25%"/>
      
-          </div>   
-        </form>  
-  {% endfor %}
+            </div>   
+          </form>  
+  
+        {% endfor %}
 
 
-  </div> 
-  <br>
-  <br>
-
+      </div> 
+      <br>
+      <br>
+    {% endif %}
   {% endfor %}
 {% endblock %}
 
