@@ -33,7 +33,7 @@ from whole_genome import get_call_ready_cases, map_workflows_to_parent, \
     review_wgs_blocks, get_case_workflows, update_wf_selection, get_block_counts, \
     get_wgs_blocks, create_WGS_project_block_json, get_workflow_output, get_release_status, \
     get_workflow_limskeys, get_file_release_status, map_fileswid_to_filename, \
-    map_limskey_to_library, map_library_to_sample, map_workflows_to_block, get_WGS_standard_deliverables    
+    map_limskey_to_library, map_library_to_sample, get_WGS_standard_deliverables    
     
 from whole_transcriptome import get_WT_call_ready_cases, get_star_case, get_WT_case_call_ready_samples, \
     map_workflows_to_samples, find_WT_analysis_blocks, map_samples_to_star_runs, get_WT_standard_deliverables, \
@@ -295,17 +295,23 @@ def wgs_case(project_name, case, sample_pair):
         print('----')
         
         
-        # get the workflows of each block and sample pair for case
+        # get the workflows of each block for sample pair and case
         case_workflows = get_case_workflows(case, database, 'WGS_blocks')
-        # get the list of workflows for which status needs an update
-        workflows = map_workflows_to_block(selected_workflows, case_workflows)
+        # list all the workflows for a given sample pair
+        # may include workflows from different blocks for a sample sample pair
+        # this ensures blocks are mutually exclusive within a sample pair but not within a case
+        workflows = []
+        for i in case_workflows[sample_pair]:
+            workflows.extend(case_workflows[sample_pair][i])
+        
+        
         
         print('block workflows')
         print(workflows)
         
         
         update_wf_selection(workflows, selected_workflows, selected, database, 'Workflows')
-        return redirect(url_for('wgs_case', case=case, project_name=project_name))
+        return redirect(url_for('wgs_case', case=case, project_name=project_name, sample_pair=sample_pair))
     else:
         return render_template('WGS_case.html',
                            project=project,
@@ -507,8 +513,14 @@ def wt_case(project_name, case):
         
         # get the workflows of each block and sample pair for case
         case_workflows = get_case_workflows(case, database, 'WT_blocks')
-        # get the list of workflows for which status needs an update
-        workflows = map_workflows_to_block(selected_workflows, case_workflows)
+        
+        # list all the workflows for a given sample that need an update
+        # may include workflows from different blocks for a sample
+        # this ensures blocks are mutually exclusive within a sample but not within a case
+        workflows = []
+        for i in case_workflows[sample]:
+            workflows.extend(case_workflows[sample][i])
+        
         
         print('block workflows')
         print(workflows)
