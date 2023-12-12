@@ -179,7 +179,7 @@ def project_page(project_name):
                            library_types = library_types, library_names=library_names)
 
 
-@app.route('/<project_name>/sequencing')
+@app.route('/<project_name>/sequencing', methods = ['GET', 'POST'])
 def sequencing(project_name):
     
     database = 'merged.db'
@@ -193,8 +193,40 @@ def sequencing(project_name):
     sequences = get_sequences(files)
     # map the instrument short name to sequencing platform
     platform_names = platform_name(project_name, database)
+ 
+    if request.method == 'POST':
+        
+        platforms = request.form.getlist('platform')
+        sequences = get_sequences(files)
+        D = {}
+        for i in sequences:
+            d = {'Case': i['case'],
+                 'Donor': i['sample'],
+                 'SampleID': i['group_id'],
+                 'Sample': i['sample_id'],
+                 'Description': i['group_description'],
+                 'Library': i['library'],
+                 'Library Type': i['library_type'],
+                 'Tissue Origin': i['tissue_origin'],
+                 'Tissue Type': i['tissue_type'],
+                 'File Prefix': i['prefix']}
     
-    return render_template('sequencing.html', routes=routes,
+            # download all information if platforms are not selected
+            if platforms:
+                # check that platform is selected
+                if platform_names[i['platform']] in platforms:
+                    D[i['case']] = d     
+            else:
+                D[i['case']] = d
+                    
+        data = pd.DataFrame(D.values())
+        outputfile = '{0}_libraries.xlsx'.format(project_name)
+        data.to_excel(outputfile, index=False)
+            
+        return send_file(outputfile, as_attachment=True)
+
+    else:
+        return render_template('sequencing.html', routes=routes,
                            project=project, sequences=sequences,
                            pipelines=pipelines, platform_names=platform_names)
 
@@ -592,38 +624,38 @@ def download_cases_table(project_name):
 
 
 
-@app.route('/download_identifiers/<project_name>')
-def download_identifiers_table(project_name):
-    '''
+# @app.route('/download_identifiers/<project_name>')
+# def download_identifiers_table(project_name):
+#     '''
     
     
-    '''
+#     '''
     
-    # get sequence file information
-    files = collect_sequence_info(project_name, 'merged.db')
-    # re-organize sequence information
-    sequences = get_sequences(files)
+#     # get sequence file information
+#     files = collect_sequence_info(project_name, 'merged.db')
+#     # re-organize sequence information
+#     sequences = get_sequences(files)
     
-    D = {}
-    for i in sequences:
-        d = {'Case': i['case'],
-             'Donor': i['sample'],
-             'SampleID': i['group_id'],
-             'Sample': i['sample_id'],
-             'Description': i['group_description'],
-             'Library': i['library'],
-             'Library Type': i['library_type'],
-             'Tissue Origin': i['tissue_origin'],
-             'Tissue Type': i['tissue_type'],
-             'File Prefix': i['prefix']}
-        D[i['case']] = d     
+#     D = {}
+#     for i in sequences:
+#         d = {'Case': i['case'],
+#              'Donor': i['sample'],
+#              'SampleID': i['group_id'],
+#              'Sample': i['sample_id'],
+#              'Description': i['group_description'],
+#              'Library': i['library'],
+#              'Library Type': i['library_type'],
+#              'Tissue Origin': i['tissue_origin'],
+#              'Tissue Type': i['tissue_type'],
+#              'File Prefix': i['prefix']}
+#         D[i['case']] = d     
              
-    data = pd.DataFrame(D.values())
+#     data = pd.DataFrame(D.values())
      
-    outputfile = '{0}_libraries.xlsx'.format(project_name)
-    data.to_excel(outputfile, index=False)
+#     outputfile = '{0}_libraries.xlsx'.format(project_name)
+#     data.to_excel(outputfile, index=False)
     
-    return send_file(outputfile, as_attachment=True)
+#     return send_file(outputfile, as_attachment=True)
 
 
 # if __name__ == "__main__":

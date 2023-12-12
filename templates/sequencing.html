@@ -3,9 +3,9 @@
 
 
 {% block link %}
-<a href="{{ url_for('project_page', project_name=project['project_id']) }}">{{ project['project_id'] }}</a>
-<a class="selected" href="{{ url_for('sequencing', project_name=project['project_id']) }}">Sequencing</a>
-{% for i in pipelines %}
+  <a href="{{ url_for('project_page', project_name=project['project_id']) }}">{{ project['project_id'] }}</a>
+  <a class="selected" href="{{ url_for('sequencing', project_name=project['project_id']) }}">Sequencing</a>
+  {% for i in pipelines %}
     {% if i in routes %}
       <a href="{{ url_for(routes[i], project_name=project['project_id']) }}">{{i}}</a>
     {% else %}
@@ -20,7 +20,6 @@
     <p>{% block title %}{{ project['project_id'] }} {% endblock %}
       {% if sequences %}
         <span style="font-size:30px; font-style:normal;"> Displaying sequence information for <span id ="count"> {{ sequences|length }} </span> records</span>
-        <button id="download_button" style="margin-top:20px;margin-left:100px"><a href="{{url_for('download_identifiers_table', project_name=project['project_id'])}}">Download library information</a></button>
       {% else %}
         <span style="font-size:30px; font-style:normal;"> No sequence information to display</span>
       {% endif %}  
@@ -30,11 +29,12 @@
   <div class="dropdown">
   <button class="dropbtn">Select Platform</button>
     <div class="dropdown-content">
-      <form>
+      <form method="POST" action="">
         <label><input type="checkbox" name="platform" value="novaseq" id="novaseq"/> NovaSeq</label><br>      
         <label><input type="checkbox" name="platform" value="hiseq" id="hiseq"/> HiSeq</label><br>      
         <label><input type="checkbox" name="platform" value="nextseq" id="nextseq"/> NextSeq</label><br>      
-        <label><input type="checkbox" name="platform" value="miseq" id="miseq"/> MiSeq</label><br>      
+        <label><input type="checkbox" name="platform" value="miseq" id="miseq"/> MiSeq</label><br>
+        <button class="select_button" type = "submit" value="submit">Download</button>      
       </form>          
     </div>
   </div>    
