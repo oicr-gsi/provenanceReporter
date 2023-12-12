@@ -191,6 +191,8 @@ def sequencing(project_name):
     files = collect_sequence_info(project_name, database)
     # re-organize sequence information
     sequences = get_sequences(files)
+    # sort data
+    sequences.sort(key=lambda x: (x['case'], x['sample_id'], x['library'], x['platform']))
     # map the instrument short name to sequencing platform
     platform_names = platform_name(project_name, database)
  
