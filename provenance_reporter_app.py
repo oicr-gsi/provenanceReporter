@@ -597,16 +597,18 @@ def download_cases_table(project_name):
     - project_name (str): Name of project of interest
     '''
     
+    database = 'merged.db'
+    
     # get case information
-    cases = get_cases(project_name, 'merged.db')
+    cases = get_cases(project_name, database)
     # get library and sample counts
-    counts = get_sample_counts(project_name, 'merged.db')
+    counts = get_sample_counts(project_name, database)
     # add missing donors to counts (ie, when counts are 0)
     counts = add_missing_donors(cases, counts)
     # count libraries for each library type
     # get the library types
-    library_types =  get_library_types(project_name)
-    libraries = count_libraries(project_name, library_types, cases, 'merged.db')
+    library_types =  get_library_types(project_name, database)
+    libraries = count_libraries(project_name, library_types, cases, database)
     
     D = {}
     for i in cases:
