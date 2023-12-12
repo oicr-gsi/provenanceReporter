@@ -83,7 +83,7 @@
                 {% for star_run in block['call_ready'] %}
                   <tr>
                     <td>
-                      <a class="workflow" href="{{ url_for('workflow', project_name=project['project_id'], case=case, workflow_id=star_run) }}">
+                      <a class="workflow" href="{{ url_for('workflow', project_name=project['project_id'], pipeline='whole_transcriptome', case=case, sample_pair=tumor_sample, workflow_id=star_run) }}">
                         {{star_run | shorten_workflow_id}}
                       </a>
                     </td> 
@@ -126,7 +126,7 @@
               {% for workflow_id in block['callers'] %}
                 <tr>
                   <td>
-                    <a class="workflow" href="{{ url_for('workflow', project_name=project['project_id'], case=case, workflow_id=workflow_id) }}">
+                    <a class="workflow" href="{{ url_for('workflow', project_name=project['project_id'], pipeline='whole_transcriptome', case=case, sample_pair=tumor_sample, workflow_id=workflow_id) }}">
                       {{workflow_id | shorten_workflow_id}}
                     </a>
                   </td>
@@ -137,7 +137,7 @@
                         <dt>
                           {% for k in parents[workflow_id][i] %}
                             <div class="tooltip">
-                              <a class="workflow" href="{{ url_for('workflow', project_name=project['project_id'], case=case, workflow_id=k) }}">
+                              <a class="workflow" href="{{ url_for('workflow', project_name=project['project_id'], pipeline='whole_transcriptome', case=case, sample_pair=tumor_sample, workflow_id=k) }}">
                                 {{k | shorten_workflow_id}}
                               </a>  
                               <span class="tooltiptext">{{i}}</span>

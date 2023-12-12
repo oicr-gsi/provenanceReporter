@@ -289,12 +289,6 @@ def wgs_case(project_name, case, sample_pair):
     if request.method == 'POST':
         # get the list of checked workflows        
         selected_workflows = request.form.getlist('workflow')
-        
-        print('selected_workflows')
-        print(selected_workflows)
-        print('----')
-        
-        
         # get the workflows of each block for sample pair and case
         case_workflows = get_case_workflows(case, database, 'WGS_blocks')
         # list all the workflows for a given sample pair
@@ -303,13 +297,6 @@ def wgs_case(project_name, case, sample_pair):
         workflows = []
         for i in case_workflows[sample_pair]:
             workflows.extend(case_workflows[sample_pair][i])
-        
-        
-        
-        print('block workflows')
-        print(workflows)
-        
-        
         update_wf_selection(workflows, selected_workflows, selected, database, 'Workflows')
         return redirect(url_for('wgs_case', case=case, project_name=project_name, sample_pair=sample_pair))
     else:
@@ -332,9 +319,8 @@ def wgs_case(project_name, case, sample_pair):
 
 
 
-@app.route('/<project_name>/whole_genome_sequencing/<case>/<workflow_id>')
-def workflow(project_name, case, workflow_id):
-    
+@app.route('/<project_name>/<pipeline>/<case>/<sample_pair>/<workflow_id>')
+def workflow(project_name, pipeline, case, sample_pair, workflow_id):
     
     database = 'merged.db'
     
@@ -342,7 +328,7 @@ def workflow(project_name, case, workflow_id):
     project = get_project_info(project_name, database)
     # get the workflow names
     workflow_names = get_workflow_names(project_name, database)
-    
+       
     # find the parents of each workflow
     parents = get_parent_workflows(project_name, database)
     if workflow_id in parents:
@@ -408,7 +394,9 @@ def workflow(project_name, case, workflow_id):
     
     return render_template('workflow.html',
                            project=project,
+                           pipeline=pipeline,
                            case=case,
+                           sample_pair=sample_pair,
                            parents=parents,
                            children=children,
                            parent_rows=parent_rows,
@@ -506,26 +494,14 @@ def wt_case(project_name, case, tumor_sample):
     if request.method == 'POST':
         # get the list of checked workflows        
         selected_workflows = request.form.getlist('workflow')
-        
-        print('selected_workflows')
-        print(selected_workflows)
-        print('----')
-        
         # get the workflows of each block and sample pair for case
         case_workflows = get_case_workflows(case, database, 'WT_blocks')
-        
         # list all the workflows for a given sample that need an update
         # may include workflows from different blocks for a sample
         # this ensures blocks are mutually exclusive within a sample but not within a case
         workflows = []
         for i in case_workflows[tumor_sample]:
             workflows.extend(case_workflows[tumor_sample][i])
-        
-        
-        print('block workflows')
-        print(workflows)
-        
-        
         update_wf_selection(workflows, selected_workflows, selected, database, 'Workflows')
         return redirect(url_for('wt_case', case=case, project_name=project_name, tumor_sample=tumor_sample))
     else:

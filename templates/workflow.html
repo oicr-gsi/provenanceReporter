@@ -3,7 +3,11 @@
 
 {% block link %}
   <a href="{{ url_for('project_page', project_name=project['project_id']) }}">{{ project['project_id'] }}</a>
-  <a href="{{ url_for('wgs_case', project_name=project['project_id'], case=case) }}">Analysis Blocks</a> 
+  {% if pipeline == 'whole_genome_sequencing' %}
+    <a href="{{ url_for('wgs_case', project_name=project['project_id'], case=case, sample_pair=sample_pair) }}">Analysis Blocks</a> 
+  {% elif pipeline == 'whole_transcriptome' %}
+    <a href="{{ url_for('wt_case', project_name=project['project_id'], case=case, tumor_sample=sample_pair) }}">Analysis Blocks</a> 
+  {% endif %}
 {% endblock %}
 
 
@@ -136,7 +140,7 @@
             <tr>
               <td>{{ parent_workflows[i] }}</td>
               <td>
-                <a class="workflow" href="{{ url_for('workflow', project_name=project['project_id'], case=case, workflow_id=parents[parent_workflows[i]][j]) }}">
+                <a class="workflow" href="{{ url_for('workflow', project_name=project['project_id'], pipeline=pipeline, case=case, sample_pair=sample_pair, workflow_id=parents[parent_workflows[i]][j]) }}">
                   {{ parents[parent_workflows[i]][j]}}
                 </a>
               </td>
@@ -171,7 +175,7 @@
             <tr>
               <td>{{ children_workflows[i] }}</td>
               <td>
-                <a class="workflow" href="{{ url_for('workflow', project_name=project['project_id'], case=case, workflow_id=children[children_workflows[i]][j]) }}">
+                <a class="workflow" href="{{ url_for('workflow', project_name=project['project_id'], pipeline=pipeline, case=case, sample_pair=sample_pair, workflow_id=children[children_workflows[i]][j]) }}">
                   {{ children[children_workflows[i]][j]}}
                 </a>
               </td>
