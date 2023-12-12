@@ -29,14 +29,14 @@
             <div class="download-dropdown-content">
               <form method="POST" action ="">
                 {% if deliverable == 'selected' %}
-                  <label><input type="checkbox" name="deliverable" value="selected" id="deliverable" checked/>selected</label><br>      
+                  <label><input class="checkbox" type="checkbox" name="deliverable" value="selected" id="deliverable" checked/>selected</label><br>      
                 {% else %}
-                  <label><input type="checkbox" name="deliverable" value="selected" id="deliverable"/>selected</label><br>      
+                  <label><input class="checkbox" type="checkbox" name="deliverable" value="selected" id="deliverable"/>selected</label><br>      
                 {% endif %}
                 {% if deliverable == 'standard' %}
-                  <label><input type="checkbox" name="deliverable" value="standard" id="deliverable" checked/>standard</label><br>      
+                  <label><input class="checkbox" type="checkbox" name="deliverable" value="standard" id="deliverable" checked/>standard</label><br>      
                 {% else %}
-                  <label><input type="checkbox" name="deliverable" value="standard" id="deliverable"/>standard</label><br>      
+                  <label><input class="checkbox" type="checkbox" name="deliverable" value="standard" id="deliverable"/>standard</label><br>      
                 {% endif %}
                 <button class="select_button" type = "submit" value="submit">Download</button>
               </form>          

@@ -5,38 +5,37 @@ Created on Tue May  3 14:32:40 2022
 @author: rjovelin
 """
 
-import sqlite3
+#import sqlite3
 import json
 from flask import Flask, render_template, request, url_for, flash, redirect, Response, send_file
-from werkzeug.exceptions import abort
-import requests
-import gzip
-import os
+#from werkzeug.exceptions import abort
+#import requests
+#import gzip
+#import os
 import time
 import pandas as pd
-import itertools
+#import itertools
 
 import matplotlib
 matplotlib.use('agg')
-import matplotlib.pyplot as plt
-import networkx as nx
-import numpy as np
-import io
-import base64
+#import matplotlib.pyplot as plt
+#import networkx as nx
+#import numpy as np
+#import io
+#import base64
 
 from utilities import connect_to_db, get_miso_sample_link,\
     get_pipelines, get_workflow_names, get_library_design, secret_key_generator, \
     get_children_workflows
-from whole_genome import get_call_ready_cases, map_workflows_to_parent, \
-    get_amount_data, create_WG_block_json, get_parent_workflows, get_workflows_analysis_date, \
-    get_workflow_file_count, get_WGTS_blocks_info, get_sequencing_platform, get_selected_workflows, \
+from whole_genome import get_call_ready_cases, get_amount_data, create_WG_block_json, \
+    get_parent_workflows, get_workflows_analysis_date, get_workflow_file_count, \
+    get_WGTS_blocks_info, get_sequencing_platform, get_selected_workflows, \
     review_wgs_blocks, get_case_workflows, update_wf_selection, get_block_counts, \
     get_wgs_blocks, create_WGS_project_block_json, get_workflow_output, get_release_status, \
     get_workflow_limskeys, get_file_release_status, map_fileswid_to_filename, \
     map_limskey_to_library, map_library_to_sample, get_WGS_standard_deliverables    
     
-from whole_transcriptome import get_WT_call_ready_cases, get_star_case, get_WT_case_call_ready_samples, \
-    map_workflows_to_samples, find_WT_analysis_blocks, map_samples_to_star_runs, get_WT_standard_deliverables, \
+from whole_transcriptome import get_WT_call_ready_cases, get_WT_standard_deliverables, \
     create_WT_project_block_json, create_WT_block_json
 from project import get_project_info, get_cases, get_sample_counts, count_libraries, \
      get_library_types, add_missing_donors, get_last_sequencing
