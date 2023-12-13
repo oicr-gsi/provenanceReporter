@@ -36,17 +36,25 @@ def get_shallow_wg(project_name, database, workflow_table = 'Workflows', wf_inpu
     for i in L:
         donor = i['sample']
         sample =  '_'.join([donor, i['tissue_type'], i['tissue_origin'], i['library_type'], i['group_id']]) 
-        d = {'donor': donor,
-            'sample': sample,
-            'library': i['library'],
-            'wf': i['wf'],
-            'workflow_id': i['wfrun_id']}
-            
+        workflow_id = i['wfrun_id']
+        library = i['library']
+        wf = i['wf']
+        platform = i['platform']
+        
         if donor not in D:
             D[donor] = {}
         if sample not in D[donor]:
             D[donor][sample] = []
-        D[donor][sample].append(d)
+        if workflow_id in D[donor][sample]:
+            D[donor][sample][workflow_id]['library'].append(library)
+            assert D[donor][sample][workflow_id]['platform'] == platform
+        else:
+            D[donor][sample][workflow_id] = {'donor': donor,
+                                             'sample': sample,
+                                             'workflow_id': workflow_id,
+                                             'library': [library],
+                                             'workflow': wf,
+                                             'platform': platform}
     
     return D
 
