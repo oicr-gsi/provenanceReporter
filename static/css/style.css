@@ -532,8 +532,6 @@ button.review_button:focus {
 .download-dropdown:hover .download-dropbtn {background-color: #3e8e41;}
 
 
-
-
 .somatic_block {
   padding: 20px;
   font-size: 17px;
@@ -576,7 +574,11 @@ button.review_button:focus {
   width: 18px;
 }
 
-
+.checkbox_small {
+  accent-color: #196719;
+  height: 12px;
+  width: 12px;
+}
 
 
 .workflow {
