@@ -40,11 +40,13 @@ from whole_transcriptome import get_WT_call_ready_cases, get_WT_standard_deliver
 from project import get_project_info, get_cases, get_sample_counts, count_libraries, \
      get_library_types, add_missing_donors, get_last_sequencing
 from sequencing import get_sequences, collect_sequence_info, platform_name
-
+from shallow_whole_genome import get_shallow_wg
 
    
 # map pipelines to views
-routes = {'Whole Genome': 'whole_genome_sequencing', 'Whole Transcriptome': 'whole_transcriptome'}
+routes = {'Whole Genome': 'whole_genome_sequencing',
+          'Whole Transcriptome': 'whole_transcriptome',
+          'Shallow Whole Genome': 'shallow_whole_genome'}
 
 
 app = Flask(__name__)
@@ -553,6 +555,108 @@ def wt_case(project_name, case, tumor_sample):
                                selected=selected,
                                tumor_sample=tumor_sample
                                )
+
+
+@app.route('/<project_name>/shallow_whole_genome/', methods=['POST', 'GET'])
+def shallow_whole_genome(project_name):
+        
+    
+    database = 'merged.db'
+    #expected_workflows = sorted(['arriba', 'rsem', 'star', 'starfusion', 'mavis'])  
+    
+    # get the project info for project_name from db
+    project = get_project_info(project_name, database)
+    # get the pipelines from the library definitions in db
+    pipelines = get_pipelines(project_name, database)
+    # get the shallow whole genome data
+    swg = get_shallow_wg(project_name, database, workflow_table = 'Workflows', wf_input_table = 'Workflow_Inputs', library_table='Libraries')
+        
+    return render_template('shallow_whole_genome.html',
+                           project=project,
+                           routes = routes,
+                           pipelines=pipelines,
+                           swg=swg                    
+                           )
+
+    
+    
+    # # get the WT blocks
+    # blocks = get_WGTS_blocks_info(project_name, case, database, 'WT_blocks')
+    # # sort sample pairs names
+    # sample_names = sorted(list(blocks.keys()))
+    # # get the workflow names
+    # workflow_names = get_workflow_names(project_name, database)
+    # # get the file count of each workflow in project
+    # file_counts = get_workflow_file_count(project_name, database)
+    # # get the amount of data for each workflow
+    # amount_data = get_amount_data(project_name, database)
+    # # get the creation date of all workflows
+    # creation_dates = get_workflows_analysis_date(project_name, database)
+    # # find the parents of each workflow
+    # parents = get_parent_workflows(project_name, database)
+    # # extract selected status of each workflow
+    # selected = get_selected_workflows(project_name, database, 'Workflows')
+    
+    # if request.method == 'POST':
+    #     # get the list of checked workflows        
+    #     selected_workflows = request.form.getlist('workflow')
+    #     # get the workflows of each block and sample pair for case
+    #     case_workflows = get_case_workflows(case, database, 'WT_blocks')
+    #     # list all the workflows for a given sample that need an update
+    #     # may include workflows from different blocks for a sample
+    #     # this ensures blocks are mutually exclusive within a sample but not within a case
+    #     workflows = []
+    #     for i in case_workflows[tumor_sample]:
+    #         workflows.extend(case_workflows[tumor_sample][i])
+    #     update_wf_selection(workflows, selected_workflows, selected, database, 'Workflows')
+    #     return redirect(url_for('wt_case', case=case, project_name=project_name, tumor_sample=tumor_sample))
+    # else:
+    #     return render_template('WT_case.html',
+    #                            project=project,
+    #                            routes = routes,
+    #                            case=case,
+    #                            pipelines=pipelines,
+    #                            blocks=blocks,
+    #                            sample_names=sample_names,
+    #                            workflow_names=workflow_names,
+    #                            file_counts=file_counts,
+    #                            amount_data=amount_data,
+    #                            creation_dates=creation_dates,
+    #                            parents=parents,
+    #                            selected=selected,
+    #                            tumor_sample=tumor_sample
+    #                            )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

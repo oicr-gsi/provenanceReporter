@@ -8,7 +8,7 @@
     {% if i in routes %}
       {% if i == 'Whole Transcriptome' %}
         <a class="selected" href="{{ url_for(routes[i], project_name=project['project_id']) }}">{{i}}</a>
-      {% elif i == 'Whole Genome' %}
+      {% else %}
         <a href="{{ url_for(routes[i], project_name=project['project_id']) }}">{{i}}</a>   
       {% endif %}  
     {% else %}
