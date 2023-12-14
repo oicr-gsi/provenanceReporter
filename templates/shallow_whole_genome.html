@@ -21,8 +21,8 @@
 {% block content %}
   <div class="project_title">
     <p>{% block title %}{{ project['project_id'] }} {% endblock %}
-      {% if cases %}
-        <span style="font-size:30px; font-style:normal;"> WGS workflow data for <span id ="count"> {{ cases|length }} </span> cases</span>
+      {% if swg %}
+        <span style="font-size:30px; font-style:normal;"> WGS workflow data for <span id ="count"> {{ swg|length }} </span> cases</span>
         
         <div class="download-dropdown">
           <button class="download-dropbtn">Download json</button>
@@ -50,7 +50,7 @@
     
   </div> 
 
-  {% if cases %}
+  {% if swg %}
   
     <div style="margin-left:auto;margin-right:auto;margin-top:80px;padding-bottom:7px;max-width:300px;position:relative">
       <input type="text" id="search_table"  onkeyup="searchFunction()" placeholder="Search.." title="Type in a keyword">
@@ -60,110 +60,59 @@
   
   <table id="wgs_table">
     <thead>
-      <th>Cases</th>
-      <th>Samples</th>
-      <th>Call-ready workflows</th>
-      <th>Downstream workflows</th>
-      <th>Blocks</th>
-      <th>Sample pairs</th>
-      <th>Analysis blocks</th>
-      <th>Block status</th>
+      <th>Case</th>
+      <th>Sample</th>
+      <th>Workflow</th>
+      <th>Library</th>
+      <th>Platform</th>
+      <th>Status</th>
     </thead>     
 
-    {% for i in samples %}
-      {% if i in block_status %}
-        {% set rowNum = block_status[i] | length %}
-        {% set myList = block_status[i].keys() | list | sort %}
-      {% else %}
-        {% set rowNum = 1 %}
-        {% set myList = [] %}
-      {% endif %}
-      <tbody>     
-        <tr>
-          <td rowspan="{{rowNum}}">
-            {{i}}
-          </td>
-          <td rowspan="{{rowNum}}">
-            <dl>
-              {% for item in cases[i]['samples'] %}
-                <dt>
-                  {{item}}
-                </dt>
-                <br>
-              {% endfor %}
-            </dl>       
-          </td>
-          <td rowspan="{{rowNum}}">
-            {{cases[i]['bmpp'] | length}}
-          </td>
-          <td rowspan="{{rowNum}}">
-            {{cases[i]['downstream'] | length}}
-          </td>
-          <td rowspan="{{rowNum}}">
-            {% if i in block_counts %}
-              {{block_counts[i].values() | sum}}
-            {% else %}
-              0
-            {% endif %} 
-          </td>       
-          <td>
-            {% if myList %}
-              {{myList.0}}
-            {% else %}
-              NA       
-            {% endif %}       
-          </td>
-       
-          <td>
-            {% if myList %}
-              {{block_counts[i][myList.0]}}
-            {% else %}
-              0       
-            {% endif %}       
-          </td>
-       
-          <td>
-            {% if myList %}
-              <a class="project_links" href="{{ url_for('wgs_case', project_name=project['project_id'], case=i, sample_pair=myList[0])}}">
-                {% if block_status[i][myList.0] != 'review' and block_status[i][myList.0] != 'ready' %}
-                  {{block_status[i][myList.0] | shorten_workflow_id}}
-                {% else %}
-                  <button class="review_button">{{block_status[i][myList.0]}}</button>
-                {% endif %}           
-              </a>         
-            {% else %}
-              NA
-            {% endif %}
-          </td> 
-     
-     
-        {% if myList %}
-          {% for j in myList[1:] %}
-            <tr>          
-              <td>
-                {{j}}
-              </td>
-              <td>
-                {{block_counts[i][j]}}
-              </td>
-              <td>
-                <a class="project_links" href="{{ url_for('wgs_case', project_name=project['project_id'], case=i, sample_pair=j)}}">
-                  {% if block_status[i][j] != 'review' and block_status[i][j] != 'ready' %}
-                    {{block_status[i][j] | shorten_workflow_id}}
-                  {% else %}
-                    <button class="review_button">{{block_status[i][j]}}</button>
+    {% set donors = swg.keys() | list | sort %}
+    {% for i in donors %}
+      {% set samples = swg[i].keys() | list | sort %}
+      {% for j in samples %}
+        {% for workflow_id in swg[i][j] %}
+          <tr>
+            <td>
+              {{i}}
+            </td>
+            <td>
+              {{j}}
+            </td>  
+            <td>
+              {{workflow_id | shorten_workflow_id}}
+            </td>
+            <td>  
+              <dl>
+                {% for library in swg[i][j][workflow_id]['library'] %}
+                  <dt>
+                    {{library}}
+                  </dt>
+                  <br>
+                {% endfor %}
+              </dl>       
+            </td>
+            <td>
+              {{swg[i][j][workflow_id]['platform']}}
+            </td>
+            <td>
+              <a class="project_links" href="#">
+                {% if i in status %}
+                  {% if j in status[i] %}
+                    {% if status[i][j][workflow_id] != 'review' and status[i][j][workflow_id] != 'ready' %}
+                      {{status[i][j][workflow_id] | shorten_workflow_id}}
+                    {% else %}
+                      <button class="review_button">{{status[i][j][workflow_id]}}</button>
+                    {% endif %}
                   {% endif %}
-                </a>  
-              </td>
-            </tr>
-          {% endfor %}
-        {% endif %}
- 
-      
-      </tbody>
-
-   {% endfor %}               
-   </table>
+                {% endif %}               
+              </a>         
+            </td> 
+        {% endfor %}
+      {% endfor %}    
+    {% endfor %}  
+  </table>
 
   <footer>
     <p style="margin-left:auto;margin-right:auto; margin-top:150px; padding-bottom:0px;max-width:300px;position:relative;font-size:16px; font-style:normal; font-family: Arial, Helvetica, sans-serif; color: #A8A8A8;"> Data last updated {{project['last_updated'].split('_')[0]}} </p>

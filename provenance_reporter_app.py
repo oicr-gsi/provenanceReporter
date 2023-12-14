@@ -40,7 +40,7 @@ from whole_transcriptome import get_WT_call_ready_cases, get_WT_standard_deliver
 from project import get_project_info, get_cases, get_sample_counts, count_libraries, \
      get_library_types, add_missing_donors, get_last_sequencing
 from sequencing import get_sequences, collect_sequence_info, platform_name
-from shallow_whole_genome import get_shallow_wg
+from shallow_whole_genome import get_shallow_wg, review_swg
 
    
 # map pipelines to views
@@ -570,12 +570,18 @@ def shallow_whole_genome(project_name):
     pipelines = get_pipelines(project_name, database)
     # get the shallow whole genome data
     swg = get_shallow_wg(project_name, database, workflow_table = 'Workflows', wf_input_table = 'Workflow_Inputs', library_table='Libraries')
-        
+    # get the selection status of workflows
+    selected = get_selected_workflows(project_name, database, 'Workflows')
+    # get the input fastqs release status
+    release_status = get_file_release_status(project_name, database)
+    status = review_swg(swg, selected, release_status)
+    
     return render_template('shallow_whole_genome.html',
                            project=project,
                            routes = routes,
                            pipelines=pipelines,
-                           swg=swg                    
+                           swg=swg,
+                           status=status
                            )
 
     

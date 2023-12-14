@@ -13,6 +13,7 @@ from whole_genome import get_parent_workflows
 
 def get_shallow_wg(project_name, database, workflow_table = 'Workflows', wf_input_table = 'Workflow_Inputs', library_table='Libraries'):
     '''
+    (str, str, str, str, str) -> 
     
     
     
@@ -40,24 +41,62 @@ def get_shallow_wg(project_name, database, workflow_table = 'Workflows', wf_inpu
         library = i['library']
         wf = i['wf']
         platform = i['platform']
+        limskey = i['limskey']
         
         if donor not in D:
             D[donor] = {}
         if sample not in D[donor]:
-            D[donor][sample] = []
+            D[donor][sample] = {}
         if workflow_id in D[donor][sample]:
-            D[donor][sample][workflow_id]['library'].append(library)
-            assert D[donor][sample][workflow_id]['platform'] == platform
+            D[donor][sample][workflow_id]['library'].add(library)
+            D[donor][sample][workflow_id]['platform'].add(platform)
+            D[donor][sample][workflow_id]['limskey'].add(limskey)
+            
         else:
             D[donor][sample][workflow_id] = {'donor': donor,
                                              'sample': sample,
                                              'workflow_id': workflow_id,
-                                             'library': [library],
+                                             'library': {library},
                                              'workflow': wf,
-                                             'platform': platform}
-    
+                                             'platform': {platform},
+                                             'limskey': {limskey}}
     return D
 
+
+def review_swg(swg, selected_workflows, release_status):
+    '''
+    (dict, dict, dict) -> dict 
+    
+    Returns a dictionary with status for analysis blocks for each case in project
+                  
+    Parameters
+    ----------
+    - blocks (dict): 
+    - selected_workflows (dict): 
+    '''
+    
+    D = {}
+    
+    for donor in swg:
+        if donor not in D:
+            D[donor] = {}
+        for sample in swg[donor]:
+            if sample not in D[donor]:
+                D[donor][sample] = {}
+            for workflow_id in swg[donor][sample]:
+                if selected_workflows[workflow_id]:
+                    D[donor][sample][workflow_id] = workflow_id 
+                    break
+                else:
+                    status = []
+                    for limskey in swg[donor][sample][workflow_id]['limskey']:
+                        for i in release_status[limskey]:
+                            status.append(i[1])
+                    if all(map(lambda x: x.lower() == 'pass', status)):
+                        D[donor][sample][workflow_id] = 'ready'
+                    else:
+                        D[donor][sample][workflow_id] = 'review'
+    return D
 
 
 
