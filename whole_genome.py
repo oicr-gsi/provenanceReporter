@@ -1869,8 +1869,8 @@ def review_wgs_blocks(blocks, selected_workflows):
                   
     Parameters
     ----------
-    - project_name (str): Name of project of interest
-    - database (str): Path to the sqlite database
+    - blocks (dict): 
+    - selected_workflows (dict): 
     '''
     
     D = {}

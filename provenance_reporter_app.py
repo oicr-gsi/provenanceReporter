@@ -40,7 +40,7 @@ from whole_transcriptome import get_WT_call_ready_cases, get_WT_standard_deliver
 from project import get_project_info, get_cases, get_sample_counts, count_libraries, \
      get_library_types, add_missing_donors, get_last_sequencing
 from sequencing import get_sequences, collect_sequence_info, platform_name
-from shallow_whole_genome import get_shallow_wg, review_swg
+from shallow_whole_genome import get_shallow_wg, review_swg, get_input_release_status
 
    
 # map pipelines to views
@@ -574,7 +574,8 @@ def shallow_whole_genome(project_name):
     selected = get_selected_workflows(project_name, database, 'Workflows')
     # get the input fastqs release status
     release_status = get_file_release_status(project_name, database)
-    status = review_swg(swg, selected, release_status)
+    workflow_release_status = get_input_release_status(swg, release_status)
+    status = review_swg(swg, selected, workflow_release_status)
     
     return render_template('shallow_whole_genome.html',
                            project=project,
@@ -583,6 +584,55 @@ def shallow_whole_genome(project_name):
                            swg=swg,
                            status=status
                            )
+
+
+@app.route('/<project_name>/shallow_whole_genome/<case>/<sample>', methods=['POST', 'GET'])
+def swg_sample(project_name, case, sample):
+    
+    database = 'merged.db'
+    
+    # get the project info for project_name from db
+    project = get_project_info(project_name, database)
+    # get the pipelines from the library definitions in db
+    pipelines = get_pipelines(project_name, database)
+    # get miso link
+    miso_link = get_miso_sample_link(project_name, case, database)
+    # get the shallow whole genome data
+    swg = get_shallow_wg(project_name, database, workflow_table = 'Workflows', wf_input_table = 'Workflow_Inputs', library_table='Libraries')
+    # get the selection status of workflows
+    selected = get_selected_workflows(project_name, database, 'Workflows')
+    # get the input fastqs release status
+    release_status = get_file_release_status(project_name, database)
+    status = get_input_release_status(swg, release_status)
+    # get the workflow names
+    workflow_names = get_workflow_names(project_name, database)
+    file_counts = get_workflow_file_count(project_name, database)
+    # get the amount of data for each workflow
+    amount_data = get_amount_data(project_name, database)
+    # get the creation date of all workflows
+    creation_dates = get_workflows_analysis_date(project_name, database)
+    # get the sequencing platform of each workflow
+    platforms = get_sequencing_platform(project_name, database)
+    # find the parents of each workflow
+    #parents = get_parent_workflows(project_name, database)
+    
+    return render_template('SWG_sample.html',
+                           project=project,
+                           routes = routes,
+                           pipelines=pipelines,
+                           swg=swg,
+                           status=status,
+                           case=case,
+                           sample=sample,
+                           workflow_names=workflow_names,
+                           file_counts=file_counts,
+                           amount_data=amount_data,
+                           creation_dates=creation_dates,
+                           selected = selected
+                           )
+
+
+
 
     
     

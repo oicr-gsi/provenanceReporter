@@ -63,7 +63,47 @@ def get_shallow_wg(project_name, database, workflow_table = 'Workflows', wf_inpu
     return D
 
 
-def review_swg(swg, selected_workflows, release_status):
+def get_input_release_status(swg, release_status):
+    '''
+    
+    
+    
+    
+
+    Parameters
+    ----------
+    swg : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    None.
+
+    '''
+    
+    D = {}
+    
+    for donor in swg:
+        if donor not in D:
+            D[donor] = {}
+        for sample in swg[donor]:
+            if sample not in D[donor]:
+                D[donor][sample] = {}
+            for workflow_id in swg[donor][sample]:
+                status = []
+                for limskey in swg[donor][sample][workflow_id]['limskey']:
+                    for i in release_status[limskey]:
+                        status.append(i[1])
+                if all(map(lambda x: x.lower() == 'pass', status)):
+                    D[donor][sample][workflow_id] = 1
+                else:
+                    D[donor][sample][workflow_id] = 0
+    return D
+
+  
+    
+
+def review_swg(swg, selected_workflows, input_release_status):
     '''
     (dict, dict, dict) -> dict 
     
@@ -88,14 +128,11 @@ def review_swg(swg, selected_workflows, release_status):
                     D[donor][sample][workflow_id] = workflow_id 
                     break
                 else:
-                    status = []
-                    for limskey in swg[donor][sample][workflow_id]['limskey']:
-                        for i in release_status[limskey]:
-                            status.append(i[1])
-                    if all(map(lambda x: x.lower() == 'pass', status)):
+                    if input_release_status[donor][sample][workflow_id]:
                         D[donor][sample][workflow_id] = 'ready'
                     else:
                         D[donor][sample][workflow_id] = 'review'
+                
     return D
 
 

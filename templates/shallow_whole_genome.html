@@ -97,7 +97,7 @@
               {{swg[i][j][workflow_id]['platform']}}
             </td>
             <td>
-              <a class="project_links" href="#">
+              <a class="project_links" href="{{ url_for('swg_sample', project_name=project['project_id'], case=i, sample=j)}}">
                 {% if i in status %}
                   {% if j in status[i] %}
                     {% if status[i][j][workflow_id] != 'review' and status[i][j][workflow_id] != 'ready' %}
