@@ -126,7 +126,6 @@ def review_swg(swg, selected_workflows, input_release_status):
             for workflow_id in swg[donor][sample]:
                 if selected_workflows[workflow_id]:
                     D[donor][sample][workflow_id] = workflow_id 
-                    break
                 else:
                     if input_release_status[donor][sample][workflow_id]:
                         D[donor][sample][workflow_id] = 'ready'
