@@ -8,7 +8,7 @@
   {% elif pipeline == 'whole_transcriptome' %}
     <a href="{{ url_for('wt_case', project_name=project['project_id'], case=case, tumor_sample=sample_pair) }}">Analysis Blocks</a> 
   {% elif pipeline == 'shallow_whole_genome' %}
-    <a href="{{ url_for('swg_sample', project_name=project['project_id'], case=case, sample=sample_pair) }}">Analysis Blocks</a> 
+    <a href="{{ url_for('swg_sample', project_name=project['project_id'], case=case, sample=sample_pair) }}">Shallow Whole Genome Sample</a> 
   {% endif %}
 {% endblock %}
 

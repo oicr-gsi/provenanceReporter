@@ -371,7 +371,6 @@ def workflow(project_name, pipeline, case, sample_pair, workflow_id):
     else:
         parents = {}
     
-    
     # find the children of each workflow
     D = get_children_workflows(project_name, database)
     children = {}
@@ -611,12 +610,16 @@ def swg_sample(project_name, case, sample):
     amount_data = get_amount_data(project_name, database)
     # get the creation date of all workflows
     creation_dates = get_workflows_analysis_date(project_name, database)
-    # get the sequencing platform of each workflow
-    platforms = get_sequencing_platform(project_name, database)
-    # find the parents of each workflow
-    #parents = get_parent_workflows(project_name, database)
     
-    return render_template('SWG_sample.html',
+    if request.method == 'POST':
+        # get the selected workflow        
+        selected_workflow = request.form.getlist('workflow')
+        # get the workflows for the given sample
+        workflows = list(swg[case][sample].keys())
+        update_wf_selection(workflows, selected_workflow, selected, database, 'Workflows')
+        return redirect(url_for('swg_sample', case=case, project_name=project_name, sample=sample))
+    else:
+        return render_template('SWG_sample.html',
                            project=project,
                            routes = routes,
                            pipelines=pipelines,
