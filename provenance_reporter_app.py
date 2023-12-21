@@ -576,12 +576,20 @@ def shallow_whole_genome(project_name):
     workflow_release_status = get_input_release_status(swg, release_status)
     status = review_swg(swg, selected, workflow_release_status)
     
+    row_counts = {}
+    for i in swg:
+        for j in swg[i]:
+            row_counts[i] = len(swg[i][j])
+    
+    
+    
     return render_template('shallow_whole_genome.html',
                            project=project,
                            routes = routes,
                            pipelines=pipelines,
                            swg=swg,
-                           status=status
+                           status=status,
+                           row_counts=row_counts
                            )
 
 

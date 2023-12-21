@@ -125,12 +125,13 @@ def review_swg(swg, selected_workflows, input_release_status):
                 D[donor][sample] = {}
             for workflow_id in swg[donor][sample]:
                 if selected_workflows[workflow_id]:
-                    D[donor][sample][workflow_id] = workflow_id 
+                    D[donor][sample] = workflow_id
+                    break
                 else:
                     if input_release_status[donor][sample][workflow_id]:
-                        D[donor][sample][workflow_id] = 'ready'
+                        D[donor][sample] = 'ready'
                     else:
-                        D[donor][sample][workflow_id] = 'review'
+                        D[donor][sample] = 'review'
                 
     return D
 

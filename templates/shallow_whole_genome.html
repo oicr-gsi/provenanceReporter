@@ -62,56 +62,62 @@
     <thead>
       <th>Case</th>
       <th>Sample</th>
-      <th>Workflow</th>
-      <th>Library</th>
-      <th>Platform</th>
       <th>Status</th>
     </thead>     
 
     {% set donors = swg.keys() | list | sort %}
     {% for i in donors %}
       {% set samples = swg[i].keys() | list | sort %}
-      {% for j in samples %}
-        {% for workflow_id in swg[i][j] %}
+      {% set rowNum = samples | length %}
+      <tbody>  
+        <td rowspan="{{rowNum}}">
+          {{i}}
+        </td>
+        <td>
+          {{samples[0]}}
+        </td>  
+        <td>
+          <a class="project_links" href="{{ url_for('swg_sample', project_name=project['project_id'], case=i, sample=samples[0])}}">
+            {% if i in status %}
+              {% if samples[0] in status[i] %}
+                {% if status[i][samples[0]] != 'review' and status[i][samples[0]] != 'ready' %}
+                  {{status[i][samples[0]] | shorten_workflow_id}}
+                {% else %}
+                  <button class="review_button">{{status[i][samples[0]]}}</button>
+                {% endif %}
+              {% endif %}
+            {% else %}
+              NA
+            {% endif %}               
+          </a>
+        </td> 
+        
+
+        {% for j in samples[1:] %}
           <tr>
-            <td>
-              {{i}}
-            </td>
             <td>
               {{j}}
             </td>  
             <td>
-              {{workflow_id | shorten_workflow_id}}
-            </td>
-            <td>  
-              <dl>
-                {% for library in swg[i][j][workflow_id]['library'] %}
-                  <dt>
-                    {{library}}
-                  </dt>
-                  <br>
-                {% endfor %}
-              </dl>       
-            </td>
-            <td>
-              {{swg[i][j][workflow_id]['platform']}}
-            </td>
-            <td>
               <a class="project_links" href="{{ url_for('swg_sample', project_name=project['project_id'], case=i, sample=j)}}">
                 {% if i in status %}
                   {% if j in status[i] %}
-                    {% if status[i][j][workflow_id] != 'review' and status[i][j][workflow_id] != 'ready' %}
-                      {{status[i][j][workflow_id] | shorten_workflow_id}}
+                    {% if status[i][j] != 'review' and status[i][j] != 'ready' %}
+                      {{status[i][j] | shorten_workflow_id}}
                     {% else %}
-                      <button class="review_button">{{status[i][j][workflow_id]}}</button>
+                      <button class="review_button">{{status[i][j]}}</button>
                     {% endif %}
                   {% endif %}
+                {% else %}
+                  NA
                 {% endif %}               
-              </a>         
-            </td> 
-        {% endfor %}
-      {% endfor %}    
-    {% endfor %}  
+              </a>
+            </td>
+          </tr>
+       {% endfor %}
+      </tbody>  
+  {% endfor %}
+     
   </table>
 
   <footer>
