@@ -13,10 +13,17 @@ from whole_genome import get_parent_workflows
 
 def get_shallow_wg(project_name, database, workflow_table = 'Workflows', wf_input_table = 'Workflow_Inputs', library_table='Libraries'):
     '''
-    (str, str, str, str, str) -> 
+    (str, str, str, str, str) -> dict
     
+    Returns a dictionary with shallow whole genome data for all samples in project
     
-    
+    Parameters
+    ----------
+    - project_name (str): Name of the project of interest
+    - database (str): Path to the sqlite database
+    - workflow_table (str): Name of the table storing workflow information
+    - wf_input_table (str): Name of the table storing information about the input data to the workflows 
+    - library_table (str): Name of the table storing information about the libraries
     '''
     
     conn = connect_to_db(database)
@@ -65,20 +72,14 @@ def get_shallow_wg(project_name, database, workflow_table = 'Workflows', wf_inpu
 
 def get_input_release_status(swg, release_status):
     '''
+    (dict, dict) -> dict
+        
+    Returns a dictionary with the release status of the input sequences of the ichorcna workflows
     
-    
-    
-    
-
     Parameters
     ----------
-    swg : TYPE
-        DESCRIPTION.
-
-    Returns
-    -------
-    None.
-
+    - swg (dict): Dictionary storing the shallow whole genome data for a given project
+    - release_status (dict): Release status of individual files for a given project
     '''
     
     D = {}
@@ -100,19 +101,21 @@ def get_input_release_status(swg, release_status):
                     D[donor][sample][workflow_id] = 0
     return D
 
-  
-    
+   
 
 def review_swg(swg, selected_workflows, input_release_status):
     '''
     (dict, dict, dict) -> dict 
     
-    Returns a dictionary with status for analysis blocks for each case in project
+    Returns a dictionary with review status of shallow whole genome data for each samples
+    of each case in project
                   
     Parameters
     ----------
-    - blocks (dict): 
-    - selected_workflows (dict): 
+    - swg (dict): Dictionary storing the shallow whole genome data for a given project
+    - selected_workflows (dict): Dictionary with workflow selection status
+    - input_release_status (status): Dictionary with the release status of the input
+                                     sequences of the ichorcna workflows
     '''
     
     D = {}
