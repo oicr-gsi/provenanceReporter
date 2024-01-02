@@ -40,7 +40,8 @@ from whole_transcriptome import get_WT_call_ready_cases, get_WT_standard_deliver
 from project import get_project_info, get_cases, get_sample_counts, count_libraries, \
      get_library_types, add_missing_donors, get_last_sequencing
 from sequencing import get_sequences, collect_sequence_info, platform_name
-from shallow_whole_genome import get_shallow_wg, review_swg, get_input_release_status
+from shallow_whole_genome import get_shallow_wg, review_swg, get_input_release_status, \
+    create_swg_sample_json
 
    
 # map pipelines to views
@@ -754,6 +755,29 @@ def download_block_data(project_name, pipeline, case, pair, anchor_wf, table, se
         mimetype="application/json",
         status=200,
         headers={"Content-disposition": "attachment; filename={0}.{1}.{2}.{3}.{4}.{5}.json".format(project_name, pipeline, case, pair_name, anchor_wf, selection)})
+
+
+@app.route('/download_swg/<project_name>/SWG/<case>/<sample>/<workflow_id>/<selection>')
+def download_SWG_data(project_name, case, sample, workflow_id, selection):
+        
+    database = 'merged.db'
+    
+    # get the shallow whole genome data
+    swg = get_shallow_wg(project_name, database, workflow_table = 'Workflows', wf_input_table = 'Workflow_Inputs', library_table='Libraries')
+    # get the selection status of workflows
+    selected_workflows = get_selected_workflows(project_name, database, 'Workflows')
+    # get the workflow names
+    workflow_names = get_workflow_names(project_name, database)
+    
+    data = create_swg_sample_json(database, project_name, swg, case, sample, workflow_id, workflow_names, selected_workflows, selection)
+    
+        
+    # send the json to outoutfile                    
+    return Response(
+        response=json.dumps(data),
+        mimetype="application/json",
+        status=200,
+        headers={"Content-disposition": "attachment; filename={0}.{1}.{2}.{3}.{4}.{5}.json".format(project_name, 'SWG', case, sample, workflow_id, selection)})
 
 
 

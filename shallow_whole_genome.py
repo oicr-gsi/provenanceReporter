@@ -7,8 +7,8 @@ Created on Wed Dec 13 11:39:27 2023
 
 
 from utilities import connect_to_db
-from whole_genome import get_parent_workflows
-
+from whole_genome import get_parent_workflows, map_limskey_to_library, map_library_to_sample, \
+    get_workflow_output    
 
 
 def get_shallow_wg(project_name, database, workflow_table = 'Workflows', wf_input_table = 'Workflow_Inputs', library_table='Libraries'):
@@ -137,6 +137,96 @@ def review_swg(swg, selected_workflows, input_release_status):
                         D[donor][sample] = 'review'
                 
     return D
+
+
+
+def get_SWG_standard_deliverables():
+    '''
+    (None) -> dict
+    
+    Returns a dictionary with the file extensions for ichorCNA workflow for which
+    output files are released as part of the standard WT package
+    
+    Parameters
+    ----------
+     None
+    '''
+    
+    deliverables = {'ichorcna': ['.params.txt']}
+           
+    return deliverables
+
+
+
+
+
+def create_swg_sample_json(database, project_name, swg, case, sample, workflow_id, workflow_names, selected_workflows, selection):
+    '''
+    (str, str, dict, str, str, dict, dict, str)
+    
+    Returns a dictionary with ichorcna workflow information for a given sample 
+    
+    Parameters
+    ----------
+    - database (str): Path to the sqlite database
+    - project_name (str): Name of project of interest
+    - case (str): Donor identifier 
+    - swg (dict): Dictionary storing the shallow whole genome data for a given project
+    - sample (str): Sample
+    - workflow_id (str): ichorCNA workflow identifier
+    - workflow_names (dict): Dictionary with workflow name and version for each workflow in project
+    - selected_workflows (dict): Dictionary with selected status of each workflow in project
+    - selection (str): Include files from all selected workflows or files from the standard deliverables
+                       Values: standard or all
+    '''
+    
+    # get the deliverables
+    if selection == 'standard':
+        deliverables = get_SWG_standard_deliverables()
+    elif selection == 'all':
+        deliverables = {}
+    
+    # organize the data
+    D = {}
+    
+    if selected_workflows[workflow_id]:
+        # get workflow name and version
+        workflow_name = workflow_names[workflow_id][0]
+        workflow_version = workflow_names[workflow_id][1]
+                
+        # get workflow output files
+        libraries = map_limskey_to_library(project_name, workflow_id, database, 'Workflow_Inputs')
+        sample_names = map_library_to_sample(project_name, case, database, 'Libraries')
+        outputfiles = get_workflow_output(project_name, case, workflow_id, database, libraries, sample_names, 'Files')
+                
+        D[case] = {}
+        assert sample not in D[case]
+        D[case][sample] = {}
+        assert workflow_name not in D[case][sample]
+        D[case][sample][workflow_name] = []
+
+                
+        # check that only workflows in standard WGS deliverables are used
+        if deliverables:
+            # keep track of the files to be released                                            
+            L = []
+            key = workflow_name.split('_')[0].lower()
+            if key in deliverables:
+                assert sample in outputfiles
+                for i in outputfiles[sample]:
+                    file = i[0]
+                    for file_ending in deliverables[key]:
+                        if file_ending in file and file[file.rindex(file_ending):] == file_ending:
+                            L.append(file)
+                
+                if L:
+                    D[case][sample][workflow_name].append({'workflow_id': workflow_id,
+                                                           'workflow_version': workflow_version,
+                                                           'files': L})
+        else:
+            D[case][sample][workflow_name].append({'workflow_id': workflow_id, 'workflow_version': workflow_version})
+    
+    return D                
 
 
 
