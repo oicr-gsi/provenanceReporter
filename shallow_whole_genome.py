@@ -230,3 +230,66 @@ def create_swg_sample_json(database, project_name, swg, case, sample, workflow_i
 
 
 
+
+def create_swg_project_json(database, project_name, swg, workflow_names, selected_workflows, deliverables=None):
+    '''
+    (str, str, dict, dict, dict, str)
+    
+    Returns a dictionary with ichorcna workflow information for a given sample 
+    
+    Parameters
+    ----------
+    - database (str): Path to the sqlite database
+    - project_name (str): Name of project of interest
+    - swg (dict): Dictionary storing the shallow whole genome data for a given project
+    - workflow_names (dict): Dictionary with workflow name and version for each workflow in project
+    - selected_workflows (dict): Dictionary with selected status of each workflow in project
+    - deliverables (None | dict): None or dictionary with file extensions of standard WGS deliverables
+    '''
+    
+    # organize the data
+    D = {}
+    
+    for case in swg:
+        for sample in swg[case]:
+            for workflow_id in swg[case][sample]:
+                if selected_workflows[workflow_id]:
+                    # get workflow name and version
+                    workflow_name = workflow_names[workflow_id][0]
+                    workflow_version = workflow_names[workflow_id][1]
+                
+                    # get workflow output files
+                    libraries = map_limskey_to_library(project_name, workflow_id, database, 'Workflow_Inputs')
+                    sample_names = map_library_to_sample(project_name, case, database, 'Libraries')
+                    outputfiles = get_workflow_output(project_name, case, workflow_id, database, libraries, sample_names, 'Files')
+                
+                    if case not in D:
+                        D[case] = {}
+                    if sample not in D[case]:
+                        D[case][sample] = {}
+                    assert workflow_name not in D[case][sample]
+                    D[case][sample][workflow_name] = []
+
+                
+                    # check that only workflows in standard WGS deliverables are used
+                    if deliverables:
+                        # keep track of the files to be released                                            
+                        L = []
+                        key = workflow_name.split('_')[0].lower()
+                        if key in deliverables:
+                            assert sample in outputfiles
+                            for i in outputfiles[sample]:
+                                file = i[0]
+                                for file_ending in deliverables[key]:
+                                    if file_ending in file and file[file.rindex(file_ending):] == file_ending:
+                                        L.append(file)
+                
+                            if L:
+                                D[case][sample][workflow_name].append({'workflow_id': workflow_id,
+                                                                       'workflow_version': workflow_version,
+                                                                       'files': L})
+                    else:
+                        D[case][sample][workflow_name].append({'workflow_id': workflow_id, 'workflow_version': workflow_version})
+    
+    return D                
+

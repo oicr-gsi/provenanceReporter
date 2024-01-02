@@ -41,7 +41,7 @@ from project import get_project_info, get_cases, get_sample_counts, count_librar
      get_library_types, add_missing_donors, get_last_sequencing
 from sequencing import get_sequences, collect_sequence_info, platform_name
 from shallow_whole_genome import get_shallow_wg, review_swg, get_input_release_status, \
-    create_swg_sample_json
+    create_swg_sample_json, create_swg_project_json, get_SWG_standard_deliverables
 
    
 # map pipelines to views
@@ -582,16 +582,33 @@ def shallow_whole_genome(project_name):
         for j in swg[i]:
             row_counts[i] = len(swg[i][j])
     
+    if request.method == 'POST':
+        deliverable = request.form.get('deliverable')
+        # get the workflow names
+        workflow_names = get_workflow_names(project_name, database)
+        if deliverable == 'selected':
+            data = create_swg_project_json(database, project_name, swg, workflow_names, selected)
+        elif deliverable == 'standard':
+            deliverables = get_SWG_standard_deliverables()
+            data = create_swg_project_json(database, project_name, swg, workflow_names, selected, deliverables)
+        else:
+            data = {}
+                         
+        return Response(
+                response=json.dumps(data),
+                mimetype="application/json",
+                status=200,
+                headers={"Content-disposition": "attachment; filename={0}.SWG.json".format(project_name)})
     
-    
-    return render_template('shallow_whole_genome.html',
-                           project=project,
-                           routes = routes,
-                           pipelines=pipelines,
-                           swg=swg,
-                           status=status,
-                           row_counts=row_counts
-                           )
+    else:
+        return render_template('shallow_whole_genome.html',
+                               project=project,
+                               routes = routes,
+                               pipelines=pipelines,
+                               swg=swg,
+                               status=status,
+                               row_counts=row_counts
+                               )
 
 
 @app.route('/<project_name>/shallow_whole_genome/<case>/<sample>', methods=['POST', 'GET'])
