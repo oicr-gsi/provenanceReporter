@@ -1337,8 +1337,7 @@ def add_blocks_to_db(database, project, expected_workflows, table, pipeline):
                          d[samples][block]['release'],
                          d[samples][block]['complete'],
                          d[samples][block]['clean'],
-                         d[samples][block]['network'],
-                         0]
+                         d[samples][block]['network']]
             
                     # insert project info
                     cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))

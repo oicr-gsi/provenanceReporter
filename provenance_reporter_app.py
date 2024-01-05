@@ -41,7 +41,8 @@ from project import get_project_info, get_cases, get_sample_counts, count_librar
      get_library_types, add_missing_donors, get_last_sequencing
 from sequencing import get_sequences, collect_sequence_info, platform_name
 from shallow_whole_genome import get_shallow_wg, review_swg, get_input_release_status, \
-    create_swg_sample_json, create_swg_project_json, get_SWG_standard_deliverables
+    create_swg_sample_json, create_swg_project_json, get_SWG_standard_deliverables, \
+    order_ichorcna_workflows    
 
    
 # map pipelines to views
@@ -636,7 +637,9 @@ def swg_sample(project_name, case, sample):
     amount_data = get_amount_data(project_name, database)
     # get the creation date of all workflows
     creation_dates = get_workflows_analysis_date(project_name, database)
-    
+    # sort workflows according to amount of data, release status and creation date
+    ordered_workflows = order_ichorcna_workflows(swg, amount_data, status, creation_dates)
+      
     if request.method == 'POST':
         # get the selected workflow        
         selected_workflow = request.form.getlist('workflow')
@@ -657,92 +660,9 @@ def swg_sample(project_name, case, sample):
                            file_counts=file_counts,
                            amount_data=amount_data,
                            creation_dates=creation_dates,
-                           selected = selected
+                           selected = selected,
+                           ordered_workflows = ordered_workflows
                            )
-
-
-
-
-    
-    
-    # # get the WT blocks
-    # blocks = get_WGTS_blocks_info(project_name, case, database, 'WT_blocks')
-    # # sort sample pairs names
-    # sample_names = sorted(list(blocks.keys()))
-    # # get the workflow names
-    # workflow_names = get_workflow_names(project_name, database)
-    # # get the file count of each workflow in project
-    # file_counts = get_workflow_file_count(project_name, database)
-    # # get the amount of data for each workflow
-    # amount_data = get_amount_data(project_name, database)
-    # # get the creation date of all workflows
-    # creation_dates = get_workflows_analysis_date(project_name, database)
-    # # find the parents of each workflow
-    # parents = get_parent_workflows(project_name, database)
-    # # extract selected status of each workflow
-    # selected = get_selected_workflows(project_name, database, 'Workflows')
-    
-    # if request.method == 'POST':
-    #     # get the list of checked workflows        
-    #     selected_workflows = request.form.getlist('workflow')
-    #     # get the workflows of each block and sample pair for case
-    #     case_workflows = get_case_workflows(case, database, 'WT_blocks')
-    #     # list all the workflows for a given sample that need an update
-    #     # may include workflows from different blocks for a sample
-    #     # this ensures blocks are mutually exclusive within a sample but not within a case
-    #     workflows = []
-    #     for i in case_workflows[tumor_sample]:
-    #         workflows.extend(case_workflows[tumor_sample][i])
-    #     update_wf_selection(workflows, selected_workflows, selected, database, 'Workflows')
-    #     return redirect(url_for('wt_case', case=case, project_name=project_name, tumor_sample=tumor_sample))
-    # else:
-    #     return render_template('WT_case.html',
-    #                            project=project,
-    #                            routes = routes,
-    #                            case=case,
-    #                            pipelines=pipelines,
-    #                            blocks=blocks,
-    #                            sample_names=sample_names,
-    #                            workflow_names=workflow_names,
-    #                            file_counts=file_counts,
-    #                            amount_data=amount_data,
-    #                            creation_dates=creation_dates,
-    #                            parents=parents,
-    #                            selected=selected,
-    #                            tumor_sample=tumor_sample
-    #                            )
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 @app.route('/download_block/<project_name>/<pipeline>/<case>/<pair>/<anchor_wf>/<table>/<selection>')

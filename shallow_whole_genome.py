@@ -293,3 +293,93 @@ def create_swg_project_json(database, project_name, swg, workflow_names, selecte
     
     return D                
 
+
+
+
+def score_workflows(swg, amount_data, release_status, dates):
+    '''
+    (dict, dict, dict, dict) -> dict
+    
+    Returns a dictionary with scores (based on amount of data, release status and creation dates)
+    for each workflow for each sample
+       
+    Parameters
+    ----------
+    - swg (dict): Dictionary storing the shallow whole genome data for a given project
+    - amount_data (dict): Dictionary of amount of data for each workflow
+    - release_status (dict): Dictionary with release status for each sub-blocks
+    - dates (dict): Dictionary with workflow creation dates
+    '''
+    
+    # rank blocks according to lane count and creation date
+    ranks = {}
+    for case in swg:
+        ranks[case] = {}
+        for sample in swg[case]:
+            ranks[case][sample] = {}
+            d = {}
+            e = {}
+            for workflow_id in swg[case][sample]:
+                d[workflow_id] = amount_data[workflow_id]
+                e[workflow_id] = dates[workflow_id]
+            L = sorted(list(set(d.values())))
+            C = sorted(list(set(e.values())))
+            # get the indices (ranks) for each workflow
+            # weighted by the number of values
+            for workflow_id in d:
+                for i in range(len(L)):
+                    if L[i] == d[workflow_id]:
+                        ranks[case][sample][workflow_id] = (i + 1) / len(L)
+                for i in range(len(C)):
+                    if C[i] == e[workflow_id]:
+                        ranks[case][sample][workflow_id] = (i + 1) / len(C)
+     
+    # score workflows for each sample
+    D = {}
+    for case in swg:
+        for sample in swg[case]:
+            for workflow_id in swg[case][sample]:
+                score = 0
+                score += ranks[case][sample][workflow_id]
+                score += release_status[case][sample][workflow_id]
+                if case not in D:
+                    D[case] = {}
+                if sample not in D[case]:
+                    D[case][sample] = {}
+                D[case][sample][workflow_id] = score
+   
+    return D
+
+def order_ichorcna_workflows(swg, amount_data, release_status, dates):
+    '''
+    (dict, dict, dict, dict) -> dict
+    
+    Returns a dictionary with ichorcna workflows ordered by amount of lane of data,
+    creation dates and release status for each sample
+    
+    Parameters
+    ----------
+    - swg (dict): Dictionary storing the shallow whole genome data for a given project
+    - amount_data (dict): Dictionary of amount of data for each workflow
+    - release_status (dict): Dictionary with release status for each sub-blocks
+    - dates (dict): Dictionary with workflow creation dates
+    '''
+    
+    # score the workflows
+    scores = score_workflows(swg, amount_data, release_status, dates)
+        
+    D = {}
+    for case in swg:
+        for sample in swg[case]:
+            L = []
+            for workflow_id in swg[case][sample]:
+                L.append([scores[case][sample][workflow_id], workflow_id])
+            # sort workflows according to scores
+            L.sort(key=lambda x: x[0])
+            L.reverse()
+            if case not in D:
+                D[case] = {}
+            assert sample not in D[case]
+            D[case][sample] = [i[1] for i in L]
+    return D
+
