@@ -22,7 +22,6 @@
   </div> 
   
   
-
   {% if swg %}
     <div class="somatic_block">
       <p style="font-size:22px; font-style:bold;">Sample: {{sample}}</p>
@@ -34,7 +33,7 @@
                   {{creation_dates[workflow_id] | readable_time}}
                 </td>
                 <td>
-                  {% if status[workfow_id] %}
+                  {% if status[case][sample][workflow_id] %}
                     <div class="tooltip">Release Status:<span class="tooltiptext">Input raw sequences released?</span></div> <span style="font-size:32px;color:#70db70">&#10004;</span>
                   {% else %}
                     <div class="tooltip">Release Status:<span class="tooltiptext">Input raw sequences released?</span></div> <span style="font-size:32px;color:#ff3300;">&#10006;</span>
