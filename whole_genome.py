@@ -1022,18 +1022,11 @@ def create_WG_block_json(database, project_name, case, blocks, block, anchor_wor
                 # get workflow name and version
                 workflow_name = workflow_names[workflow_id][0]
                 workflow_version = workflow_names[workflow_id][1]
-                # get sample pairs matching the outputfiles sample keys
-                sample_pair = ';'.join(sorted(list(map(lambda x: x.strip(), sample.split('.')))))
-                # get workflow output files
                 # needed to sort outputs by sample pairs or by sample for call-ready workflows
                 # even if all files are recorded
                 libraries = map_limskey_to_library(project_name, workflow_id, database, 'Workflow_Inputs')
                 sample_names = map_library_to_sample(project_name, case, database, 'Libraries')
                 outputfiles = get_workflow_output(project_name, case, workflow_id, database, libraries, sample_names, 'Files')
-                
-                
-                if case not in block_data:
-                    block_data[case] = {}
                 
                 # check that only workflows in standard WGS deliverables are used
                 if deliverables:
@@ -1057,21 +1050,19 @@ def create_WG_block_json(database, project_name, case, blocks, block, anchor_wor
                                 block_data[case][sample_id][workflow_name].append({'workflow_id': workflow_id,
                                                                           'workflow_version': workflow_version,
                                                                           'files': L})
-                                
-                                
-                
                 else:
                     for j in outputfiles:
                         sample_id = j.replace(';', '.')
-                        d =  {'workflow_id': workflow_id, 'workflow_version': workflow_version}
+                        d =  {'workflow_id': workflow_id, 
+                              'workflow_version': workflow_version,
+                              'files': [i[0] for i in outputfiles[j]]}
                         if case not in block_data:
                             block_data[case] = {}
                         if sample_id not in block_data[case]:
                             block_data[case][sample_id] = {}
                         if workflow_name not in block_data[case][sample_id]:
                             block_data[case][sample_id][workflow_name] = []
-                        if d not in block_data[case][sample_id][workflow_name]:
-                            block_data[case][sample_id][workflow_name].append(d)
+                        block_data[case][sample_id][workflow_name].append(d)
                     
     return block_data                
 
@@ -1144,15 +1135,16 @@ def create_WGS_project_block_json(project_name, database, blocks, block_status, 
                         else:
                             for j in outputfiles:
                                 sample_id = j.replace(';', '.')
-                                d =  {'workflow_id': workflow, 'workflow_version': workflow_version}
+                                d =  {'workflow_id': workflow,
+                                      'workflow_version': workflow_version,
+                                      'files': [i[0] for i in outputfiles[j]]}
                                 if case not in D:
                                     D[case] = {}
                                 if sample_id not in D[case]:
                                     D[case][sample_id] = {}
                                 if workflow_name not in D[case][sample_id]:
                                     D[case][sample_id][workflow_name] = []
-                                if d not in D[case][sample_id][workflow_name]:
-                                    D[case][sample_id][workflow_name].append(d)
+                                D[case][sample_id][workflow_name].append(d)
                                         
     
     return D
