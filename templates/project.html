@@ -63,11 +63,11 @@
     {% endif %}
   </tr>
   <tr>
-    <th>Expected Cases:</th>
+    <th>Expected cases:</th>
     <td>{{ project['expected_samples'] }}</td>
   </tr>
   <tr>
-    <th>Sequenced Cases:</th>
+    <th>Sequenced cases:</th>
     <td>{{ project['sequenced_samples'] }}</td>
   </tr>
   <tr>
@@ -76,13 +76,13 @@
   </tr>
   <tr>
     <th>Species:</th>
-    <td>{{ species }}</td>
+    <td style="font-style: italic;">{{ species }}</td>
   </tr>
 </table>
 
-<button id="download_button" style="margin-top:20px;margin-left:100px"><a href="{{url_for('download_cases_table', project_name=project['project_id'])}}">Download Case table</a></button>
+<button id="download_button" style="margin-top:20px;margin-left:50px"><a href="{{url_for('download_cases_table', project_name=project['project_id'])}}">Download case table</a></button>
 
-<table id="project_table" style="margin-top:35px;">
+<table id="project_table" style="margin-top:35px; margin-left:50px">
     <tr>
       <th><div class="tooltip">Case Id<span class="tooltiptext">OICR-generated case identifier</span></th>
       <th><div class="tooltip">Donor Id<span class="tooltiptext">User-supplied donor identifier</span></th>
