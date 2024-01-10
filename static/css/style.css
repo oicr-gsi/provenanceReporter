@@ -357,6 +357,46 @@ button.select_button:focus {
 
 
 
+.select_button_small {
+  background-color: gray;
+  border: none;
+  color: white;
+  padding: 7px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-blocks;
+  font-size: 13px;
+  margin-top: 8px;
+  margin-left: 25px;
+  cursor: pointer;
+  border-radius: 8px;
+  transition-duration: 0.4s; 
+}
+
+.select_button_small:hover {
+  background-color: #196719;
+  }
+
+button.select_button_small:focus {
+  background-color: #ff3333;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 .review_button {
@@ -436,14 +476,18 @@ button.review_button:focus {
 
 
 
+
+
+
 .dropbtn {
   background-color: #04AA6D;
   color: white;
-  padding: 16px;
+  padding: 14px;
   font-size: 16px;
   border: none;
   border-radius: 8px;
   font-family: Arial, Helvetica, sans-serif;
+  margin-top: 20px;
 }
 
 .dropdown {
@@ -456,10 +500,12 @@ button.review_button:focus {
   display: none;
   position: absolute;
   background-color: #f1f1f1;
-  min-width: 160px;
+  min-width: 120px;
   box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
   z-index: 1;
   padding: 12px 16px;
+  font-size:13px;
+  font-family: Arial, Helvetica, sans-serif;
 }
 
 .dropdown-content a {
@@ -579,6 +625,7 @@ button.review_button:focus {
   height: 12px;
   width: 12px;
 }
+
 
 
 .workflow {
