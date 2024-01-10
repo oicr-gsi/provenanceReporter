@@ -20,108 +20,100 @@
 
 {% block content %}
   <div class="project_title">
-    <p>{% block title %}{{ project['project_id'] }} {% endblock %}
-      {% if swg %}
-        <span style="font-size:30px; font-style:normal;"> WGS workflow data for <span id ="count"> {{ swg|length }} </span> cases</span>
-        
-        <div class="download-dropdown">
-          <button class="download-dropbtn">Download json</button>
-            <div class="download-dropdown-content">
-              <form method="POST" action ="">
-                {% if deliverable == 'selected' %}
-                  <label><input class="checkbox_small" type="checkbox" name="deliverable" value="selected" id="deliverable" checked/>selected</label><br>      
-                {% else %}
-                  <label><input class="checkbox_small" type="checkbox" name="deliverable" value="selected" id="deliverable"/>selected</label><br>      
-                {% endif %}
-                {% if deliverable == 'standard' %}
-                  <label><input class="checkbox_small" type="checkbox" name="deliverable" value="standard" id="deliverable" checked/>standard</label><br>      
-                {% else %}
-                  <label><input class="checkbox_small" type="checkbox" name="deliverable" value="standard" id="deliverable"/>standard</label><br>      
-                {% endif %}
-                <button class="select_button" type = "submit" value="submit">Download</button>
-              </form>          
-            </div>
-        </div>  
-        
-      {% else %}
-        <span style="font-size:30px; font-style:normal;"> No cases to display</span>
-      {% endif %}  
-    </p>   
-    
+    {% if swg %}
+      <span style="font-size:22px; font-style:normal;"> WGS workflow data for <span id ="count"> {{ swg|length }} </span> cases</span>
+    {% else %}
+      <span style="font-size:22px; font-style:normal;"> No cases to display</span>
+    {% endif %}  
   </div> 
 
   {% if swg %}
-  
-    <div style="margin-left:auto;margin-right:auto;margin-top:80px;padding-bottom:7px;max-width:300px;position:relative">
+    <div class="download-dropdown">
+      <button class="download-dropbtn">Download json</button>
+        <div class="download-dropdown-content">
+          <form method="POST" action ="">
+            {% if deliverable == 'selected' %}
+              <label><input class="checkbox_small" type="checkbox" name="deliverable" value="selected" id="deliverable" checked/>selected</label><br>      
+            {% else %}
+              <label><input class="checkbox_small" type="checkbox" name="deliverable" value="selected" id="deliverable"/>selected</label><br>      
+            {% endif %}
+            {% if deliverable == 'standard' %}
+              <label><input class="checkbox_small" type="checkbox" name="deliverable" value="standard" id="deliverable" checked/>standard</label><br>      
+            {% else %}
+              <label><input class="checkbox_small" type="checkbox" name="deliverable" value="standard" id="deliverable"/>standard</label><br>      
+            {% endif %}
+            <button class="select_button_small" type = "submit" value="submit">Download</button>
+          </form>          
+        </div>
+    </div>  
+
+    <div class="search_container">
       <input type="text" id="search_table"  onkeyup="searchFunction()" placeholder="Search.." title="Type in a keyword">
     </div>
 
   
-  
-  <table id="wgs_table">
-    <thead>
-      <th>Case</th>
-      <th>Sample</th>
-      <th>Status</th>
-    </thead>     
+    <table id="wgs_table">
+      <thead>
+        <th>Case</th>
+        <th>Sample</th>
+        <th>Status</th>
+      </thead>     
 
-    {% set donors = swg.keys() | list | sort %}
-    {% for i in donors %}
-      {% set samples = swg[i].keys() | list | sort %}
-      {% set rowNum = samples | length %}
-      <tbody>  
-        <td rowspan="{{rowNum}}">
-          {{i}}
-        </td>
-        <td>
-          {{samples[0]}}
-        </td>  
-        <td>
-          <a class="project_links" href="{{ url_for('swg_sample', project_name=project['project_id'], case=i, sample=samples[0])}}">
-            {% if i in status %}
-              {% if samples[0] in status[i] %}
-                {% if status[i][samples[0]] != 'review' and status[i][samples[0]] != 'ready' %}
-                  {{status[i][samples[0]] | shorten_workflow_id}}
-                {% else %}
-                  <button class="review_button">{{status[i][samples[0]]}}</button>
-                {% endif %}
-              {% endif %}
-            {% else %}
-              NA
-            {% endif %}               
-          </a>
-        </td> 
-        
-
-        {% for j in samples[1:] %}
-          <tr>
-            <td>
-              {{j}}
-            </td>  
-            <td>
-              <a class="project_links" href="{{ url_for('swg_sample', project_name=project['project_id'], case=i, sample=j)}}">
-                {% if i in status %}
-                  {% if j in status[i] %}
-                    {% if status[i][j] != 'review' and status[i][j] != 'ready' %}
-                      {{status[i][j] | shorten_workflow_id}}
-                    {% else %}
-                      <button class="review_button">{{status[i][j]}}</button>
-                    {% endif %}
+      {% set donors = swg.keys() | list | sort %}
+      {% for i in donors %}
+        {% set samples = swg[i].keys() | list | sort %}
+        {% set rowNum = samples | length %}
+        <tbody>  
+          <td rowspan="{{rowNum}}">
+            {{i}}
+          </td>
+          <td>
+            {{samples[0]}}
+          </td>  
+          <td>
+            <a class="project_links" href="{{ url_for('swg_sample', project_name=project['project_id'], case=i, sample=samples[0])}}">
+              {% if i in status %}
+                {% if samples[0] in status[i] %}
+                  {% if status[i][samples[0]] != 'review' and status[i][samples[0]] != 'ready' %}
+                    {{status[i][samples[0]] | shorten_workflow_id}}
+                  {% else %}
+                    <button class="review_button">{{status[i][samples[0]]}}</button>
                   {% endif %}
-                {% else %}
-                  NA
-                {% endif %}               
-              </a>
-            </td>
-          </tr>
-       {% endfor %}
-      </tbody>  
-  {% endfor %}
-     
-  </table>
+                {% endif %}
+              {% else %}
+                NA
+              {% endif %}               
+            </a>
+          </td> 
+        
+          {% for j in samples[1:] %}
+            <tr>
+              <td>
+                {{j}}
+              </td>  
+              <td>
+                <a class="project_links" href="{{ url_for('swg_sample', project_name=project['project_id'], case=i, sample=j)}}">
+                  {% if i in status %}
+                    {% if j in status[i] %}
+                      {% if status[i][j] != 'review' and status[i][j] != 'ready' %}
+                        {{status[i][j] | shorten_workflow_id}}
+                      {% else %}
+                        <button class="review_button">{{status[i][j]}}</button>
+                      {% endif %}
+                    {% endif %}
+                  {% else %}
+                    NA
+                  {% endif %}               
+                </a>
+              </td>
+            </tr>
+         {% endfor %}
+        </tbody>  
+      {% endfor %}
+    </table>
 
   <footer>
-    <p style="margin-left:auto;margin-right:auto; margin-top:150px; padding-bottom:0px;max-width:300px;position:relative;font-size:16px; font-style:normal; font-family: Arial, Helvetica, sans-serif; color: #A8A8A8;"> Data last updated {{project['last_updated'].split('_')[0]}} </p>
+    <p class="data_update"> Data last updated: {{project['last_updated'].split('_')[0]}} </p>
   </footer>
   
   <script>
