@@ -27,6 +27,14 @@ img {
   border: 1px solid #ddd;
   padding: 8px;
 }
+#project_table td {
+  font-size:12px;
+  font-style: normal;
+}
+#project_table th {
+  font-size:14px;
+  font-style: normal;
+}
 #project_table tr:nth-child(even){background-color: #f2f2f2;}
 #project_table tr:hover {background-color: #196719;color: white}
 #project_table tr:hover a {background-color: #196719;color: white}
@@ -40,6 +48,176 @@ img {
 
 
 
+.project_title {
+  font-family: Arial, Helvetica, sans-serif;
+  padding-left: 15px;   
+  font-size: 50px;
+  margin-top: 30px; 
+  font-style: bold;
+  color: black;
+  text-align: left; 
+}
+
+
+
+.dropbtn {
+  background-color: #04AA6D;
+  color: white;
+  padding: 14px;
+  font-size: 16px;
+  border: none;
+  border-radius: 8px;
+  font-family: Arial, Helvetica, sans-serif;
+  margin-top: 20px;
+  margin-left: 15px;
+}
+
+.dropdown {
+  position: relative;
+  display: inline-block;
+  font-family: Arial, Helvetica, sans-serif; 
+}
+
+.dropdown-content {
+  display: none;
+  position: absolute;
+  background-color: #f1f1f1;
+  min-width: 120px;
+  box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+  z-index: 1;
+  padding: 12px 12px;
+  margin-left: 15px;
+  font-size:13px;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.dropdown-content a {
+  color: black;
+  padding: 12px 16px;
+  text-decoration: none;
+  display: block;
+}
+
+.dropdown-content a:hover {background-color: #ddd;}
+.dropdown:hover .dropdown-content {display: block;}
+.dropdown:hover .dropbtn {background-color: #3e8e41;}
+
+
+
+.checkbox_small {
+  accent-color: #196719;
+  height: 12px;
+  width: 12px;
+}
+
+
+
+.select_button_small {
+  background-color: gray;
+  border: none;
+  color: white;
+  padding: 7px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-blocks;
+  font-size: 13px;
+  margin-top: 8px;
+  margin-left: 25px;
+  cursor: pointer;
+  border-radius: 8px;
+  transition-duration: 0.4s; 
+}
+
+.select_button_small:hover {
+  background-color: #196719;
+  }
+
+button.select_button_small:focus {
+  background-color: #ff3333;
+}
+
+
+
+#search_table {
+  padding: 6px;
+  font-size: 15px;
+  font-family: Arial, Helvetica, sans-serif;
+  border: 1px solid grey;
+  width: 70%;
+  background: #f1f1f1;
+  box-sizing: border-box;
+  position:absolute
+}
+
+
+
+.tooltip {
+  position: relative;
+  display: inline-block;
+}
+
+.tooltip .tooltiptext {
+  visibility: hidden;
+  width: 200px;
+  background-color: black;
+  color: #fff;
+  text-align: center;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-radius: 6px;
+  position: absolute;
+  z-index: 1;
+  font-family: Arial, Helvetica, sans-serif;
+  font-style: normal;
+  font-size: 10px;
+}
+
+.tooltip:hover .tooltiptext {
+  visibility: visible;
+}
+
+
+
+.miso_link {
+  color: #b35900;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 12px; 
+  text-align: left;
+  text-decoration:none;
+}
+
+.miso_link:hover {
+  color: #ff9933;
+}
+
+
+
+.data_update {
+  margin-left: auto;
+  margin-right: auto;
+  margin-top: 150px;
+  padding-bottom: 0px;
+  max-width: 300px;
+  position:relative;
+  font-size:16px;
+  font-style:normal;
+  font-family: Arial, Helvetica, sans-serif;
+  color: #A8A8A8;
+}
+
+
+
+
+
+
+
+
+#review_below {
+  font-size:12px
+
+}
 
 
 
@@ -199,16 +377,6 @@ img {
 }
 
 
-#search_table {
-    
-  padding: 6px;
-  font-size: 17px;
-  border: 1px solid grey;
-  width: 70%;
-  background: #f1f1f1;
-  box-sizing: border-box;
-  position:absolute
-}
 
 
 
@@ -258,15 +426,6 @@ img {
 
 
 
-.project_title {
-  font-family: Arial, Helvetica, sans-serif;
-  padding-left: 30px;   
-  font-size: 50px;
-  margin-top: 30px; 
-  font-style: bold;
-  color: black;
-  text-align: left; 
-}
 
 
 
@@ -357,29 +516,6 @@ button.select_button:focus {
 
 
 
-.select_button_small {
-  background-color: gray;
-  border: none;
-  color: white;
-  padding: 7px;
-  text-align: center;
-  text-decoration: none;
-  display: inline-blocks;
-  font-size: 13px;
-  margin-top: 8px;
-  margin-left: 25px;
-  cursor: pointer;
-  border-radius: 8px;
-  transition-duration: 0.4s; 
-}
-
-.select_button_small:hover {
-  background-color: #196719;
-  }
-
-button.select_button_small:focus {
-  background-color: #ff3333;
-}
 
 
 
@@ -462,64 +598,12 @@ button.review_button:focus {
 
 
 
-.miso_link {
-  color: #b35900;
-  font-family: Arial, Helvetica, sans-serif;
-  font-size: 20px; 
-  text-align: left;
-  text-decoration:none;
-}
-
-.miso_link:hover {
-  color: #ff9933;
-}
 
 
 
 
 
 
-.dropbtn {
-  background-color: #04AA6D;
-  color: white;
-  padding: 14px;
-  font-size: 16px;
-  border: none;
-  border-radius: 8px;
-  font-family: Arial, Helvetica, sans-serif;
-  margin-top: 20px;
-}
-
-.dropdown {
-  position: relative;
-  display: inline-block;
-  font-family: Arial, Helvetica, sans-serif; 
-}
-
-.dropdown-content {
-  display: none;
-  position: absolute;
-  background-color: #f1f1f1;
-  min-width: 120px;
-  box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
-  z-index: 1;
-  padding: 12px 16px;
-  font-size:13px;
-  font-family: Arial, Helvetica, sans-serif;
-}
-
-.dropdown-content a {
-  color: black;
-  padding: 12px 16px;
-  text-decoration: none;
-  display: block;
-}
-
-.dropdown-content a:hover {background-color: #ddd;}
-
-.dropdown:hover .dropdown-content {display: block;}
-
-.dropdown:hover .dropbtn {background-color: #3e8e41;}
 
 
 
@@ -591,27 +675,6 @@ button.review_button:focus {
 
 
 
-.tooltip {
-  position: relative;
-  display: inline-block;
-}
-
-.tooltip .tooltiptext {
-  visibility: hidden;
-  width: 350px;
-  background-color: black;
-  color: #fff;
-  text-align: center;
-  padding: 5px 0;
-  border-radius: 6px;
- 
-  position: absolute;
-  z-index: 1;
-}
-
-.tooltip:hover .tooltiptext {
-  visibility: visible;
-}
 
 
 .checkbox {
@@ -620,11 +683,6 @@ button.review_button:focus {
   width: 18px;
 }
 
-.checkbox_small {
-  accent-color: #196719;
-  height: 12px;
-  width: 12px;
-}
 
 
 

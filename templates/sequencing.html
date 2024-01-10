@@ -49,7 +49,7 @@
         <th><div class="tooltip">Donor<span class="tooltiptext">User-supplied donor identifier</span></th>
         <th><div class="tooltip">Sample ID<span class="tooltiptext">User-supplied sample, this distinguishes distinct samples of the same type from the same donor</span></th>
         <th><div class="tooltip">Sample<span class="tooltiptext">OICR-generated sample identifier. Formed from: 1. case, 2. tissue origin, 3. tissue type, 4. sample ID</span></th>
-        <th><div class="tooltip">Description<span class="tooltiptext">a description of the Sample ID</span></th>
+        <th><div class="tooltip">Description<span class="tooltiptext">A description of the Sample ID</span></th>
         <th><div class="tooltip">Library<span class="tooltiptext">OICR-generated library identifier</span></th>     
         <th>Library Type</th>     
         <th>Tissue Origin</th>     
@@ -86,12 +86,14 @@ Flow cell identifier, 6. Lane number, 7. Demultiplex barcodes</span></th>
       {% endfor %}               
     </table>
 
+  
+  {% endif %}
 
   <footer>
-    <p style="margin-left:auto;margin-right:auto; margin-top:150px; padding-bottom:0px;max-width:300px;position:relative;font-size:16px; font-style:normal; font-family: Arial, Helvetica, sans-serif; color: #A8A8A8;"> Data last updated {{project['last_updated'].split('_')[0]}} </p>
+    <p class="data_update"> Data last updated: {{project['last_updated'].split('_')[0]}} </p>
   </footer>
 
-  {% endif %}
+  
 
 
 
