@@ -51,11 +51,12 @@
                       <button class="select_button" id="select" type = "submit" value="submit">Select workflows</button>
                     </td>
                     <td>
-                      <div class="download-dropdown">
-                        <button class="download-dropbtn">Download json</button>
-                          <div class="download-dropdown-content">
-                            <button id="download_button"><a href="{{url_for('download_block_data', project_name=project['project_id'], pipeline='WG', case=case, pair=pair, anchor_wf=block['anchor_wf'], table='WGS_blocks', selection='all')}}">all</a></button>
-                            <button id="download_button"><a href="{{url_for('download_block_data', project_name=project['project_id'], pipeline='WG', case=case, pair=pair, anchor_wf=block['anchor_wf'], table='WGS_blocks', selection='standard')}}">standard</a></button>
+                      <div class="download-dropdown-small">
+                        <button class="download-dropbtn-small">Download json</button>
+                          <div class="download-dropdown-content-small">
+                            <button class="download_button_small"><a href="{{url_for('download_block_data', project_name=project['project_id'], pipeline='WG', case=case, pair=pair, anchor_wf=block['anchor_wf'], table='WGS_blocks', selection='all')}}">all</a></button>
+                            <br>
+                            <button class="download_button_small"><a href="{{url_for('download_block_data', project_name=project['project_id'], pipeline='WG', case=case, pair=pair, anchor_wf=block['anchor_wf'], table='WGS_blocks', selection='standard')}}">standard</a></button>
                           </div>
                       </div>
                     </td>

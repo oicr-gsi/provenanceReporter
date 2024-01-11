@@ -17,14 +17,13 @@
 
 {% block content %}
   <div class="project_title">
-    <p><span style="font-size:30px; font-style:normal;"> Shallow Whole Genome data </span></p>  
-    <p><span style="font-size:16px; font-style:normal;"> Select ichorCNA workflow for the sample of interest.</span></p>  
+    <p><span style="font-size:22px; font-style:normal;"> Shallow Whole Genome data </span></p>  
   </div> 
   
   
   {% if swg %}
     <div class="somatic_block">
-      <p style="font-size:22px; font-style:bold;">Sample: {{sample}}</p>
+      <p style="font-size:16px; font-style:bold;">Sample: {{sample}}</p>
         {% for workflow_id in ordered_workflows[case][sample] %}
           <form method="POST" action = "">
             <div class="somatic_block">
@@ -42,11 +41,12 @@
                   <button class="select_button" id="select" type = "submit" value="submit">Select workflows</button>
                 </td>
                 <td>
-                  <div class="download-dropdown">
-                    <button class="download-dropbtn">Download json</button>
-                      <div class="download-dropdown-content">
-                        <button id="download_button"><a href="{{url_for('download_SWG_data', project_name=project['project_id'], case=case, sample=sample, workflow_id=workflow_id, selection='all')}}">all</a></button>
-                        <button id="download_button"><a href="{{url_for('download_SWG_data', project_name=project['project_id'], case=case, sample=sample, workflow_id=workflow_id, selection='standard')}}">standard</a></button>
+                  <div class="download-dropdown-small">
+                    <button class="download-dropbtn-small">Download json</button>
+                      <div class="download-dropdown-content-small">
+                        <button class="download_button_small"><a href="{{url_for('download_SWG_data', project_name=project['project_id'], case=case, sample=sample, workflow_id=workflow_id, selection='all')}}">all</a></button>
+                        <br>
+                        <button class="download_button_small"><a href="{{url_for('download_SWG_data', project_name=project['project_id'], case=case, sample=sample, workflow_id=workflow_id, selection='standard')}}">standard</a></button>
                       </div>
                   </div>
                 </td>

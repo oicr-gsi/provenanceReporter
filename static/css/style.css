@@ -132,9 +132,6 @@ img {
 .select_button_small:hover {
   background-color: #196719;
   }
-
-
-
 button.select_button_small:focus {
   background-color: #ff3333;
 }
@@ -377,11 +374,150 @@ button.review_button:focus {
 
 
 
+#block_header_table {
+  margin-left: auto;
+  margin-right: auto;
+  border-collapse: collapse;
+  width: 100%;
+}
+#block_header_table td {
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 15px;
+  padding-right: 4px;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 12px;
+  text-align: left;
+  border: 1px solid #404040;
+}
+
+
+
+.select_button {
+  background-color: gray;
+  border: none;
+  color: white;
+  padding: 10px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-blocks;
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 8px;
+  transition-duration: 0.4s; 
+}
+.select_button:hover {
+  background-color: #196719;
+  }
+button.select_button:focus {
+  background-color: #ff3333;
+}
 
 
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+.download-dropbtn-small {
+  background-color: gray;
+  color: white;
+  padding: 10px;
+  border:none;
+  font-size: 12px;
+  text-align: center;
+  text-decoration: none;
+  border-radius: 8px;
+  display:inline-block;
+  cursor: pointer;
+  transition-duration: 0.4s;
+  font-family: Arial, Helvetica, sans-serif;
+}
+.download-dropdown-small {
+  position: relative;
+  display: inline-block;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 12px;
+}
+.download-dropdown-content-small {
+  display: none;
+  position: absolute;
+  background-color: #f1f1f1;
+  min-width: 120px;
+  box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+  z-index: 1;
+  padding: 12px 12px;
+  margin-left: 15px;
+  font-size:12px;
+  font-family: Arial, Helvetica, sans-serif;
+}
+.download-dropdown-content-small a {
+  color: black;
+  padding: 12px 12px;
+  text-decoration: none;
+  display: block;
+}
+.download-dropdown-content-small a:hover {background-color: #ddd;}
+.download-dropdown-small:hover .download-dropdown-content-small {display: block;}
+.download-dropdown-small:hover-small .download-dropbtn-small {background-color: #3e8e41;}
+
+
+
+
+
+
+
+
+.download_button_small {
+  background-color: gray;
+  border: none;
+  color: white;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 8px;
+  transition-duration: 0.4s;
+  padding: 0px;
+  display: inline-blocks;
+  margin-bottom: 4px;
+}
+.download_button_small a {
+  color: white;
+  text-decoration: none;
+}
+.download_button_small:hover {
+  background-color: #196719;
+  border-radius: 8px;    
+  color: white;
+  text-decoration: none;
+  
+}
+.download_button_small:hover a {
+  background-color: #196719;
+  border-radius: 8px;    
+  color: white;
+  text-decoration: none;
+  
+}
 
 
 
@@ -451,25 +587,6 @@ button.review_button:focus {
 }
 
 
-#block_header_table {
-  margin-left: auto;
-  margin-right: auto;
-  margin-top: 10px;
-  font-family: Arial, Helvetica, sans-serif;
-  border-collapse: collapse;
-  width: 100%;
-}
-#block_header_table td, #block_header_table th {
-  border: 1px solid #404040;
-  padding: 8px;
-}
-#block_header_table th {
-  padding-top: 12px;
-  padding-bottom: 12px;
-  text-align: left;
-  background-color: #00b300;
-  color: white;
-}
 
 
 #block_table {
@@ -572,29 +689,6 @@ button.review_button:focus {
 
 
 
-.select_button {
-  background-color: gray;
-  border: none;
-  color: white;
-  padding: 10px;
-  text-align: center;
-  text-decoration: none;
-  display: inline-blocks;
-  font-size: 16px;
-  margin: 4px 2px;
-  cursor: pointer;
-  border-radius: 8px;
-  margin-left: 25px;
-  transition-duration: 0.4s; 
-}
-
-.select_button:hover {
-  background-color: #196719;
-  }
-
-button.select_button:focus {
-  background-color: #ff3333;
-}
 
 
 
