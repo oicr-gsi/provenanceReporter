@@ -415,27 +415,6 @@ button.select_button:focus {
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 .download-dropbtn-small {
   background-color: gray;
   color: white;
@@ -480,11 +459,6 @@ button.select_button:focus {
 
 
 
-
-
-
-
-
 .download_button_small {
   background-color: gray;
   border: none;
@@ -509,15 +483,54 @@ button.select_button:focus {
   border-radius: 8px;    
   color: white;
   text-decoration: none;
-  
 }
 .download_button_small:hover a {
   background-color: #196719;
   border-radius: 8px;    
   color: white;
   text-decoration: none;
-  
 }
+
+
+
+#block_table {
+  margin-left: auto;
+  margin-right: auto;
+  margin-top: 30px;
+  margin-bottom: 10px;
+  border-collapse: collapse;
+  width: 100%;
+}
+#block_table td, #block_table th {
+  border: 1px solid #ddd;
+  padding: 8px;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 12px;
+}
+#block_table th {
+  text-align: left;
+  background-color: #00b300;
+  color: white;
+}
+
+
+
+.checkbox {
+  accent-color: #196719;
+  height: 16px;
+  width: 16px;
+}
+
+
+
+.workflow {
+  color: #196719;
+  text-decoration: none;
+}
+.workflow:hover {
+  color:  LimeGreen;
+}
+
 
 
 
@@ -589,25 +602,6 @@ button.select_button:focus {
 
 
 
-#block_table {
-  margin-left: auto;
-  margin-right: auto;
-  margin-top: 60px;
-  font-family: Arial, Helvetica, sans-serif;
-  border-collapse: collapse;
-  width: 100%;
-}
-#block_table td, #block_table th {
-  border: 1px solid #ddd;
-  padding: 8px;
-}
-#block_table th {
-  padding-top: 12px;
-  padding-bottom: 12px;
-  text-align: left;
-  background-color: #00b300;
-  color: white;
-}
 
 
 
@@ -765,23 +759,10 @@ button.select_button:focus {
 
 
 
-.checkbox {
-  accent-color: #196719;
-  height: 18px;
-  width: 18px;
-}
 
 
 
 
-.workflow {
-  color: #196719;
-  text-decoration: none;
-}
-
-.workflow:hover {
-  color:  LimeGreen;
-}
 
 #workflow_table {
   margin-left: auto;
