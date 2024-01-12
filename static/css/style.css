@@ -5,6 +5,22 @@ h1 {
     padding: 10px;
 }
 
+
+
+h2 {
+  border: none;
+  color: black;
+  text-align: left;
+  font-family: Arial, Helvetica, sans-serif;
+  font-weight: bold;
+  font-size: 16px;
+  margin-top: 30px;
+  margin-bottom: 15px;
+  padding: 10px;
+}
+
+
+
 img {
   width: 80%;
 }
@@ -142,7 +158,7 @@ button.select_button_small:focus {
   margin-left: auto;
   margin-right:auto;
   margin-top: 80px; 
-  padding-bottom: 7px;
+  padding-bottom: 30px;
   max-width:300px;
   position:relative;
 }
@@ -156,7 +172,8 @@ button.select_button_small:focus {
   width: 70%;
   background: #f1f1f1;
   box-sizing: border-box;
-  position:absolute
+  position:absolute;
+  margin-bottom: 30px;
 }
 
 
@@ -302,9 +319,8 @@ button.select_button_small:focus {
 
 
 #wgs_table {
-  margin-left: auto;
-  margin-right: auto;
-  margin-top: 60px;
+  margin-left: 15px;
+  margin-top: 30px;
   font-family: Arial, Helvetica, sans-serif;
   font-size: 12px;
   border-collapse: collapse;
@@ -316,23 +332,24 @@ button.select_button_small:focus {
 }
 #wgs_table tbody * {
   font-weight: normal;
+  font-size: 12px;
 }
 #wgs_table tbody:nth-child(odd){background-color: #f2f2f2;}
 #wgs_table tbody:hover {background-color: #196719;color: white}
 #wgs_table tbody:hover a {background-color: #196719;color: white}
 #wgs_table th {
-  padding-top: 12px;
-  padding-bottom: 12px;
   background-color: #00b300;
   color: white;
   padding-left: 6px;
   padding-right: 6px;
-}
-#wgs_table td {
   padding-top: 6px;
   padding-bottom: 6px;
-  padding-left: 6px;
-  padding-right: 6px;
+}
+#wgs_table td {
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 4px;
+  padding-right: 4px;
 }
 
 
@@ -380,7 +397,7 @@ button.review_button:focus {
   border-collapse: collapse;
   width: 100%;
 }
-#block_header_table td {
+#block_header_table td, #block_header_table th {
   padding-top: 4px;
   padding-bottom: 4px;
   padding-left: 15px;
@@ -533,6 +550,59 @@ button.select_button:focus {
 
 
 
+#workflow_table {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 12px;
+  border-collapse: collapse;
+  margin-left: 15px;
+}
+#workflow_table td, #workflow_table th {
+  border: 1px solid #ddd;
+  padding: 4px;
+}
+#workflow_table tr:nth-child(even){background-color: #f2f2f2;}
+#workflow_table th {
+  text-align: left;
+  background-color: #00b300;
+  color: white;
+}
+
+
+
+#simple_table {
+  margin-left: 15px;
+  margin-top: 30px;
+  font-family: Arial, Helvetica, sans-serif;
+  border-collapse: collapse;
+  font-size: 12px;
+  width: 80%;
+}
+#simple_table td, #simple_table th {
+  border: 1px solid #ddd;
+  padding: 4px;
+  text-align: left;
+}
+#simple_table th {
+  padding-top: 6px;
+  padding-bottom: 6px;
+  text-align: left;
+  background-color: #00b300;
+  color: white;
+}
+
+
+
+.somatic_block {
+  padding: 20px;
+  border: 1.5px solid black;
+  background: #f1f1f1;
+  box-sizing: border-box;
+  position:relative;
+  font-family: Arial, Helvetica, sans-serif;
+  margin-top: 30px;
+}
+
+
 
 
 #review_below {
@@ -579,25 +649,6 @@ button.select_button:focus {
 
 
 
-#simple_table {
-  margin-left: auto;
-  margin-right: auto;
-  margin-top: 60px;
-  font-family: Arial, Helvetica, sans-serif;
-  border-collapse: collapse;
-  width: 80%;
-}
-#simple_table td, #simple_table th {
-  border: 1px solid #ddd;
-  padding: 8px;
-}
-#simple_table th {
-  padding-top: 12px;
-  padding-bottom: 12px;
-  text-align: left;
-  background-color: #00b300;
-  color: white;
-}
 
 
 
@@ -668,123 +719,6 @@ button.select_button:focus {
   background-color: #196719;
   color: white;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-.somatic_block {
-  padding: 20px;
-  font-size: 17px;
-  border: 2px solid black;
-  background: #f1f1f1;
-  box-sizing: border-box;
-  position:relative;
-  font-family: Arial, Helvetica, sans-serif;
-}
-
-
-
-
-
-
-
-
-
-
-
-#workflow_table {
-  margin-left: auto;
-  margin-right: auto;
-  margin-top: 60px;
-  font-family: Arial, Helvetica, sans-serif;
-  border-collapse: collapse;
-  width: 80%;
-}
-#workflow_table td, #workflow_table th {
-  border: 1px solid #ddd;
-  padding: 8px;
-}
-#workflow_table tr:nth-child(even){background-color: #f2f2f2;}
-#workflow_table th {
-  padding-top: 12px;
-  padding-bottom: 12px;
-  text-align: left;
-  background-color: #00b300;
-  color: white;
-}
-
 
 
 

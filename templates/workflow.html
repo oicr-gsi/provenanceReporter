@@ -16,7 +16,7 @@
 {% block content %}
 
 
-<table id="block_header_table">
+<table id="block_header_table" style="margin-top:60px;">
   <tr>
     <th>Workflow id</th>
     <th>Name</th>
@@ -30,7 +30,7 @@
 </table>
 
 
-<p style="font-size:22px; font-family: Arial, Helvetica, sans-serif; font-style:bold;"> Output files </p>     
+<h2> Output files: </h2>     
 
 {% if files %}
   <table id="wgs_table">
@@ -89,11 +89,9 @@
 {% endif %}
 
 
-<br>
+<h2> Input sequences: </h2>   
 
-<p style="font-size:22px; font-family: Arial, Helvetica, sans-serif; font-style:bold;"> Input sequences </p>   
-
-<table id="wgs_table">
+<table id="simple_table">
   <tr>
     <th>Samples</th>
     <th>Libraries</th>
@@ -124,7 +122,7 @@
 </table>
 
   {% if parents %}  
-  <p style="font-size:22px; font-family: Arial, Helvetica, sans-serif; font-style:bold;"> Parent workflows </p> 
+  <h2> Parent workflows: </h2> 
 
   <table id="workflow_table">
     <tr>
@@ -155,11 +153,9 @@
 
 {% endif %}  
 
-<br>
-
 
 {% if children %}  
-  <p style="font-size:22px; font-family: Arial, Helvetica, sans-serif; font-style:bold;"> Downstream workflows </p> 
+  <h2> Downstream workflows: </h2> 
 
   <table id="workflow_table">
     <tr>
@@ -190,9 +186,9 @@
 
 {% endif %}  
 
-<br>
-
-
+<footer>
+  <p class="data_update"> Data last updated: {{project['last_updated'].split('_')[0]}} </p>
+</footer>
 
 {% endblock %}
 
