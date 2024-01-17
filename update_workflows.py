@@ -10,8 +10,6 @@ import os
 import sqlite3
 from utilities import connect_to_db
 import argparse
-import time
-
 
 
 def collect_workflows(db, project_name, table = 'Workflows'):
@@ -36,7 +34,6 @@ def collect_workflows(db, project_name, table = 'Workflows'):
     return L
     
 
-
 def collect_projects(main_db, table = 'Projects'):
     '''
     (str, str) -> list
@@ -56,7 +53,6 @@ def collect_projects(main_db, table = 'Projects'):
     L = [i['project_id'] for i in data]
     
     return L
-
 
 
 def add_missing_workflow(workflow_db, project_id, workflows, workflow_table='Workflows'):
@@ -83,10 +79,6 @@ def add_missing_workflow(workflow_db, project_id, workflows, workflow_table='Wor
     conn.close()
 
 
-    
-
-
-
 def update_workflow_db(workflow_db, main_db, project_table, workflow_table):
     '''
     (str, str, str, str) -> None
@@ -106,8 +98,6 @@ def update_workflow_db(workflow_db, main_db, project_table, workflow_table):
     projects = collect_projects(main_db, project_table)
     
     for project in projects:
-        print(project)
-        start = time.time()
         # collect the workflows from the main database
         new_workflows = collect_workflows(main_db, project, workflow_table)
         # collect the workflows from the workflow database
@@ -116,11 +106,7 @@ def update_workflow_db(workflow_db, main_db, project_table, workflow_table):
         workflows = list(set(new_workflows).difference(set(recorded_workflows)))
         # add the missing workflows for the project of focus
         add_missing_workflow(workflow_db, project, workflows, workflow_table)
-        end = time.time()
-        print(end - start)
-        print('----')
-
-
+        
 
 def setup_database(database, table = 'Workflows'):
     '''
@@ -159,13 +145,10 @@ if __name__ == '__main__':
         
     # get arguments from the command line
     args = parser.parse_args()
- 
-    start = time.time()   
- 
+    # create database if doesn't exist
     if os.path.isfile(args.workflow_db) == False:
         setup_database(args.workflow_db, 'Workflows')
+    # add missing workflows
     update_workflow_db(args.workflow_db, args.main_db, 'Projects', 'Workflows')
     
-    end = time.time()
     
-    print(end - start)
