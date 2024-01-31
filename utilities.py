@@ -7,15 +7,22 @@ Created on Tue Jun  6 15:04:02 2023
 
 import sqlite3
 import time
+import string
+import random
 
 
 
-def connect_to_db(database='merged.db'):
+
+def connect_to_db(database):
     '''
-    (None) -> sqlite3.Connection
+    (str) -> sqlite3.Connection
     
     Returns a connection to SqLite database prov_report.db.
     This database contains information extracted from FPR
+    
+    Parameters
+    ----------
+    - database (str): Path to the sqlite database
     '''
     
     conn = sqlite3.connect(database)
@@ -23,7 +30,7 @@ def connect_to_db(database='merged.db'):
     return conn
 
 
-def get_children_workflows(project_name):
+def get_children_workflows(project_name, database):
     '''
     (str) -> list
     
@@ -34,9 +41,10 @@ def get_children_workflows(project_name):
     ----------
     - project_name (str): Name of project of interest
     - bmpp_id (str): bamMergePreprocessing workflow id 
+    - database (str): Path to the sqlite database
     '''
     
-    conn = connect_to_db()
+    conn = connect_to_db(database)
     data = conn.execute("SELECT DISTINCT Workflows.wf, Parents.parents_id, \
                         Parents.children_id FROM Parents JOIN Workflows \
                         WHERE Parents.project_id = '{0}' \
@@ -54,18 +62,19 @@ def get_children_workflows(project_name):
     return D
 
 
-def get_workflow_names(project_name):
+def get_workflow_names(project_name, database):
     '''
-    (str) -> dict
+    (str, str) -> dict
     
     Returns a dictionary with workflow_id and workflow name key, value pairs
     
     Parameters
     ----------
     - project_name (str): Name of project of interest
+    - database (str): Path to the sqlite database
     '''
 
-    conn = connect_to_db()
+    conn = connect_to_db(database)
     data = conn.execute("SELECT DISTINCT Workflows.wfrun_id, Workflows.wf, Workflows.wfv FROM \
                         Workflows WHERE Workflows.project_id = '{0}';".format(project_name)).fetchall()
     data= list(set(data))
@@ -118,9 +127,9 @@ def convert_epoch_time(epoch):
     return time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(int(epoch)))
 
 
-def get_miso_sample_link(project_name, case):
+def get_miso_sample_link(project_name, case, database):
     '''
-    (str, str) -> str
+    (str, str, str) -> str
     
     Returns a link to the sample MISO page
     
@@ -128,9 +137,10 @@ def get_miso_sample_link(project_name, case):
     ----------
     - project_name (str): Project of interest
     - case (str): Sample name
+    - database (str): Path to the sqlite database
     '''
     
-    conn = connect_to_db()
+    conn = connect_to_db(database)
     data = conn.execute("SELECT miso FROM Samples WHERE project_id = '{0}' AND case_id = '{1}';".format(project_name, case)).fetchall()
     data = list(set(data))
     miso_link = data[0]['miso']
@@ -164,19 +174,20 @@ def get_library_design(library_source):
 
 
 
-def get_pipelines(project_name):
+def get_pipelines(project_name, database):
     '''
-    (str) -> list
+    (str, str) -> list
     
     Returns a list of pipeline names based on the library codes extracted from database for project_name
     
     Parameters
     ----------
     - project_name (str) Name of the project of interest
+    - database (str): Path to the sqlite database
     '''    
     
     # connect to db
-    conn = connect_to_db()
+    conn = connect_to_db(database)
     # extract library source
     library_source = conn.execute("SELECT DISTINCT library_type FROM Files WHERE project_id = '{0}';".format(project_name)).fetchall()
     library_source = list(set([i['library_type'] for i in  list(set(library_source))]))
@@ -188,4 +199,44 @@ def get_pipelines(project_name):
 
 
 
+def get_donors(project_name, database):
+    '''
+    (str, str) -> list
+    
+    Returns a list of donors for a given project
+    
+    Parameters
+    ----------
+    - project_name (str): Name of project of interest
+    - database (str): Path to the sqlite database
+    '''
+    
+    # connect to db
+    conn = connect_to_db(database)
+    # extract library source
+    data = conn.execute("SELECT DISTINCT case_id FROM Samples WHERE project_id = '{0}';".format(project_name)).fetchall()
+    donors = list(set([i['case_id'] for i in  data]))
+    conn.close()
+    
+    return donors
+
+
+
+def secret_key_generator(size=10):
+    '''
+    (int)
+    
+    Returns a random string of length size with upper and lower case characters
+    and digit
+    
+    Parameters
+    ----------
+    - size (int): Length of the random string
+    '''
+    
+    chars=string.ascii_uppercase + string.ascii_lowercase + string.digits
+    s = ''.join(random.choice(chars) for i in range(size))
+    
+    return s
+    
 

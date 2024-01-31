@@ -5,48 +5,55 @@ Created on Tue May  3 14:32:40 2022
 @author: rjovelin
 """
 
-import sqlite3
+#import sqlite3
 import json
 from flask import Flask, render_template, request, url_for, flash, redirect, Response, send_file
-from werkzeug.exceptions import abort
-import requests
-import gzip
-import os
+#from werkzeug.exceptions import abort
+#import requests
+#import gzip
+#import os
 import time
 import pandas as pd
-import itertools
+#import itertools
 
 import matplotlib
 matplotlib.use('agg')
-import matplotlib.pyplot as plt
-import networkx as nx
-import numpy as np
-import io
-import base64
+#import matplotlib.pyplot as plt
+#import networkx as nx
+#import numpy as np
+#import io
+#import base64
 
-from utilities import connect_to_db, get_children_workflows, get_miso_sample_link,\
-    get_pipelines, get_workflow_names, get_library_design
-from whole_genome import get_call_ready_cases, get_bmpp_case, get_case_call_ready_samples, group_normal_tumor_pairs, \
-    find_analysis_blocks, map_workflows_to_sample_pairs, map_workflows_to_parent, list_block_workflows, \
-    get_block_analysis_date, sort_call_ready_samples, get_block_workflow_file_count, get_block_release_status, \
-    get_amount_data, is_block_complete, order_blocks, name_WGS_blocks, create_block_json, map_samples_to_bmpp_runs, \
+from utilities import connect_to_db, get_miso_sample_link,\
+    get_pipelines, get_workflow_names, get_library_design, secret_key_generator, \
+    get_children_workflows
+from whole_genome import get_call_ready_cases, get_amount_data, create_WG_block_json, \
     get_parent_workflows, get_workflows_analysis_date, get_workflow_file_count, \
-    get_workflow_limskeys, get_file_release_status    
-from networks import get_node_labels, make_adjacency_matrix, plot_workflow_network
-from whole_transcriptome import get_WT_call_ready_cases, get_star_case, get_WT_case_call_ready_samples, \
-    map_workflows_to_samples, find_WT_analysis_blocks, name_WT_blocks, map_samples_to_star_runs
+    get_WGTS_blocks_info, get_sequencing_platform, get_selected_workflows, \
+    review_wgs_blocks, get_case_workflows, update_wf_selection, get_block_counts, \
+    get_wgs_blocks, create_WGS_project_block_json, get_workflow_output, get_release_status, \
+    get_workflow_limskeys, get_file_release_status, map_fileswid_to_filename, \
+    map_limskey_to_library, map_library_to_sample, get_WGS_standard_deliverables    
+    
+from whole_transcriptome import get_WT_call_ready_cases, get_WT_standard_deliverables, \
+    create_WT_project_block_json, create_WT_block_json
 from project import get_project_info, get_cases, get_sample_counts, count_libraries, \
      get_library_types, add_missing_donors, get_last_sequencing
-from sequencing import get_sequences, collect_sequence_info
-
+from sequencing import get_sequences, collect_sequence_info, platform_name
+from shallow_whole_genome import get_shallow_wg, review_swg, get_input_release_status, \
+    create_swg_sample_json, create_swg_project_json, get_SWG_standard_deliverables, \
+    order_ichorcna_workflows    
 
    
 # map pipelines to views
-routes = {'Whole Genome': 'whole_genome_sequencing', 'Whole Transcriptome': 'whole_transcriptome'}
+routes = {'Whole Genome': 'whole_genome_sequencing',
+          'Whole Transcriptome': 'whole_transcriptome',
+          'Shallow Whole Genome': 'shallow_whole_genome'}
 
 
 app = Flask(__name__)
-
+#app.config['SECRET_KEY'] = secret_key_generator(10)
+app.secret_key = secret_key_generator(10)
 
 
 
@@ -80,6 +87,23 @@ def find_workflow_id(generic_name, bmpp_children_workflows, library):
     else:
         return 'NA'
     
+
+
+
+@app.template_filter()
+def readable_time(date):
+    '''
+    (str) -> str
+    
+    Returns epoch time in readable format
+    
+    Parameters
+    ----------
+    - date (str): Epoch time
+    '''
+    
+    #return time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(int(date)))
+    return time.strftime('%Y-%m-%d', time.localtime(int(date)))
 
 
 @app.template_filter()
@@ -116,7 +140,7 @@ def format_created_time(created_time):
 def index():
     
     # connect to db and extract project info
-    conn = connect_to_db()
+    conn = connect_to_db('merged.db')
     projects = conn.execute('SELECT * FROM Projects').fetchall()
     conn.close()
     
@@ -128,27 +152,29 @@ def index():
 @app.route('/<project_name>')
 def project_page(project_name):
     
-    
+    database = 'merged.db'
     # get the project info for project_name from db
-    project = get_project_info(project_name)
+    project = get_project_info(project_name, database)
     # get the pipelines from the library definitions in db
-    pipelines = get_pipelines(project_name)
+    pipelines = get_pipelines(project_name, database)
     # get case information
-    cases = get_cases(project_name)
+    cases = get_cases(project_name, database)
+    # sort by donor id
+    cases = sorted(cases, key=lambda d: d['case_id']) 
     # get the species
     species = ', '.join(sorted(list(set([i['species'] for i in cases]))))
     # get library and sample counts
-    counts = get_sample_counts(project_name)
+    counts = get_sample_counts(project_name, database)
     # add missing donors to counts (ie, when counts are 0)
     counts = add_missing_donors(cases, counts)
     # count libraries for each library type
     # get the library types
-    library_types =  get_library_types(project_name)
+    library_types =  get_library_types(project_name, database)
     # get the library names
     library_names = {i: get_library_design(i) for i in library_types}
-    libraries = count_libraries(project_name, library_types, cases)
+    libraries = count_libraries(project_name, library_types, cases, database)
     # get the date of the last sequencing data
-    seq_date = get_last_sequencing(project['project_id'])
+    seq_date = get_last_sequencing(project['project_id'], database)
     
     return render_template('project.html', routes=routes, project=project,
                            pipelines=pipelines, cases=cases, counts=counts,
@@ -156,473 +182,541 @@ def project_page(project_name):
                            library_types = library_types, library_names=library_names)
 
 
-@app.route('/<project_name>/sequencing')
+@app.route('/<project_name>/sequencing', methods = ['GET', 'POST'])
 def sequencing(project_name):
     
+    database = 'merged.db'
     # get the project info for project_name from db
-    project = get_project_info(project_name)
+    project = get_project_info(project_name, database)
     # get the pipelines from the library definitions in db
-    pipelines = get_pipelines(project_name)
+    pipelines = get_pipelines(project_name, database)
     # get sequence file information
-    files = collect_sequence_info(project_name)
+    files = collect_sequence_info(project_name, database)
     # re-organize sequence information
     sequences = get_sequences(files)
+    # sort data
+    sequences.sort(key=lambda x: (x['case'], x['sample_id'], x['library'], x['platform']))
+    # map the instrument short name to sequencing platform
+    platform_names = platform_name(project_name, database)
+ 
+    if request.method == 'POST':
+        
+        platforms = request.form.getlist('platform')
+        sequences = get_sequences(files)
+        D = {}
+        for i in sequences:
+            d = {'Case': i['case'],
+                 'Donor': i['sample'],
+                 'SampleID': i['group_id'],
+                 'Sample': i['sample_id'],
+                 'Description': i['group_description'],
+                 'Library': i['library'],
+                 'Library Type': i['library_type'],
+                 'Tissue Origin': i['tissue_origin'],
+                 'Tissue Type': i['tissue_type'],
+                 'File Prefix': i['prefix']}
+    
+            # download all information if platforms are not selected
+            if platforms:
+                # check that platform is selected
+                if platform_names[i['platform']] in platforms:
+                    D[i['case']] = d     
+            else:
+                D[i['case']] = d
+                    
+        data = pd.DataFrame(D.values())
+        outputfile = '{0}_libraries.xlsx'.format(project_name)
+        data.to_excel(outputfile, index=False)
+            
+        return send_file(outputfile, as_attachment=True)
 
-    return render_template('sequencing.html', routes=routes, project=project, sequences=sequences, pipelines=pipelines)
+    else:
+        return render_template('sequencing.html', routes=routes,
+                           project=project, sequences=sequences,
+                           pipelines=pipelines, platform_names=platform_names)
 
 
 
-@app.route('/<project_name>/whole_genome_sequencing')
+@app.route('/<project_name>/whole_genome_sequencing/', methods=['POST', 'GET'])
 def whole_genome_sequencing(project_name):
     
+    database = 'merged.db'
     # get the project info for project_name from db
-    project = get_project_info(project_name)
-    
+    project = get_project_info(project_name, database)
     # get the pipelines from the library definitions in db
-    pipelines = get_pipelines(project_name)
-        
+    pipelines = get_pipelines(project_name, database)
     # get samples and libraries and workflow ids for each case
-    cases = get_call_ready_cases(project_name, 'novaseq', 'WG')
+    cases = get_call_ready_cases(project_name, 'novaseq', 'WG', database)
     samples = sorted(list(cases.keys()))
-
-   
-    return render_template('Whole_Genome_Sequencing.html', routes = routes, project=project, samples=samples, cases=cases, pipelines=pipelines)
-
-
-@app.route('/<project_name>/whole_genome_sequencing/<case>')
-def wgs_case(project_name, case):
+    # get the block counts
+    blocks = get_wgs_blocks(project_name, database, 'WGS_blocks')
+    block_counts = get_block_counts(blocks)
+       
+    # get analysis block status
+    # extract selected status of each workflow
+    selected = get_selected_workflows(project_name, database, 'Workflows')
+    block_status = review_wgs_blocks(blocks, selected)
+    # make a list of donor ids with block status
     
-    tasks = []
+    if request.method == 'POST':
+        deliverable = request.form.get('deliverable')
+        # get the workflow names
+        workflow_names = get_workflow_names(project_name, database)
+                
+        if deliverable == 'selected':
+            block_data = create_WGS_project_block_json(project_name, database, blocks, block_status, selected, workflow_names)
+        elif deliverable == 'standard':
+            # get the pipeline deliverables       
+            deliverables = get_WGS_standard_deliverables()
+            block_data = create_WGS_project_block_json(project_name, database, blocks, block_status, selected, workflow_names, deliverables)
+        else:
+            block_data = {}
+                
+        return Response(
+            response=json.dumps(block_data),
+            mimetype="application/json",
+            status=200,
+            headers={"Content-disposition": "attachment; filename={0}.WGS.json".format(project_name)})
+
+    else:
+        return render_template('Whole_Genome_Sequencing.html',
+                           routes = routes,
+                           project=project,
+                           samples=samples,
+                           cases=cases,
+                           pipelines=pipelines,
+                           block_status = block_status,
+                           block_counts = block_counts
+                           )
+ 
+
+@app.route('/<project_name>/whole_genome_sequencing/<case>/<sample_pair>', methods = ['POST', 'GET'])
+def wgs_case(project_name, case, sample_pair):
     
-    start = time.time()
+    
+    print('method', request.method)
+    
+    database = 'merged.db'
     
     # get the project info for project_name from db
-    project = get_project_info(project_name)
-    end1 = time.time()
-    print('project', end1 - start)
-    
+    project = get_project_info(project_name, database)
     # get the pipelines from the library definitions in db
-    pipelines = get_pipelines(project_name)
-    end2 = time.time()
-    print('pipeline', end2 - end1)
-    
-    # get all the bmpp runs for WG library type and Novaseq platform
-    bmpp = get_bmpp_case(project_name, case, 'novaseq', 'WG')
-    end3 = time.time()
-    print('bmpp', end3 - end2)
-       
-    
-    # get the normal and tumor samples for each bmpp id
-    bmpp_samples = map_samples_to_bmpp_runs(project_name, bmpp)
-    end4 = time.time()
-    print('bmpp_samples', end4 - end3)
-    
-    # identify all the samples processed
-    samples = get_case_call_ready_samples(project_name, bmpp_samples)
-    end5 = time.time()
-    print('samples', end5 - end4)
-    
-    # get all pairs N/T samples
-    pairs = group_normal_tumor_pairs(samples)
-    end6 = time.time()
-    print('pairs', end6 - end5)
-    
-    
-    # find analysis workflows for each N/T pairs
-    # remove sample pairs without analysis workflows
-    D = map_workflows_to_sample_pairs(project_name, 'novaseq', pairs)
-    end7 = time.time()
-    print('analysis workflows', end7 - end6)
-    
-       
-    # find the parents of each workflow
-    parents = get_parent_workflows(project_name)
-    end8 = time.time()
-    print('parents', end8 - end7)
-    
-    # get the parent workflows for each block
-    parent_workflows = map_workflows_to_parent(D, parents)
-    end9 = time.time()
-    print('parent workflows', end9 - end8)
-    
-    # find the blocks by mapping the analysis workflows to their parent workflows    
-    blocks = find_analysis_blocks(D, parents, parent_workflows, bmpp)
-    end10 = time.time()
-    print('blocks', end10 - end9)
-    
-    # list all workflows for each block
-    block_workflows = list_block_workflows(blocks)
-    end11 = time.time()
-    print('block workflows', end11 - end10)
-    
-    # get the workflow creation date for all the workflows in project
-    creation_dates = get_workflows_analysis_date(project_name)
-    # assign date to each block. most recent file creation date from all workflows within block 
-    # get the date of each workflow within block
-    block_date, workflow_date = get_block_analysis_date(block_workflows, creation_dates)
-    end12 = time.time()
-    print('workflow date', end12 - end11)
-    
-    # map each workflow run id to its workflow name
-    workflow_names = get_workflow_names(project_name)
-    # get the workflow names
-    block_workflow_names = get_node_labels(block_workflows, workflow_names)
-    end13 = time.time()
-    print('workflow names', end13 - end12)
-    
-    # convert workflow relationships to adjacency matrix for each block
-    matrix = make_adjacency_matrix(block_workflows, parent_workflows)
-    end14 = time.time()
-    print('matrix', end14 - end13)
-    
-    # create figures
-    figures = plot_workflow_network(matrix, block_workflow_names)
-    end15 = time.time()
-    print('figures', end15 - end14)
-    
-     
-    # get the samples for each bmpp id
-    samples_bmpp = sort_call_ready_samples(project_name, blocks, bmpp_samples, workflow_names)
-    end16 = time.time()
-    print('samples bmpp', end16 - end15)
-    
-    
-    # get the file count of each workflow in project
-    file_counts = get_workflow_file_count(project_name)
-    # get the workflow file counts
-    file_counts = get_block_workflow_file_count(block_workflows, file_counts)
-    end17 = time.time()
-    print('file counts', end17 - end16)
-    
-    # get release status of input sequences for each block
-    # get the input limskeys for each workflow in project
-    limskeys = get_workflow_limskeys(project_name)
-    end18 = time.time()
-    print('limskeys', end18 - end17)
-    
-      
-    # get the file swid and release status for each limskey for fastq-generating workflows
-    # excluding fastq-import workflows
-    status = get_file_release_status(project_name)
-    release_status = get_block_release_status(block_workflows, limskeys, status)
-    end19 = time.time()
-    print('release status', end19 - end18)
-    
-    # get the amount of data for each workflow
-    amount_data = get_amount_data(block_workflows, limskeys)
-    end20 = time.time()
-    print('amount data', end20 - end19)
-    
-    
-    
-    # check if blocks are complete
-    expected_workflows = sorted(['mutect2', 'variantEffectPredictor', 'delly', 'varscan', 'sequenza', 'mavis'])           
-    complete = is_block_complete(blocks, expected_workflows)
-    end21 = time.time()
-    print('complete', end21 - end20)
-    
-    
-    
-    # order blocks based on the amount of data
-    ordered_blocks = order_blocks(blocks, amount_data)
-    end22 = time.time()
-    print('order blocks', end22 - end21)
-
-
-    # name each block according to the selected block order
-    names = name_WGS_blocks(ordered_blocks)
-    end23 = time.time()
-    print('name blocks', end23 - end22)    
-    
+    pipelines = get_pipelines(project_name, database)
     # get miso link
-    miso_link = get_miso_sample_link(project_name, case)
-    end24 = time.time()
-    print('miso link', end24 - end23)
-    
-    
+    miso_link = get_miso_sample_link(project_name, case, database)
+    # get the WGS blocks
+    blocks = get_WGTS_blocks_info(project_name, case, database, 'WGS_blocks')
     # sort sample pairs names
     sample_pairs_names = sorted(list(blocks.keys()))
-    end25 = time.time()
-    print('sort sample pairs', end25 - end24)
+    # get the workflow names
+    workflow_names = get_workflow_names(project_name, database)
+    # get the file count of each workflow in project
+    file_counts = get_workflow_file_count(project_name, database)
+    # get the amount of data for each workflow
+    amount_data = get_amount_data(project_name, database)
+    # get the creation date of all workflows
+    creation_dates = get_workflows_analysis_date(project_name, database)
+    # get the sequencing platform of each workflow
+    platforms = get_sequencing_platform(project_name, database)
+    # find the parents of each workflow
+    parents = get_parent_workflows(project_name, database)
+    # extract selected status of each workflow
+    selected = get_selected_workflows(project_name, database, 'Workflows')
     
-    
-    print('all tasks', end25 -  start)
-    
-    tasks.extend([('project', end1 - start), ('pipeline', end2 - end1),
-                 ('bmpp', end3 - end2), ('bmpp_samples', end4 - end3),
-                 ('samples', end5 - end4), ('pairs', end6 - end5),
-                 ('analysis workflows', end7 - end6), ('parents', end8 - end7),
-                 ('parent workflows', end9 - end8), ('blocks', end10 - end9),
-                 ('block workflows', end11 - end10), ('workflow date', end12 - end11),
-                 ('workflow names', end13 - end12), ('matrix', end14 - end13),
-                 ('figures', end15 - end14), ('samples bmpp', end16 - end15),
-                 ('file counts', end17 - end16), ('limskeys', end18 - end17),
-                 ('release status', end19 - end18), ('amount data', end20 - end19),
-                 ('complete', end21 - end20), ('order blocks', end22 - end21),
-                 ('name blocks', end23 - end22), ('miso link', end24 - end23),
-                 ('sort sample pairs', end25 - end24)])
-    tasks.sort(key=lambda x: x[1])
-    print(tasks)
-    
-    
-    
-    
-    
-    
-    
-    return render_template('WGS_case.html', project=project, routes = routes,
-                           case=case, pipelines=pipelines, sample_pairs_names=sample_pairs_names,
-                           blocks=blocks, names=names, ordered_blocks=ordered_blocks,
-                           miso_link=miso_link, complete=complete, release_status=release_status,
-                           block_date=block_date, workflow_date=workflow_date,
-                           figures=figures, samples_bmpp=samples_bmpp, 
-                           file_counts=file_counts, amount_data=amount_data, )
+    if request.method == 'POST':
+        # get the list of checked workflows        
+        selected_workflows = request.form.getlist('workflow')
+        # get the workflows of each block for sample pair and case
+        case_workflows = get_case_workflows(case, database, 'WGS_blocks')
+        # list all the workflows for a given sample pair
+        # may include workflows from different blocks for a sample sample pair
+        # this ensures blocks are mutually exclusive within a sample pair but not within a case
+        workflows = []
+        for i in case_workflows[sample_pair]:
+            workflows.extend(case_workflows[sample_pair][i])
+        update_wf_selection(workflows, selected_workflows, selected, database, 'Workflows')
+        return redirect(url_for('wgs_case', case=case, project_name=project_name, sample_pair=sample_pair))
+    else:
+        return render_template('WGS_case.html',
+                           project=project,
+                           routes = routes,
+                           case=case,
+                           pipelines=pipelines,
+                           blocks=blocks,
+                           sample_pairs_names=sample_pairs_names,
+                           workflow_names=workflow_names,
+                           file_counts=file_counts,
+                           amount_data=amount_data,
+                           creation_dates=creation_dates,
+                           platforms=platforms,
+                           parents=parents,
+                           selected = selected,
+                           sample_pair=sample_pair
+                           )
 
 
 
-@app.route('/<project_name>/whole_transcriptome')
+@app.route('/<project_name>/<pipeline>/<case>/<sample_pair>/<workflow_id>')
+def workflow(project_name, pipeline, case, sample_pair, workflow_id):
+    
+    database = 'merged.db'
+    
+    # get the project info for project_name from db
+    project = get_project_info(project_name, database)
+    # get the workflow names
+    workflow_names = get_workflow_names(project_name, database)
+       
+    # find the parents of each workflow
+    parents = get_parent_workflows(project_name, database)
+    if workflow_id in parents:
+        parents = parents[workflow_id]
+    else:
+        parents = {}
+    
+    # find the children of each workflow
+    D = get_children_workflows(project_name, database)
+    children = {}
+    if workflow_id in D:
+        D = D[workflow_id]
+        for i in D:
+            if i['wf'] in children:
+                children[i['wf']].append(i['children_id'])
+            else:
+                children[i['wf']] = [i['children_id']]
+    
+    # get the number of rows in table
+    rows, parent_rows, children_rows = 0, 0, 0
+    for i in parents:
+        parent_rows += len(parents[i])
+    for i in children:
+        children_rows += len(children[i])
+    rows = max([parent_rows, children_rows])
+    if parent_rows > children_rows:
+        parent_rows = rows
+    elif parent_rows < children_rows:
+        children_rows = rows
+    
+    # get input worflow sequences
+    limskeys = get_workflow_limskeys(project_name, database, 'Workflow_Inputs')
+    limskeys = limskeys[workflow_id]
+    # get release status of input sequences, excluding fastq-import workflows
+    D = get_file_release_status(project_name, database)
+    sequence_status = {i:D[i] for i in limskeys}
+    # map file swids to file names
+    fastqs = map_fileswid_to_filename(project_name, database, 'Files')
+    # map library to limskey
+    libraries = map_limskey_to_library(project_name, workflow_id, database, 'Workflow_Inputs')
+    # map libraries to samples
+    samples = map_library_to_sample(project_name, case, database, 'Libraries')
+    sequences = []
+    for i in limskeys:
+        library = libraries[i]
+        sample = samples[library]
+        status = sequence_status[i]
+        swid1, status1 = status[0][0], status[0][1]
+        swid2, status2 = status[1][0], status[1][1]
+        file1, file2 = fastqs[swid1], fastqs[swid2]
+        seq = [[swid1, file1, status1], [swid2, file2, status2]]
+        seq.sort(key=lambda x: x[1])
+        for j in seq:
+            sequences.append([sample, library, i, j[0], j[1], j[2]])
+    sequences.sort(key=lambda x: x[0])
+    
+    # get workflow output files
+    files = get_workflow_output(project_name, case, workflow_id, database, libraries, samples, 'Files')
+    
+    # get the file release status
+    release_status = get_release_status(project_name, database, 'FilesQC')
+    
+    return render_template('workflow.html',
+                           project=project,
+                           pipeline=pipeline,
+                           case=case,
+                           sample_pair=sample_pair,
+                           parents=parents,
+                           children=children,
+                           parent_rows=parent_rows,
+                           children_rows=children_rows,
+                           rows=rows,
+                           workflow_id=workflow_id,
+                           workflow_names=workflow_names,
+                           files=files,
+                           release_status=release_status,
+                           sequences=sequences
+                           )
+
+
+@app.route('/<project_name>/whole_transcriptome', methods = ['POST', 'GET'])
 def whole_transcriptome(project_name):
     
+    database = 'merged.db'
     # get the project info for project_name from db
-    project = get_project_info(project_name)
+    project = get_project_info(project_name, database)
     # get the pipelines from the library definitions in db
-    pipelines = get_pipelines(project_name)
+    pipelines = get_pipelines(project_name, database)
     # get samples and libraries and workflow ids for each case
-    cases = get_WT_call_ready_cases(project_name, 'novaseq', 'WT')
+    cases = get_WT_call_ready_cases(project_name, 'novaseq', database, 'WT')
     samples = sorted(list(cases.keys()))
-
-    return render_template('Whole_transcriptome.html', routes = routes, project=project,
-                           samples=samples, cases=cases, pipelines=pipelines)
-
-
-@app.route('/<project_name>/whole_transcriptome/<case>')
-def wt_case(project_name, case):
+    # get the block counts
+    blocks = get_wgs_blocks(project_name, database, 'WT_blocks')
+    block_counts = get_block_counts(blocks)
     
+    # get analysis block status
+    # extract selected status of each workflow
+    selected = get_selected_workflows(project_name, database, 'Workflows')
+    block_status = review_wgs_blocks(blocks, selected)
     
-    tasks = []
-    start = time.time()
-       
+    if request.method == 'POST':
+        deliverable = request.form.get('deliverable')
+        # get the workflow names
+        workflow_names = get_workflow_names(project_name, database)
+        
+        if deliverable == 'selected':
+            block_data = create_WT_project_block_json(project_name, database, blocks, block_status, selected, workflow_names)
+        elif deliverable == 'standard':
+            # get the pipeline deliverables       
+            deliverables = get_WT_standard_deliverables()
+            block_data = create_WT_project_block_json(project_name, database, blocks, block_status, selected, workflow_names, deliverables)
+        else:
+            block_data = {}
+            
+        return Response(
+               response=json.dumps(block_data),
+               mimetype="application/json",
+               status=200,
+               headers={"Content-disposition": "attachment; filename={0}.WT.json".format(project_name)})
+    
+    else:
+        return render_template('Whole_transcriptome.html',
+                         routes = routes, project=project,
+                         samples=samples,
+                         cases=cases,
+                         pipelines=pipelines,
+                         blocks=blocks,
+                         block_counts=block_counts,
+                         block_status=block_status)
+
+
+@app.route('/<project_name>/whole_transcriptome/<case>/<tumor_sample>', methods=['POST', 'GET'])
+def wt_case(project_name, case, tumor_sample):
+        
+    
+    database = 'merged.db'
+    expected_workflows = sorted(['arriba', 'rsem', 'star', 'starfusion', 'mavis'])  
     
     # get the project info for project_name from db
-    project = get_project_info(project_name)
-    end1 = time.time()
-    print('project', end1 - start)
-    
+    project = get_project_info(project_name, database)
     # get the pipelines from the library definitions in db
-    pipelines = get_pipelines(project_name)
-    end2 = time.time()
-    print('pipeline', end2 - end1)
-           
-    # build the somatic calling block
-
-    # identify all call ready star runs for novaseq
-    star = get_star_case(project_name, case, 'novaseq', 'WT')
-    end3 = time.time()
-    print('star', end3 - end2)
-    
-    # get the tumor samples for each star id
-    star_samples = map_samples_to_star_runs(project_name, star)
-    end4 = time.time()
-    print('star_samples', end4 - end3)
-    
-    # identify all the samples processed
-    samples = get_WT_case_call_ready_samples(project_name, star_samples)
-    end5 = time.time()
-    print('samples', end5 - end4)
-    
-    # remove samples without analysis workflows
-    D = map_workflows_to_samples(project_name, 'novaseq', samples)
-    end6 = time.time()
-    print('analysis workflows', end6 - end5)
-
+    pipelines = get_pipelines(project_name, database)
+    # get miso link
+    miso_link = get_miso_sample_link(project_name, case, database)
+    # get the WT blocks
+    blocks = get_WGTS_blocks_info(project_name, case, database, 'WT_blocks')
+    # sort sample pairs names
+    sample_names = sorted(list(blocks.keys()))
+    # get the workflow names
+    workflow_names = get_workflow_names(project_name, database)
+    # get the file count of each workflow in project
+    file_counts = get_workflow_file_count(project_name, database)
+    # get the amount of data for each workflow
+    amount_data = get_amount_data(project_name, database)
+    # get the creation date of all workflows
+    creation_dates = get_workflows_analysis_date(project_name, database)
     # find the parents of each workflow
-    parents = get_parent_workflows(project_name)
-    end7 = time.time()
-    print('parents', end7 - end6)
-
-    # get the parent workflows for each block
-    parent_workflows = map_workflows_to_parent(D, parents)
-    end8 = time.time()
-    print('parent workflows', end8 - end7)     
-
+    parents = get_parent_workflows(project_name, database)
+    # extract selected status of each workflow
+    selected = get_selected_workflows(project_name, database, 'Workflows')
     
-    # find the blocks by mapping the analysis workflows to their parent workflows    
-    blocks = find_WT_analysis_blocks(D, parents, parent_workflows, star)
-    end9 = time.time()
-    print('blocks', end9 - end8)
+    if request.method == 'POST':
+        # get the list of checked workflows        
+        selected_workflows = request.form.getlist('workflow')
+        # get the workflows of each block and sample pair for case
+        case_workflows = get_case_workflows(case, database, 'WT_blocks')
+        # list all the workflows for a given sample that need an update
+        # may include workflows from different blocks for a sample
+        # this ensures blocks are mutually exclusive within a sample but not within a case
+        workflows = []
+        for i in case_workflows[tumor_sample]:
+            workflows.extend(case_workflows[tumor_sample][i])
+        update_wf_selection(workflows, selected_workflows, selected, database, 'Workflows')
+        return redirect(url_for('wt_case', case=case, project_name=project_name, tumor_sample=tumor_sample))
+    else:
+        return render_template('WT_case.html',
+                               project=project,
+                               routes = routes,
+                               case=case,
+                               pipelines=pipelines,
+                               blocks=blocks,
+                               sample_names=sample_names,
+                               workflow_names=workflow_names,
+                               file_counts=file_counts,
+                               amount_data=amount_data,
+                               creation_dates=creation_dates,
+                               parents=parents,
+                               selected=selected,
+                               tumor_sample=tumor_sample
+                               )
+
+
+@app.route('/<project_name>/shallow_whole_genome/', methods=['POST', 'GET'])
+def shallow_whole_genome(project_name):
+        
+    
+    database = 'merged.db'
+    #expected_workflows = sorted(['arriba', 'rsem', 'star', 'starfusion', 'mavis'])  
+    
+    # get the project info for project_name from db
+    project = get_project_info(project_name, database)
+    # get the pipelines from the library definitions in db
+    pipelines = get_pipelines(project_name, database)
+    # get the shallow whole genome data
+    swg = get_shallow_wg(project_name, database, workflow_table = 'Workflows', wf_input_table = 'Workflow_Inputs', library_table='Libraries')
+    # get the selection status of workflows
+    selected = get_selected_workflows(project_name, database, 'Workflows')
+    # get the input fastqs release status
+    release_status = get_file_release_status(project_name, database)
+    workflow_release_status = get_input_release_status(swg, release_status)
+    status = review_swg(swg, selected, workflow_release_status)
+    
+    row_counts = {}
+    for i in swg:
+        for j in swg[i]:
+            row_counts[i] = len(swg[i][j])
+    
+    if request.method == 'POST':
+        deliverable = request.form.get('deliverable')
+        # get the workflow names
+        workflow_names = get_workflow_names(project_name, database)
+        if deliverable == 'selected':
+            data = create_swg_project_json(database, project_name, swg, workflow_names, selected)
+        elif deliverable == 'standard':
+            deliverables = get_SWG_standard_deliverables()
+            data = create_swg_project_json(database, project_name, swg, workflow_names, selected, deliverables)
+        else:
+            data = {}
+                         
+        return Response(
+                response=json.dumps(data),
+                mimetype="application/json",
+                status=200,
+                headers={"Content-disposition": "attachment; filename={0}.SWG.json".format(project_name)})
+    
+    else:
+        return render_template('shallow_whole_genome.html',
+                               project=project,
+                               routes = routes,
+                               pipelines=pipelines,
+                               swg=swg,
+                               status=status,
+                               row_counts=row_counts
+                               )
+
+
+@app.route('/<project_name>/shallow_whole_genome/<case>/<sample>', methods=['POST', 'GET'])
+def swg_sample(project_name, case, sample):
+    
+    database = 'merged.db'
+    
+    # get the project info for project_name from db
+    project = get_project_info(project_name, database)
+    # get the pipelines from the library definitions in db
+    pipelines = get_pipelines(project_name, database)
+    # get miso link
+    miso_link = get_miso_sample_link(project_name, case, database)
+    # get the shallow whole genome data
+    swg = get_shallow_wg(project_name, database, workflow_table = 'Workflows', wf_input_table = 'Workflow_Inputs', library_table='Libraries')
+    # get the selection status of workflows
+    selected = get_selected_workflows(project_name, database, 'Workflows')
+    # get the input fastqs release status
+    release_status = get_file_release_status(project_name, database)
+    status = get_input_release_status(swg, release_status)
+    # get the workflow names
+    workflow_names = get_workflow_names(project_name, database)
+    file_counts = get_workflow_file_count(project_name, database)
+    # get the amount of data for each workflow
+    amount_data = get_amount_data(project_name, database)
+    # get the creation date of all workflows
+    creation_dates = get_workflows_analysis_date(project_name, database)
+    # sort workflows according to amount of data, release status and creation date
+    ordered_workflows = order_ichorcna_workflows(swg, amount_data, status, creation_dates)
+      
+    if request.method == 'POST':
+        # get the selected workflow        
+        selected_workflow = request.form.getlist('workflow')
+        # get the workflows for the given sample
+        workflows = list(swg[case][sample].keys())
+        update_wf_selection(workflows, selected_workflow, selected, database, 'Workflows')
+        return redirect(url_for('swg_sample', case=case, project_name=project_name, sample=sample))
+    else:
+        return render_template('SWG_sample.html',
+                           project=project,
+                           routes = routes,
+                           pipelines=pipelines,
+                           swg=swg,
+                           status=status,
+                           case=case,
+                           sample=sample,
+                           workflow_names=workflow_names,
+                           file_counts=file_counts,
+                           amount_data=amount_data,
+                           creation_dates=creation_dates,
+                           selected = selected,
+                           ordered_workflows = ordered_workflows
+                           )
+
+
+@app.route('/download_block/<project_name>/<pipeline>/<case>/<pair>/<anchor_wf>/<table>/<selection>')
+def download_block_data(project_name, pipeline, case, pair, anchor_wf, table, selection):
+        
+    database = 'merged.db'
+    
+    # get the WGS blocks
+    blocks = get_WGTS_blocks_info(project_name, case, database, table)
+    # get the workflow names
+    workflow_names = get_workflow_names(project_name, database)
+    # get selected workflows
+    selected_workflows = get_selected_workflows(project_name, database)
+    # create json with workflow information for block for DARE
+    #block_data = create_block_json(project_name, blocks, pair, anchor_wf, workflow_names, selected_workflows, selection)
+    
+    if pipeline == 'WG':
+        block_data = create_WG_block_json(database, project_name, case, blocks, pair, anchor_wf, workflow_names, selected_workflows, selection)
+    elif pipeline == 'WT':
+        block_data = create_WT_block_json(database, project_name, case, blocks, pair, anchor_wf, workflow_names, selected_workflows, selection)
+    
+    pair_name = '.'.join(map(lambda x: x.strip(), pair.split('|')))
+    
+    # send the json to outoutfile                    
+    return Response(
+        response=json.dumps(block_data),
+        mimetype="application/json",
+        status=200,
+        headers={"Content-disposition": "attachment; filename={0}.{1}.{2}.{3}.{4}.{5}.json".format(project_name, pipeline, case, pair_name, anchor_wf, selection)})
+
+
+@app.route('/download_swg/<project_name>/SWG/<case>/<sample>/<workflow_id>/<selection>')
+def download_SWG_data(project_name, case, sample, workflow_id, selection):
+        
+    database = 'merged.db'
+    
+    # get the shallow whole genome data
+    swg = get_shallow_wg(project_name, database, workflow_table = 'Workflows', wf_input_table = 'Workflow_Inputs', library_table='Libraries')
+    # get the selection status of workflows
+    selected_workflows = get_selected_workflows(project_name, database, 'Workflows')
+    # get the workflow names
+    workflow_names = get_workflow_names(project_name, database)
+    
+    data = create_swg_sample_json(database, project_name, swg, case, sample, workflow_id, workflow_names, selected_workflows, selection)
     
         
-    # list all workflows for each block
-    block_workflows = list_block_workflows(blocks)
-    end10 = time.time()
-    print('block workflows', end10 - end9)
-    
-    # get the workflow creation date for all the workflows in project
-    creation_dates = get_workflows_analysis_date(project_name)
-    # assign date to each block. most recent file creation date from all workflows within block 
-    # get the date of each workflow within block
-    block_date, workflow_date = get_block_analysis_date(block_workflows, creation_dates)
-    end11 = time.time()
-    print('workflow date', end11 - end10)  
-    
-    # map each workflow run id to its workflow name
-    workflow_names = get_workflow_names(project_name)
-    # get the workflow names
-    block_workflow_names = get_node_labels(block_workflows, workflow_names)
-    end12 = time.time()
-    print('workflow names', end12 - end11)
-    
-    # convert workflow relationships to adjacency matrix for each block
-    matrix = make_adjacency_matrix(block_workflows, parent_workflows)
-    end13 = time.time()
-    print('matrix', end13 - end12)
- 
-    # create figures
-    figures = plot_workflow_network(matrix, block_workflow_names)
-    end14 = time.time()
-    print('figures', end14 - end13)
- 
-    # get the samples for each star id
-    samples_star = sort_call_ready_samples(project_name, blocks, star_samples, workflow_names)
-    end15 = time.time()
-    print('samples bmpp', end15 - end14)
-   
-    # # get the file count of each workflow in project
-    file_counts = get_workflow_file_count(project_name)
-    # get the workflow file counts
-    file_counts = get_block_workflow_file_count(block_workflows, file_counts)
-    end16 = time.time()
-    print('file counts', end16 - end15)
-
-    # get release status of input sequences for each block
-    # get the input limskeys for each workflow in project
-    limskeys = get_workflow_limskeys(project_name)
-    end17 = time.time()
-    print('limskeys', end17 - end16)
-
-    # get the file swid and release status for each limskey for fastq-generating workflows
-    # excluding fastq-import workflows
-    status = get_file_release_status(project_name)
-    release_status = get_block_release_status(block_workflows, limskeys, status)
-    end18 = time.time()
-    print('release status', end18 - end17)
-
-    # get the amount of data for each workflow
-    amount_data = get_amount_data(block_workflows, limskeys)
-    end19 = time.time()
-    print('amount data', end19 - end18)
-    
-    # check if blocks are complete
-    expected_workflows = sorted(['arriba', 'rsem', 'star', 'starfusion', 'mavis'])           
-    complete = is_block_complete(blocks, expected_workflows)
-    end20 = time.time()
-    print('complete', end20 - end19)
-    
-    # order blocks based on the amount of data
-    ordered_blocks = order_blocks(blocks, amount_data)
-    end21 = time.time()
-    print('order blocks', end21 - end20)
-
-    # name each block according to the selected block order
-    names = name_WT_blocks(ordered_blocks)
-    end22 = time.time()
-    print('name blocks', end22 - end21)    
-    
-    # get miso link
-    miso_link = get_miso_sample_link(project_name, case)
-    end23 = time.time()
-    print('miso link', end23 - end22)
-    
-    # sort sample pairs names
-    sample_pairs_names = sorted(list(blocks.keys()))
-    end24 = time.time()
-    print('sort sample pairs', end24 - end23)
-    
-    
-    print('all tasks', end24 -  start)
-
-    
-    
-    return render_template('WT_case.html', project=project, routes = routes,
-                           case=case, pipelines=pipelines, sample_pairs_names=sample_pairs_names,
-                           blocks=blocks, names=names, ordered_blocks=ordered_blocks,
-                           miso_link=miso_link, complete=complete, release_status=release_status,
-                           block_date=block_date, workflow_date=workflow_date,
-                           figures=figures, samples_star=samples_star, 
-                           file_counts=file_counts, amount_data=amount_data, )
-
-
-
-@app.route('/download_wgs_block/<project_name>/<case>/<block>/<bmpp_parent>')
-def download_block_data(project_name, case, block, bmpp_parent):
-    '''
-    
-    
-    '''
-    
-    # get all the bmpp runs for WG library type and Novaseq platform
-    bmpp = get_bmpp_case(project_name, case, 'novaseq', 'WG')
-    # get the normal and tumor samples for each bmpp id
-    bmpp_samples = map_samples_to_bmpp_runs(project_name, bmpp)
-    # identify all the samples processed
-    samples = get_case_call_ready_samples(project_name, bmpp_samples)
-    # get all pairs N/T samples
-    pairs = group_normal_tumor_pairs(samples)
-    # find analysis workflows for each N/T pairs
-    # remove sample pairs without analysis workflows
-    D = map_workflows_to_sample_pairs(project_name, 'novaseq', pairs)
-    # get the parents of each workflow
-    parents = get_parent_workflows(project_name)
-    # get the parent workflows for each block
-    parent_workflows = map_workflows_to_parent(D, parents)
-    # find the blocks by mapping the analysis workflows to their parent workflows    
-    blocks = find_analysis_blocks(D, parents, parent_workflows, bmpp)
-    # map each workflow run id to its workflow name
-    workflow_names = get_workflow_names(project_name)
-    # create json with workflow information for block for DARE
-    block_data = create_block_json(project_name, blocks, block, bmpp_parent, workflow_names)
-    
     # send the json to outoutfile                    
     return Response(
-        response=json.dumps(block_data),
+        response=json.dumps(data),
         mimetype="application/json",
         status=200,
-        headers={"Content-disposition": "attachment; filename={0}_WGS_{1}_{2}.json".format(project_name, case, block)})
+        headers={"Content-disposition": "attachment; filename={0}.{1}.{2}.{3}.{4}.{5}.json".format(project_name, 'SWG', case, sample, workflow_id, selection)})
 
 
-@app.route('/download_wt_block/<project_name>/<case>/<block>/<star_parent>')
-def download_WT_block_data(project_name, case, block, star_parent):
-
-    # build the somatic calling block
-
-    # identify all call ready star runs for novaseq
-    star = get_star_case(project_name, case, 'novaseq', 'WT')
-    # get the tumor samples for each star id
-    star_samples = map_samples_to_star_runs(project_name, star)
-    samples = get_WT_case_call_ready_samples(project_name, star_samples)
-    # remove samples without analysis workflows
-    D = map_workflows_to_samples(project_name, 'novaseq', samples)
-    # find the parents of each workflow
-    parents = get_parent_workflows(project_name)
-    # get the parent workflows for each block
-    parent_workflows = map_workflows_to_parent(D, parents)
-    # find the blocks by mapping the analysis workflows to their parent workflows    
-    blocks = find_WT_analysis_blocks(D, parents, parent_workflows, star)
-    # map each workflow run id to its workflow name
-    workflow_names = get_workflow_names(project_name)
-    # create json with workflow information for block for DARE
-    block_data = create_block_json(project_name, blocks, block, star_parent, workflow_names)
-
-
-    # send the json to outoutfile                    
-    return Response(
-        response=json.dumps(block_data),
-        mimetype="application/json",
-        status=200,
-        headers={"Content-disposition": "attachment; filename={0}_WT_{1}_{2}.json".format(project_name, case, block)})
-
-    
-       
 
 @app.route('/download_cases/<project_name>')
 def download_cases_table(project_name):
@@ -636,16 +730,18 @@ def download_cases_table(project_name):
     - project_name (str): Name of project of interest
     '''
     
+    database = 'merged.db'
+    
     # get case information
-    cases = get_cases(project_name)
+    cases = get_cases(project_name, database)
     # get library and sample counts
-    counts = get_sample_counts(project_name)
+    counts = get_sample_counts(project_name, database)
     # add missing donors to counts (ie, when counts are 0)
     counts = add_missing_donors(cases, counts)
     # count libraries for each library type
     # get the library types
-    library_types =  get_library_types(project_name)
-    libraries = count_libraries(project_name, library_types, cases)
+    library_types =  get_library_types(project_name, database)
+    libraries = count_libraries(project_name, library_types, cases, database)
     
     D = {}
     for i in cases:
@@ -663,38 +759,38 @@ def download_cases_table(project_name):
 
 
 
-@app.route('/download_identifiers/<project_name>')
-def download_identifiers_table(project_name):
-    '''
+# @app.route('/download_identifiers/<project_name>')
+# def download_identifiers_table(project_name):
+#     '''
     
     
-    '''
+#     '''
     
-    # get sequence file information
-    files = collect_sequence_info(project_name)
-    # re-organize sequence information
-    sequences = get_sequences(files)
+#     # get sequence file information
+#     files = collect_sequence_info(project_name, 'merged.db')
+#     # re-organize sequence information
+#     sequences = get_sequences(files)
     
-    D = {}
-    for i in sequences:
-        d = {'Case': i['case'],
-             'Donor': i['sample'],
-             'SampleID': i['group_id'],
-             'Sample': i['sample_id'],
-             'Description': i['group_description'],
-             'Library': i['library'],
-             'Library Type': i['library_type'],
-             'Tissue Origin': i['tissue_origin'],
-             'Tissue Type': i['tissue_type'],
-             'File Prefix': i['prefix']}
-        D[i['case']] = d     
+#     D = {}
+#     for i in sequences:
+#         d = {'Case': i['case'],
+#              'Donor': i['sample'],
+#              'SampleID': i['group_id'],
+#              'Sample': i['sample_id'],
+#              'Description': i['group_description'],
+#              'Library': i['library'],
+#              'Library Type': i['library_type'],
+#              'Tissue Origin': i['tissue_origin'],
+#              'Tissue Type': i['tissue_type'],
+#              'File Prefix': i['prefix']}
+#         D[i['case']] = d     
              
-    data = pd.DataFrame(D.values())
+#     data = pd.DataFrame(D.values())
      
-    outputfile = '{0}_libraries.xlsx'.format(project_name)
-    data.to_excel(outputfile, index=False)
+#     outputfile = '{0}_libraries.xlsx'.format(project_name)
+#     data.to_excel(outputfile, index=False)
     
-    return send_file(outputfile, as_attachment=True)
+#     return send_file(outputfile, as_attachment=True)
 
 
 # if __name__ == "__main__":

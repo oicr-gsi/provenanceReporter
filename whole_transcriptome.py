@@ -5,14 +5,20 @@ Created on Tue Jun  6 13:35:40 2023
 @author: rjovelin
 """
 
-from utilities import connect_to_db, get_children_workflows, remove_non_analysis_workflows
-from whole_genome import map_analysis_workflows_to_sample, get_parent_workflows
+from utilities import connect_to_db, get_children_workflows, remove_non_analysis_workflows, \
+     get_workflow_names, get_donors
+from whole_genome import map_analysis_workflows_to_sample, get_parent_workflows, \
+    map_workflows_to_parent, list_block_workflows, get_workflows_analysis_date, \
+    get_block_analysis_date, sort_call_ready_samples, is_block_complete, \
+    get_workflow_limskeys, get_file_release_status, get_block_release_status, is_block_clean, \
+    get_amount_data, order_blocks, map_limskey_to_library, map_library_to_sample, \
+    get_workflow_output    
+from networks import get_node_labels, make_adjacency_matrix, plot_workflow_network
 
 
-
-def get_WT_call_ready_cases(project_name, platform, library_type='WT'):
+def get_WT_call_ready_cases(project_name, platform, database, library_type='WT'):
     '''
-    (str, str, str) -> dict
+    (str, str, str, str) -> dict
 
     Returns a dictionary with samples and libraries and bmpp and downstream workflow ids for each case in a project,
     restricting data to specified platform and library type
@@ -22,11 +28,12 @@ def get_WT_call_ready_cases(project_name, platform, library_type='WT'):
     - project_name (str): Name of the project
     - platform (str): Name of sequencing platform.
                       Accepted values: novaseq, nextseq, hiseq, miseq
+    - database (str): Path to the sqlite database
     - library_type (str): 2 letters-code indicating the type of library                   
     '''
 
     # get all the samples for project name 
-    conn = connect_to_db()
+    conn = connect_to_db(database)
     data = conn.execute("SELECT DISTINCT Libraries.library, Libraries.sample, Libraries.project_id, \
                           Libraries.ext_id, Libraries.group_id, Libraries.library_type, \
                           Libraries.tissue_type, Libraries.tissue_origin, \
@@ -50,7 +57,7 @@ def get_WT_call_ready_cases(project_name, platform, library_type='WT'):
                 cases[i['sample']]['libraries'].append(i['library'])
             
     # get parent-children workflow relationships
-    parents = get_children_workflows(project_name)
+    parents = get_children_workflows(project_name, database)
 
     # find the bmpp downstream workflows
     for sample in cases:
@@ -76,9 +83,9 @@ def get_WT_call_ready_cases(project_name, platform, library_type='WT'):
 
 
 
-def get_star_case(project_name, case, platform, library_type):
+def get_star_case(project_name, case, platform, library_type, database):
     '''
-    (str, str, str, str) -> list
+    (str, str, str, str, database) -> list
     
     Returns a list of star call ready workflow Ids corresponding to the specific case from project 
     with input sequences from platform and library_type
@@ -89,8 +96,10 @@ def get_star_case(project_name, case, platform, library_type):
     - case (str): Donor id 
     - platform (str): Sequencing platform. Values are novaseq, miseq, nextseq and hiseq
     - library_type (str): 2-letters code describing the type of the library (eg, WG, WT,..)
+    - database (str): Path to the sqlite database
     '''
-    conn = connect_to_db()
+    
+    conn = connect_to_db(database)
     data = conn.execute("SELECT Libraries.library_type, Workflow_Inputs.platform, \
                         Workflow_Inputs.wfrun_id FROM Libraries JOIN Workflow_Inputs \
                         JOIN Workflows WHERE Libraries.project_id = '{0}' \
@@ -109,9 +118,9 @@ def get_star_case(project_name, case, platform, library_type):
 
 
 
-def get_WT_call_ready_samples(project_name, star_id):
+def get_WT_call_ready_samples(project_name, star_id, database):
     '''
-    (str, str) -> dict
+    (str, str, str) -> dict
     
     Returns a dictionary with normal and tumour samples from project_name processed through bamMergePreprcessing
     workflow with bmpp_run_id 
@@ -120,9 +129,10 @@ def get_WT_call_ready_samples(project_name, star_id):
     ----------
     - project_name (str): Name of the project of interest
     - star_id (str): star_call_ready workflow run identifiers
+    - database (str): Path to the sqlite database
     '''
     
-    conn = connect_to_db()
+    conn = connect_to_db(database)
     data = conn.execute("SELECT Libraries.sample, Libraries.group_id, Libraries.library, Libraries.tissue_type, \
                         Libraries.tissue_origin, Libraries.library_type \
                         FROM Libraries JOIN Workflow_Inputs WHERE Workflow_Inputs.library = Libraries.library \
@@ -165,9 +175,9 @@ def get_WT_case_call_ready_samples(project_name, star_samples):
  
 
 
-def map_samples_to_star_runs(project_name, star_ids):
+def map_samples_to_star_runs(project_name, star_ids, database):
     '''
-    (str, list) -> dict
+    (str, list, str) -> dict
     
     Returns a dictionary with normal, tumor samples for each bmpp run id
       
@@ -175,43 +185,21 @@ def map_samples_to_star_runs(project_name, star_ids):
     ----------
     - project_name (str): Name of the project of interest
     - star_ids (list): List of star_call_ready workflow run identifiers for a single case
+    - database (str): Path to the sqlite database
     '''
 
     D = {}
     for i in star_ids:
         # initiate dictionary
-        samples = get_WT_call_ready_samples(project_name, i)
+        samples = get_WT_call_ready_samples(project_name, i, database)
         D[i] = samples
     return D
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-def map_workflows_to_samples(project_name, platform, samples):
+def map_workflows_to_samples(project_name, platform, samples, database):
     '''
-    (str, str, dict) -> dict
+    (str, str, dict, str) -> dict
     
     Returns a dictionary with workflows processed by the WT pipeline for tumor samples
     
@@ -220,11 +208,12 @@ def map_workflows_to_samples(project_name, platform, samples):
     - project_name (str): Name of project of interest
     - platform (str): Sequencing platform. Values are: novaseq, miseq, hiseq and nextseq
     - samples (dict): Dictionary with tumor samples
+    - database (str): Path to the sqlite database
     '''
     
     D = {}
     for i in samples['tumour']:
-        L =  map_analysis_workflows_to_sample(project_name, i, platform)
+        L =  map_analysis_workflows_to_sample(project_name, i, platform, database)
         if L:
             D[i] = L 
     
@@ -302,3 +291,505 @@ def name_WT_blocks(ordered_blocks):
             names[block][i] = k
             counter += 1
     return names
+
+
+def find_case_WT_blocks(project_name, case, database, expected_workflows):
+    '''
+    (str, str, str, list) -> dict
+    
+    Returns a dictionary with the WT blocks for case in project
+    
+    Parameters
+    ----------
+    - project_name (str): Name of project of interest
+    - case (str): Case in project
+    - database (str): Path to the sqlite database
+    - expected_workflows (list): List of expected workflow names to define a complete block
+    '''
+       
+    WT_blocks = {}
+            
+    # build the somatic calling block
+    # identify all call ready star runs for novaseq
+    star = get_star_case(project_name, case, 'novaseq', 'WT', database)
+    # proceed only in star ids exist
+    if star:
+        # get the tumor samples for each star id
+        star_samples = map_samples_to_star_runs(project_name, star, database)
+        # identify all the samples processed
+        samples = get_WT_case_call_ready_samples(project_name, star_samples)
+        if samples['tumour']:
+            # remove samples without analysis workflows
+            D = map_workflows_to_samples(project_name, 'novaseq', samples, database)
+            # find the parents of each workflow
+            parents = get_parent_workflows(project_name, database)
+            # get the parent workflows for each block
+            parent_workflows = map_workflows_to_parent(D, parents)
+            # find the blocks by mapping the analysis workflows to their parent workflows    
+            blocks = find_WT_analysis_blocks(D, parents, parent_workflows, star)
+            # list all workflows for each block
+            block_workflows = list_block_workflows(blocks)
+            # get the workflow creation date for all the workflows in project
+            creation_dates = get_workflows_analysis_date(project_name, database)
+            # assign date to each block. most recent file creation date from all workflows within block 
+            block_date = get_block_analysis_date(block_workflows, creation_dates)
+            # map each workflow run id to its workflow name
+            workflow_names = get_workflow_names(project_name, database)
+            # get the workflow names
+            block_workflow_names = get_node_labels(block_workflows, workflow_names)
+            # convert workflow relationships to adjacency matrix for each block
+            matrix = make_adjacency_matrix(block_workflows, parent_workflows)
+            # create figures
+            figures = plot_workflow_network(matrix, block_workflow_names)
+            # get the samples for each star id
+            samples_star = sort_call_ready_samples(project_name, blocks, star_samples, workflow_names)
+            # get release status of input sequences for each block
+            # get the input limskeys for each workflow in project
+            limskeys = get_workflow_limskeys(project_name, database)
+            # get the file swid and release status for each limskey for fastq-generating workflows
+            # excluding fastq-import workflows
+            status = get_file_release_status(project_name, database)
+            release_status = get_block_release_status(block_workflows, limskeys, status)
+            # check if blocks are complete
+            complete = is_block_complete(block_workflows, expected_workflows, workflow_names)
+            # check if blocks have extra workflows
+            clean = is_block_clean(block_workflows, expected_workflows)
+            # get the amount of data for each block
+            amount_data = get_amount_data(project_name, database)
+            # order blocks based on scores
+            ordered_blocks = order_blocks(blocks, amount_data, release_status, complete, clean)
+            # name each block according to the selected block order
+            names = name_WT_blocks(ordered_blocks)
+                        
+            for samples in blocks:
+                WT_blocks[samples] = {}
+                for block in blocks[samples]:
+                    WT_blocks[samples][block] = {}
+                    # record network image
+                    WT_blocks[samples][block]['network'] = figures[samples][block]
+                    # record all workflow ids
+                    WT_blocks[samples][block]['workflows'] = block_workflows[samples][block]
+                    # record release status
+                    WT_blocks[samples][block]['release'] = release_status[samples][block]
+                    # record block date
+                    WT_blocks[samples][block]['date'] = block_date[samples][block]
+                    # record complete status
+                    WT_blocks[samples][block]['complete'] = complete[samples][block]
+                    # record extra workflow status
+                    WT_blocks[samples][block]['clean'] = clean[samples][block]
+                    # record block name
+                    WT_blocks[samples][block]['name'] = names[samples][block]
+                    # add project and case ids
+                    WT_blocks[samples][block]['project_id'] = project_name
+                    WT_blocks[samples][block]['case_id'] = case
+        
+        return WT_blocks
+
+
+
+def find_WT_blocks(project_name, database, expected_workflows):
+    '''
+    (str, str, list) -> list
+    
+    Returns a list of WGS blocks for donors in project in which WGS blocks exist
+    
+    Parameters
+    ----------
+    - project_name (str): Name of project of interest
+    - database (str): Path to the sqlite database
+    - expected_workflows (list): List of expected workflow names to define a complete block
+    '''
+    
+    # make a list of donors:
+    donors = get_donors(project_name, database)
+    L = []
+    for case in donors:
+        blocks = find_case_WT_blocks(project_name, case, database, expected_workflows)
+        if blocks:
+            L.append(blocks)
+       
+    return L
+
+
+def get_WT_standard_deliverables():
+    '''
+    (None) -> dict
+    
+    Returns a dictionary with the file extensions or file endings for each workflow
+    for which output files are released as part of the standard WT package
+    
+    Parameters
+    ----------
+     None
+    '''
+    
+    deliverables = {'star': ['.bai', '.bam'],
+                    'mavis': ['.zip', '.tab'],
+                    'rsem': ['.genes.results', '.isoforms.results', '.transcript.bam'],
+                    'starfusion': ['.tsv'],
+                    'arriba': ['.tsv']}
+       
+    return deliverables
+
+
+
+# def create_WT_project_block_json(project_name, database, blocks, block_status, selected_workflows, workflow_names, deliverables=None):
+#     '''
+#     (str, str, dict, dict, dict, dict, None | dict)
+    
+#     Returns a dictionary with workflow information for a given block (ie, sample pair)
+#     and anchor star parent workflow
+    
+#     Parameters
+#     ----------
+#     - project_name (None | str): None or name of project of interest
+#     - database (None | str): None or path to the sqlite database
+#     - blocks (dict): Dictionary with block information
+#     - block_status (dict): Dictionary with review status of each block
+#     - selected_workflows (dict): Dictionary with selected status of each workflow in project
+#     - workflow_names (dict): Dictionary with workflow name and version for each workflow in project
+#     - deliverables (None | dict): None or dictionary with file extensions of standard WGS deliverables
+#     '''
+    
+#     D = {}
+    
+#     for case in blocks:
+#         for sample in blocks[case]:
+#             # check the selection status of the block
+#             if block_status[case][sample] not in ['ready', 'review']:
+#                 # block already reviewed and workflows selected
+#                 anchor_wf = block_status[case][sample]
+                                
+#                 for workflow in blocks[case][sample][anchor_wf]['workflows']:
+#                     # get workflow name and version
+#                     workflow_name = workflow_names[workflow][0]
+#                     workflow_version = workflow_names[workflow][1]
+                    
+#                     # check workflow status
+#                     if selected_workflows[workflow]:
+#                         # initiate dictionary
+#                         if case not in D:
+#                             D[case] = {}
+                        
+#                         # get workflow output files
+#                         # needed to sort outputs by sample pairs or by sample for call-ready workflows
+#                         # even if all files are recorded
+#                         libraries = map_limskey_to_library(project_name, workflow, database, 'Workflow_Inputs')
+#                         sample_names = map_library_to_sample(project_name, case, database, 'Libraries')
+#                         outputfiles = get_workflow_output(project_name, case, workflow, database, libraries, sample_names, 'Files')
+                        
+#                         # check that only workflows in standard WGS deliverables are used
+#                         if deliverables:
+#                             # keep track of the files to be released                                            
+#                             L = []
+#                             key = workflow_name.split('_')[0].lower()
+#                             if key in deliverables:
+#                                 if sample in outputfiles:
+#                                     sample_id = sample
+#                                 else:
+#                                     sample_id = list(outputfiles.keys())
+#                                     assert len(sample_id) == 1
+#                                     sample_id = sample_id[0]
+#                                 for i in outputfiles[sample_id]:
+#                                     file = i[0]
+#                                     for file_ending in deliverables[key]:
+#                                         if file_ending in file and file[file.rindex(file_ending):] == file_ending:
+#                                             L.append(file)
+                                
+#                             if L:
+#                                 sample_id = '.'.join(sample_id.split(';'))
+#                                 if sample_id not in D[case]:
+#                                     D[case][sample_id] = {}
+#                                 if workflow_name not in D[case][sample_id]:
+#                                     D[case][sample_id][workflow_name] = []
+#                                 D[case][sample_id][workflow_name].append({'workflow_id': workflow,
+#                                                                           'workflow_version': workflow_version,
+#                                                                           'files': L})
+                            
+#                         else:
+#                             if sample in outputfiles:
+#                                 sample_id = sample
+#                             else:
+#                                 sample_id = list(outputfiles.keys())
+#                                 assert len(sample_id) == 1
+#                                 sample_id = '.'.join(sample_id[0].split(';'))
+#                             if sample_id not in D[case]:
+#                                 D[case][sample_id] = {}
+#                             if workflow_name not in D[case][sample_id]:
+#                                 D[case][sample_id][workflow_name] = []
+#                             D[case][sample_id][workflow_name].append({'workflow_id': workflow, 'workflow_version': workflow_version})
+                                
+#     return D
+
+
+
+
+def create_WT_project_block_json(project_name, database, blocks, block_status, selected_workflows, workflow_names, deliverables=None):
+    '''
+    (str, str, dict, dict, dict, dict, None | dict)
+    
+    Returns a dictionary with workflow information for a given block (ie, sample pair)
+    and anchor star parent workflow
+    
+    Parameters
+    ----------
+    - project_name (None | str): None or name of project of interest
+    - database (None | str): None or path to the sqlite database
+    - blocks (dict): Dictionary with block information
+    - block_status (dict): Dictionary with review status of each block
+    - selected_workflows (dict): Dictionary with selected status of each workflow in project
+    - workflow_names (dict): Dictionary with workflow name and version for each workflow in project
+    - deliverables (None | dict): None or dictionary with file extensions of standard WGS deliverables
+    '''
+    
+    D = {}
+    
+    for case in blocks:
+        for sample in blocks[case]:
+            # check the selection status of the block
+            if block_status[case][sample] not in ['ready', 'review']:
+                # block already reviewed and workflows selected
+                anchor_wf = block_status[case][sample]
+                                
+                for workflow in blocks[case][sample][anchor_wf]['workflows']:
+                    # get workflow name and version
+                    workflow_name = workflow_names[workflow][0]
+                    workflow_version = workflow_names[workflow][1]
+                    
+                    # check workflow status
+                    if selected_workflows[workflow]:
+                                                
+                        # get workflow output files
+                        # needed to sort outputs by sample pairs or by sample for call-ready workflows
+                        # even if all files are recorded
+                        libraries = map_limskey_to_library(project_name, workflow, database, 'Workflow_Inputs')
+                        sample_names = map_library_to_sample(project_name, case, database, 'Libraries')
+                        outputfiles = get_workflow_output(project_name, case, workflow, database, libraries, sample_names, 'Files')
+                        
+                        # check that only workflows in standard WGS deliverables are used
+                        if deliverables:
+                            # keep track of the files to be released                                            
+                            L = []
+                            key = workflow_name.split('_')[0].lower()
+                            if key in deliverables:
+                                for j in outputfiles:
+                                    L = []
+                                    for i in outputfiles[j]:
+                                        file = i[0]
+                                        for file_ending in deliverables[key]:
+                                            if file_ending in file and file[file.rindex(file_ending):] == file_ending:
+                                                L.append(file)
+                                
+                                    if L:
+                                        sample_id = j.replace('.', ';')
+                                        if case not in D:
+                                            D[case] = {}
+                                        if sample_id not in D[case]:
+                                            D[case][sample_id] = {}
+                                        if workflow_name not in D[case][sample_id]:
+                                            D[case][sample_id][workflow_name] = []
+                                        D[case][sample_id][workflow_name].append({'workflow_id': workflow,
+                                                                                 'workflow_version': workflow_version,
+                                                                                 'files': L})
+                            
+                        else:
+                            for j in outputfiles:
+                                sample_id = j.replace(';', '.')
+                                d =  {'workflow_id': workflow, 
+                                      'workflow_version': workflow_version,
+                                      'files': [i[0] for i in outputfiles[j]]}
+                                if case not in D:
+                                    D[case] = {}
+                                if sample_id not in D[case]:
+                                    D[case][sample_id] = {}
+                                if workflow_name not in D[case][sample_id]:
+                                    D[case][sample_id][workflow_name] = []
+                                D[case][sample_id][workflow_name].append(d)
+                                
+    return D
+
+
+
+# def create_WT_block_json(database, project_name, case, blocks, sample, anchor_workflow, workflow_names, selected_workflows, selection):
+#     '''
+#     (str, str, dict, str, str, dict, dict, str)
+    
+#     Returns a dictionary with workflow information for a given block (ie, sample pair)
+#     and anchor parent workflow (bmpp or star)
+    
+#     Parameters
+#     ----------
+#     - database (str): Path to the sqlite database
+#     - project_name (str): Name of project of interest
+#     - case (str): Donor identifier 
+#     - blocks (dict): Dictionary with block information
+#     - sample (str): Tumor sample
+#     - anchor_workflow (str): bamMergePreprocessing parent workflow(s) or star_call_ready parent workflow
+#     - workflow_names (dict): Dictionary with workflow name and version for each workflow in project
+#     - selected_workflows (dict): Dictionary with selected status of each workflow in project
+#     - selection (str): Include files from all selected workflows or files from the standard deliverables
+#                        Values: standard or all
+#     '''
+    
+#     # get the deliverables
+#     if selection == 'standard':
+#         deliverables = get_WT_standard_deliverables()
+#     elif selection == 'all':
+#         deliverables = {}
+    
+#     # organize the workflows by block and samples
+#     D = {}
+#     # get the workflow ids for that block
+#     for i in blocks[sample]:
+#         if i['anchor_wf'] == anchor_workflow:
+#             D[sample] = map(lambda x: x.strip(), i['workflows'].split(';'))
+    
+#     block_data = {}
+#     for sample in D:
+#         for workflow_id in D[sample]:
+#             # check if workflow is selected
+#             if selected_workflows[workflow_id]:
+#                 # get workflow name and version
+#                 workflow_name = workflow_names[workflow_id][0]
+#                 workflow_version = workflow_names[workflow_id][1]
+                
+#                 # get workflow output files
+#                 # needed to sort outputs by sample pairs or by sample for call-ready workflows
+#                 # even if all files are recorded
+#                 libraries = map_limskey_to_library(project_name, workflow_id, database, 'Workflow_Inputs')
+#                 sample_names = map_library_to_sample(project_name, case, database, 'Libraries')
+#                 outputfiles = get_workflow_output(project_name, case, workflow_id, database, libraries, sample_names, 'Files')
+                
+#                 if case not in block_data:
+#                     block_data[case] = {}
+                
+#                 # check that only workflows in standard WGS deliverables are used
+#                 if deliverables:
+#                     # keep track of the files to be released                                            
+#                     L = []
+#                     key = workflow_name.split('_')[0].lower()
+#                     if key in deliverables:
+#                         if sample in outputfiles:
+#                             sample_id = sample
+#                         else:
+#                             sample_id = list(outputfiles.keys())
+#                             assert len(sample_id) == 1
+#                             sample_id = sample_id[0]
+#                         for i in outputfiles[sample_id]:
+#                             file = i[0]
+#                             for file_ending in deliverables[key]:
+#                                 if file_ending in file and file[file.rindex(file_ending):] == file_ending:
+#                                     L.append(file)
+                        
+#                         if L:
+#                             sample_id = '.'.join(sample_id.split(';'))
+#                             if sample_id not in block_data[case]:
+#                                 block_data[case][sample_id] = {}
+#                             if workflow_name not in block_data[case][sample_id]:
+#                                 block_data[case][sample_id][workflow_name] = []
+#                             block_data[case][sample_id][workflow_name].append({'workflow_id': workflow_id,
+#                                                                       'workflow_version': workflow_version,
+#                                                                       'files': L})
+#                 else:
+#                     if sample in outputfiles:
+#                         sample_id = sample
+#                     else:
+#                         sample_id = list(outputfiles.keys())
+#                         assert len(sample_id) == 1
+#                         sample_id = '.'.join(sample_id[0].split(';'))
+#                     if sample_id not in block_data[case]:
+#                         block_data[case][sample_id] = {}
+#                     if workflow_name not in block_data[case][sample_id]:
+#                         block_data[case][sample_id][workflow_name] = []
+#                     block_data[case][sample_id][workflow_name].append({'workflow_id': workflow_id, 'workflow_version': workflow_version})
+    
+#     return block_data                
+
+
+def create_WT_block_json(database, project_name, case, blocks, sample, anchor_workflow, workflow_names, selected_workflows, selection):
+    '''
+    (str, str, dict, str, str, dict, dict, str)
+    
+    Returns a dictionary with workflow information for a given block (ie, sample pair)
+    and anchor parent workflow (bmpp or star)
+    
+    Parameters
+    ----------
+    - database (str): Path to the sqlite database
+    - project_name (str): Name of project of interest
+    - case (str): Donor identifier 
+    - blocks (dict): Dictionary with block information
+    - sample (str): Tumor sample
+    - anchor_workflow (str): bamMergePreprocessing parent workflow(s) or star_call_ready parent workflow
+    - workflow_names (dict): Dictionary with workflow name and version for each workflow in project
+    - selected_workflows (dict): Dictionary with selected status of each workflow in project
+    - selection (str): Include files from all selected workflows or files from the standard deliverables
+                       Values: standard or all
+    '''
+    
+    # get the deliverables
+    if selection == 'standard':
+        deliverables = get_WT_standard_deliverables()
+    elif selection == 'all':
+        deliverables = {}
+    
+    # organize the workflows by block and samples
+    D = {}
+    # get the workflow ids for that block
+    for i in blocks[sample]:
+        if i['anchor_wf'] == anchor_workflow:
+            D[sample] = map(lambda x: x.strip(), i['workflows'].split(';'))
+    
+    block_data = {}
+    for sample in D:
+        for workflow_id in D[sample]:
+            # check if workflow is selected
+            if selected_workflows[workflow_id]:
+                # get workflow name and version
+                workflow_name = workflow_names[workflow_id][0]
+                workflow_version = workflow_names[workflow_id][1]
+                
+                # get workflow output files
+                # needed to sort outputs by sample pairs or by sample for call-ready workflows
+                # even if all files are recorded
+                libraries = map_limskey_to_library(project_name, workflow_id, database, 'Workflow_Inputs')
+                sample_names = map_library_to_sample(project_name, case, database, 'Libraries')
+                outputfiles = get_workflow_output(project_name, case, workflow_id, database, libraries, sample_names, 'Files')
+                
+                # check that only workflows in standard WGS deliverables are used
+                if deliverables:
+                    key = workflow_name.split('_')[0].lower()
+                    if key in deliverables:
+                        for j in outputfiles:
+                            L = []
+                            for i in outputfiles[j]:
+                                file = i[0]
+                                for file_ending in deliverables[key]:
+                                    if file_ending in file and file[file.rindex(file_ending):] == file_ending:
+                                        L.append(file)
+                            if L:
+                                sample_id = '.'.join(j.split(';'))
+                                if case not in block_data:
+                                    block_data[case] = {}
+                                if sample_id not in block_data[case]:
+                                    block_data[case][sample_id] = {}
+                                if workflow_name not in block_data[case][sample_id]:
+                                    block_data[case][sample_id][workflow_name] = []
+                                block_data[case][sample_id][workflow_name].append({'workflow_id': workflow_id,
+                                                                      'workflow_version': workflow_version,
+                                                                      'files': L})
+                else:
+                    for j in outputfiles:
+                        sample_id = '.'.join(j.split(';'))
+                        d =  {'workflow_id': workflow_id, 
+                              'workflow_version': workflow_version,
+                              'files': [i[0] for i in outputfiles[j]]}
+                        if case not in block_data:
+                            block_data[case] = {}
+                        if sample_id not in block_data[case]:
+                            block_data[case][sample_id] = {}
+                        if workflow_name not in block_data[case][sample_id]:
+                            block_data[case][sample_id][workflow_name] = []
+                        block_data[case][sample_id][workflow_name].append(d)
+                    
+    return block_data                

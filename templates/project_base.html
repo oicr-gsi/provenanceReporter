@@ -3,16 +3,17 @@
 <head>
   <meta charset="utf-8">
   <link rel="stylesheet" href="{{ url_for('static', filename= 'css/style.css') }}">
+  <link rel="shortcut icon" href="#">  
   <title>{% block title %} {% endblock %}</title>
 </head>
+
 <body>
-    
   <div class="topnav">
     <a class="active" href="{{ url_for('index')}}">Home</a>
     {% block link %} {% endblock %}
   </div>
 
   {% block content %} {% endblock %}
-  
+
 </body>
 </html>

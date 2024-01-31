@@ -11,19 +11,21 @@ import os
 from utilities import connect_to_db
 
 
-def collect_sequence_info(project_name):
+
+def collect_sequence_info(project_name, database):
     '''
-    (str) -> list
+    (str, str) -> list
     
     Returns a list with sequence file information for a project of interest
     
     Parameters
     ----------
     - project_name (str): Project of interest
+    - database (str): Path to the sqlite database
     '''
     
     # get sequences    
-    conn = connect_to_db()
+    conn = connect_to_db(database)
     files = conn.execute("SELECT Files.file, Files.workflow, Files.version, Files.wfrun_id, Files.attributes, \
                          FilesQC.status, FilesQC.ticket, Workflow_Inputs.run, Workflow_Inputs.lane, Workflow_Inputs.platform, \
                          Libraries.library, Libraries.sample, Libraries.ext_id, Libraries.group_id, Libraries.group_id_description, \
@@ -95,3 +97,39 @@ def get_sequences(L):
     F.sort(key = lambda x: x['case'])
      
     return F
+
+
+def platform_name(project_name, database):
+    '''
+    (str, str) -> list
+    
+    Returns a dictionary with sequencing platform, shortname for all platforms 
+    for the project of interest
+    
+    Parameters
+    ----------
+    - project_name (str): Project of interest
+    - database (str): Path to the sqlite database
+    '''
+    
+    # get sequences    
+    conn = connect_to_db(database)
+    data = conn.execute("SELECT DISTINCT Workflow_Inputs.platform FROM Workflow_Inputs WHERE \
+                         Workflow_Inputs.project_id = '{0}';".format(project_name)).fetchall()
+    conn.close()
+
+    D = {}
+    
+    for i in data:
+        s = ''
+        for j in i['platform']:
+            if not j.isnumeric():
+                s += j
+        s = s.split('_')
+        while '' in s:
+            s.remove('')
+        D[i['platform']] = s[-1].lower()
+    
+    return D
+
+
