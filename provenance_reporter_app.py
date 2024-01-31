@@ -33,7 +33,8 @@ from whole_genome import get_call_ready_cases, get_amount_data, create_WG_block_
     review_wgs_blocks, get_case_workflows, update_wf_selection, get_block_counts, \
     get_wgs_blocks, create_WGS_project_block_json, get_workflow_output, get_release_status, \
     get_workflow_limskeys, get_file_release_status, map_fileswid_to_filename, \
-    map_limskey_to_library, map_library_to_sample, get_WGS_standard_deliverables    
+    map_limskey_to_library, map_library_to_sample, get_WGS_standard_deliverables, \
+    get_block_level_contamination    
     
 from whole_transcriptome import get_WT_call_ready_cases, get_WT_standard_deliverables, \
     create_WT_project_block_json, create_WT_block_json
@@ -321,7 +322,9 @@ def wgs_case(project_name, case, sample_pair):
     parents = get_parent_workflows(project_name, database)
     # extract selected status of each workflow
     selected = get_selected_workflows(project_name, workflow_db, 'Workflows')
-    
+    # get the contamination for each anchor workflow 
+    contamination = get_block_level_contamination(project_name, database, blocks, sample_pair)
+        
     if request.method == 'POST':
         # get the list of checked workflows        
         selected_workflows = request.form.getlist('workflow')
@@ -350,7 +353,8 @@ def wgs_case(project_name, case, sample_pair):
                            platforms=platforms,
                            parents=parents,
                            selected = selected,
-                           sample_pair=sample_pair
+                           sample_pair=sample_pair,
+                           contamination=contamination
                            )
 
 
