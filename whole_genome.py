@@ -1577,7 +1577,6 @@ def get_case_workflows(case, database, table = 'WGS_blocks'):
     - table (str): Name of the table storing analysis blocks
     '''
         
-    # update selected status
     conn = connect_to_db(database)    
     cur = conn.cursor()
     cur.execute("SELECT samples, anchor_wf, workflows FROM {0} WHERE case_id = '{1}'".format(table, case))
@@ -1620,22 +1619,10 @@ def update_wf_selection(workflows, selected_workflows, selection_status, databas
     conn = connect_to_db(database)
     cur = conn.cursor()
     for i in workflows:
-        
-        print('xxxx')
-        print(i)
-        print(i in selected_workflows)
-        
         if i in selected_workflows:
             status = 1
         else:
             status = 0
-        
-        print('new status', status)
-        print('current status', selection_status[i])
-        
-        
-        print('xxxx')
-        
         
         # update only if status has changed
         if selection_status[i] != status:
