@@ -1914,5 +1914,113 @@ def get_WGS_standard_deliverables():
 
     
     
+def get_contamination(sample_id, database, table = 'Calculate_Contamination'):
+    '''
+    (str, str, str) -> dict
+    
+    Returns a dictionary with call-ready contamination and merged limskey for sample_id     
+    
+    Parameters
+    ----------
+    - sample_id (str): Sample identifier
+    - database (str): Path to the sqlite database
+    - table (str): Table in database storing the call-ready contamination. Default is Calculate_Contamination
+    '''    
+   
+    conn = connect_to_db(database)
+    data = conn.execute("SELECT DISTINCT contamination, merged_limskey FROM {0} WHERE sample_id = '{1}'".format(table, sample_id)).fetchall()
+    conn.close()
+
+    D = {}
+    for i in data:
+        if i['merged_limskey'] in D:
+            D[i['merged_limskey']].append(i['contamination'])
+        else:
+            D[i['merged_limskey']] = [i['contamination']]
+    for i in D:
+        D[i] = max(D[i])    
+    
+    return D
+
+
+
+def group_limskeys(block_limskeys):
+    '''
+    (list) -> list
+    
+    Sort the limskeys of an analysis block by sample
+    
+    Parameters
+    ----------
+    - block_limskeys (list): List of limskeys for a given block
+        
+    Examples
+    --------
+    >>> group_limskeys(['4991_1_LDI51430', '5073_4_LDI57812', '5073_3_LDI57812', '5073_2_LDI57812'])
+    ['4991_1_LDI51430', '5073_4_LDI57812;5073_3_LDI57812;5073_2_LDI57812']
+    '''
+    
+    D = {}
+    for i in block_limskeys:
+        j = i.split('_')[-1]
+        if j in D:
+            D[j].append(i)
+        else:
+            D[j] = [i]
+        D[j].sort()
+    
+    L = [';'.join(D[j]) for j in D]
+
+    return L
+
+
+def get_block_level_contamination(project_name, database, blocks, sample_pair):
+    '''
+    (str, str,, dict, str) -> dict
+    
+    Returns a dictionary with contamination for each anchor workflow in the 
+    analysis block for the given sample pair.
+    The contamination is the maximum contamination among samples and among 
+    bmpp workflows for each anhor workflow (sub-block)
+    
+    Parameters
+    ----------
+    - project_name (str): 
+    - database (str): Path to the sqlite database
+    - blocks (dict): Dictionary with analysis block information
+    - sample_pair (str): Normal/tumor sample pair
+    '''
+       
+    # get the block limskeys
+    limskeys = get_workflow_limskeys(project_name, database, 'Workflow_Inputs')
+    
+    # list the bmpp anchor workflow ids
+    bmpp_workflows = [blocks[sample_pair][i]['anchor_wf'] for i in range(len(blocks[sample_pair]))]
+    bmpp_workflows = list(set(bmpp_workflows))
+    
+    # get contamination for each sample in sample pair
+    contamination = {}
+    for sample in sample_pair.split('|'):
+        sample = sample.strip()
+        contamination.update(get_contamination(sample, database, 'Calculate_Contamination'))
+    
+    # map each contamination to the workflow anchor id
+    D = {}    
+    for workflow in bmpp_workflows:
+        block_conta = []
+        for workflow_id in workflow.split('.'):
+            # get the limskeys for that workflow
+            workflow_limskeys = limskeys[workflow_id]
+            # group the limskeys by sample
+            workflow_limskeys = group_limskeys(workflow_limskeys)
+            # use the maximum contamination of each sample 
+            conta = max([contamination[i] for i in workflow_limskeys if i in contamination]) * 100
+            conta = round(conta, 3)
+            block_conta.append(conta)
+        # use the maximum contamination of each bmpp workflow
+        D[workflow] = max(block_conta)
+    
+    return D       
+    
     
     

@@ -701,7 +701,10 @@ def define_column_names():
                     'Workflow_Inputs': ['library', 'run', 'lane', 'wfrun_id', 'limskey', 'barcode', 'platform', 'project_id'],
                     'Samples': ['case_id', 'donor_id', 'species', 'sex', 'miso', 'created_date', 'modified_date', 'project_id', 'parent_project'],
                     'WGS_blocks': ['project_id', 'case_id', 'samples', 'anchor_wf', 'workflows', 'name', 'date', 'release_status', 'complete', 'clean', 'network'],
-                    'WT_blocks': ['project_id', 'case_id', 'samples', 'anchor_wf', 'workflows', 'name', 'date', 'release_status', 'complete', 'clean', 'network']}
+                    'WT_blocks': ['project_id', 'case_id', 'samples', 'anchor_wf', 'workflows', 'name', 'date', 'release_status', 'complete', 'clean', 'network'],
+                    #'Calculate_Contamination': ['sample_id', 'project_id', 'group_id', 'case_id', 'library_type', 'tissue_origin', 'tissue_type', 'contamination', 'merged_limskey']
+                    'Calculate_Contamination': ['sample_id', 'group_id', 'case_id', 'library_type', 'tissue_origin', 'tissue_type', 'contamination', 'merged_limskey']
+                    }
         
     return column_names
 
@@ -732,7 +735,10 @@ def define_column_types():
                                         'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)'],
                     'Samples': ['VARCHAR(128) PRIMARY KEY NOT NULL', 'VARCHAR(256)', 'VARCHAR(256)', 'VARCHAR(128)', 'VARCHAR(572)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)'],
                     'WGS_blocks': ['VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(572)', 'VARCHAR(572)', 'TEXT', 'VARCHAR(256)', 'VARCHAR(128)', 'INT', 'INT', 'INT', 'TEXT'],
-                    'WT_blocks': ['VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(572)', 'VARCHAR(572)', 'TEXT', 'VARCHAR(256)', 'VARCHAR(128)', 'INT', 'INT', 'INT', 'TEXT']}
+                    'WT_blocks': ['VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(572)', 'VARCHAR(572)', 'TEXT', 'VARCHAR(256)', 'VARCHAR(128)', 'INT', 'INT', 'INT', 'TEXT'],
+                    #'Calculate_Contamination': ['VARCHAR(128) PRIMARY KEY NOT NULL UNIQUE', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(572)']
+                    'Calculate_Contamination': ['VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'FLOAT', 'VARCHAR(572)']
+                    }
                     
     
     return column_types
@@ -759,6 +765,7 @@ def create_table(database, table):
     table_format = ', '.join(list(map(lambda x: ' '.join(x), list(zip(column_names, column_types)))))
 
 
+    #if table  in ['Workflows', 'Parents', 'Files', 'FilesQC', 'Libraries', 'Workflow_Inputs', 'Samples', 'WGS_blocks', 'WT_blocks', 'Calculate_Contamination']:
     if table  in ['Workflows', 'Parents', 'Files', 'FilesQC', 'Libraries', 'Workflow_Inputs', 'Samples', 'WGS_blocks', 'WT_blocks']:
         constraints = '''FOREIGN KEY (project_id)
             REFERENCES Projects (project_id)
@@ -843,7 +850,7 @@ def initiate_db(database):
     tables = [i[0] for i in tables]    
     conn.close()
     for i in ['Projects', 'Workflows', 'Parents', 'Files', 'FilesQC', 'Libraries',
-              'Workflow_Inputs', 'Samples', 'WGS_blocks', 'WT_blocks']:
+              'Workflow_Inputs', 'Samples', 'WGS_blocks', 'WT_blocks', 'Calculate_Contamination']:
         if i not in tables:
             create_table(database, i)
 
@@ -987,6 +994,101 @@ def add_workflow_relationships(parent_workflows, database, project, table = 'Par
                             
     conn.close()
 
+
+
+def parse_calculate_contamination_db(calcontaqc_db):
+    '''
+    (str) -> dict
+    
+    Returns a dictionary with information collected from the calculate contamination
+    QC-etl sqlite cache
+    
+    Parameters
+    ----------
+    - calcontaqc_db (str): Path to the calculate contamination database
+    '''
+
+    # get tables in db
+    conn = sqlite3.connect(calcontaqc_db)
+    cur = conn.cursor()
+    cur.execute("SELECT name FROM sqlite_master WHERE type='table';")
+    tables = cur.fetchall()
+    tables = [i[0] for i in tables]    
+    conn.close()
+    # connect to db and retrieve all data
+    conn = connect_to_db(calcontaqc_db)
+    data = conn.execute('SELECT * FROM {0}'.format(tables[0])).fetchall()  
+    conn.close()
+
+    D = {}
+    
+    for i in data:
+        case_id = i['Donor']
+        group_id = i['Group ID']
+        library_type = i['Library Design']
+        tissue_origin = i['Tissue Origin']
+        tissue_type = i['Tissue Type']
+        contamination = i['contamination']
+        merged_limskey = i['Merged Pinery Lims ID']
+        merged_limskey = list(map(lambda x: x.strip(), merged_limskey.replace('[', '').replace(']', '').replace('\"', '').split(',')))
+        merged_limskey = ';'.join(sorted(merged_limskey))
+        sample_id = '_'.join([i['Donor'], i['Tissue Type'], i['Tissue Origin'],
+                              i['Library Design'], i['Group ID']])
+        
+        if case_id not in D:
+            D[case_id] = {}
+        if sample_id not in D[case_id]:
+            D[case_id][sample_id] = []
+        d = {'case_id': case_id,
+             'group_id': group_id,
+             'library_type': library_type, 
+             'tissue_origin': tissue_origin,
+             'tissue_type': tissue_type,
+             'contamination': contamination,
+             'merged_limskey': merged_limskey,
+             'sample_id': sample_id
+             }
+        D[case_id][sample_id].append(d)
+           
+    return D                         
+                         
+                         
+
+
+def add_contamination_info(database, calcontaqc_db, table = 'Calculate_Contamination'):
+    '''
+    (str, str, str) -> None
+    
+    Parse the calcontaqc_db, reformat data and add information to the Calculate_Contamination
+    table of the database
+    
+    Parameters
+    ----------
+    - database (str): Path to the sqlite database
+    - calcontaqc_db (db): Path to the calculate contamination database
+    - table (str): name of the table in the database. Default is Calculate_Contamination 
+    '''
+
+    # collect ata from the calculate contamination cache
+    D = parse_calculate_contamination_db(calcontaqc_db)
+        
+    if D:
+        # connect to db
+        conn = sqlite3.connect(database)
+        cur = conn.cursor()
+        
+        # get column names
+        column_names = define_column_names()[table]
+
+        # add data
+        for case_id in D:
+            for sample_id in D[case_id]:
+                for i in D[case_id][sample_id]:
+                    L = [i[j] for j in  column_names]
+                    cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
+                    conn.commit()
+        
+        conn.close()
 
 
 
@@ -1503,8 +1605,9 @@ def add_info(args):
     add_blocks_to_db(args.database, args.project, expected_WT_workflows, 'WT_blocks', 'WT')
     print('added WT blocks')  
         
-      
-
+    # add calculate contamination info
+    add_contamination_info(args.database, args.calcontaqc_db, table = 'Calculate_Contamination')
+    print('added call-ready contamination')
 
 def launch_jobs(args):
     '''
@@ -1750,7 +1853,7 @@ def get_job_exit_status(job):
     return exit_status
 
 
-    
+   
 def migrate(args):
     '''
     (list) -> None
@@ -1804,7 +1907,8 @@ if __name__ == '__main__':
     parent_parser.add_argument('-f', '--fpr', dest='fpr', default = '/scratch2/groups/gsi/production/vidarr/vidarr_files_report_latest.tsv.gz', help='Path to the File Provenance Report. Default is /scratch2/groups/gsi/production/vidarr/vidarr_files_report_latest.tsv.gz')
     parent_parser.add_argument('-n', '--nabu', dest='nabu', default='https://nabu-prod.gsi.oicr.on.ca', help='URL of the Nabu API. Default is https://nabu-prod.gsi.oicr.on.ca')
     parent_parser.add_argument('-p', '--pinery', dest = 'pinery', default = 'http://pinery.gsi.oicr.on.ca', help = 'Pinery API. Default is http://pinery.gsi.oicr.on.ca')
-        
+    parent_parser.add_argument('-cq', '--calcontaqc', dest = 'calcontaqc_db', default = '/scratch2/groups/gsi/production/qcetl_v1/calculatecontamination/latest', help = 'Path to the merged rnaseq calculateContamination database. Default is /scratch2/groups/gsi/production/qcetl_v1/calculatecontamination/latest')
+                               
     main_parser = argparse.ArgumentParser(prog = 'prov_reporter_db_filler.py', description = 'Add data to the Provenance Reporter database')
     subparsers = main_parser.add_subparsers(title='sub-commands', description='valid sub-commands', dest= 'subparser_name', help = 'sub-commands help')
     
