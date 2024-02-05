@@ -509,8 +509,6 @@ def wt_case(project_name, case, tumor_sample):
     database = 'merged.db'
     workflow_db = 'workflows.db'
         
-    expected_workflows = sorted(['arriba', 'rsem', 'star', 'starfusion', 'mavis'])  
-    
     # get the project info for project_name from db
     project = get_project_info(project_name, database)
     # get the pipelines from the library definitions in db
@@ -571,8 +569,6 @@ def shallow_whole_genome(project_name):
     
     database = 'merged.db'
     workflow_db = 'workflows.db'
-    
-    #expected_workflows = sorted(['arriba', 'rsem', 'star', 'starfusion', 'mavis'])  
     
     # get the project info for project_name from db
     project = get_project_info(project_name, database)

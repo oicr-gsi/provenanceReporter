@@ -1601,7 +1601,7 @@ def add_info(args):
     print('added wgs blocks')  
     
     # add WT blocks
-    expected_WT_workflows = sorted(['arriba', 'rsem', 'star', 'starfusion', 'mavis'])
+    expected_WT_workflows = sorted(['arriba', 'rsem', 'starfusion', 'mavis'])
     add_blocks_to_db(args.database, args.project, expected_WT_workflows, 'WT_blocks', 'WT')
     print('added WT blocks')  
         
