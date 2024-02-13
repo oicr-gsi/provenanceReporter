@@ -9,21 +9,10 @@ Created on Tue May  3 14:32:40 2022
 import json
 from flask import Flask, render_template, request, url_for, flash, redirect, Response, send_file
 #from werkzeug.exceptions import abort
-#import requests
-#import gzip
-#import os
 import time
 import pandas as pd
-#import itertools
-
 import matplotlib
 matplotlib.use('agg')
-#import matplotlib.pyplot as plt
-#import networkx as nx
-#import numpy as np
-#import io
-#import base64
-
 from utilities import connect_to_db, get_miso_sample_link,\
     get_pipelines, get_workflow_names, get_library_design, secret_key_generator, \
     get_children_workflows
@@ -35,7 +24,6 @@ from whole_genome import get_call_ready_cases, get_amount_data, create_WG_block_
     get_workflow_limskeys, get_file_release_status, map_fileswid_to_filename, \
     map_limskey_to_library, map_library_to_sample, get_WGS_standard_deliverables, \
     get_block_level_contamination    
-    
 from whole_transcriptome import get_WT_call_ready_cases, get_WT_standard_deliverables, \
     create_WT_project_block_json, create_WT_block_json
 from project import get_project_info, get_cases, get_sample_counts, count_libraries, \
