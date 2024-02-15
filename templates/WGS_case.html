@@ -50,7 +50,7 @@
                 {% else %}
                   <td><div class="tooltip">Release Status:<span class="tooltiptext">Input raw sequences released?</span></div> <span style="font-size:32px;color:#ff3300;">&#10006;</span></td>
                 {% endif %}
-                {% if contamination[block['anchor_wf']] > 0.04%}
+                {% if contamination[block['anchor_wf']] < 4 %}
                   <td> Contamination: {{contamination[block['anchor_wf']]}}% <span style="font-size:32px;color:#70db70">&#10004;</span></td>
                 {% else %}:
                   <td> Contamination: {{contamination[block['anchor_wf']]}}% <span style="font-size:32px;color:#ff3300">&#10004;</span></td>
