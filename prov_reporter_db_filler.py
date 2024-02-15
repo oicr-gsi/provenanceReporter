@@ -1681,11 +1681,11 @@ def launch_jobs(args):
         # store job names
         job_names.append(jobName)
     
-    # launch job to copy database to server
-    cmd4 = '/u/rjovelin/SOFT/anaconda3/bin/python3.6 {0} migrate -md {1} -jn "{2}" -wd {3} -pf {4} -s {5}'
-    bashScript = os.path.join(qsubdir, 'migrate_db.sh')
+    # launch job to merge the project databases
+    cmd4 = '/u/rjovelin/SOFT/anaconda3/bin/python3.6 {0} merge -md {1} -jn "{2}" -wd {3}'
+    bashScript = os.path.join(qsubdir, 'merge_db.sh')
     with open(bashScript, 'w') as newfile:
-        newfile.write(cmd4.format(dbfiller, args.merged_database, ','.join(job_names), args.workingdir, args.pemfile, args.server))
+        newfile.write(cmd4.format(dbfiller, args.merged_database, ','.join(job_names), args.workingdir))
     qsubCmd = "qsub -b y -P gsi -l h_vmem={0}g,h_rt={1}:0:0 -N {2}  -hold_jid \"{3}\" -e {4} -o {4} \"bash {5}\"".format(args.mem, args.run_time, 'provdb.migration', ','.join(job_names), logdir, bashScript)
     subprocess.call(qsubCmd, shell=True)
 
@@ -1854,50 +1854,90 @@ def get_job_exit_status(job):
 
 
    
-def migrate(args):
+# def migrate(args):
+#     '''
+#     (list) -> None
+    
+#     Launch job to copy the database to the server
+    
+#     Parameters
+#     ----------
+#     - database (str): Path to the database file
+#     - mem (str): Memory allocated to jobs
+#     - server (str): Server running the application
+#     - job_names (str): Semi-colon separated list of job names 
+#     '''
+    
+    
+#     # check if jobs are still running
+#     jobs = list(map(lambda x: x.strip(), args.job_names.split(',')))
+    
+#     # make a list of successfully updated project db
+#     updated = []
+#     databasedir = os.path.join(args.workingdir, 'databases')
+#     for job in jobs:
+#         # get exit status
+#         exit_status = get_job_exit_status(job)
+#         if exit_status == 0:
+#             db =  os.path.join(databasedir, job.split('.')[0] + '.db')
+#             updated.append(db)
+            
+#     # merge all projects databases that were successfully updated
+#     merge_databases(args.merged_database, updated)
+
+#     # copy merged database to server
+#     subprocess.call('scp -i {0} {1} {2}:~/provenance-reporter/'.format(args.pemfile, args.merged_database, args.server), shell=True)
+
+    
+#     if args.remove_db:
+#         # remove project databases
+#         project_databases = [os.path.join(databasedir, i) for i in os.listdir(databasedir) if '.db' in i]
+#         for i in project_databases:
+#             assert '/scratch2/groups/gsi/bis/rjovelin/provenance_reporter/databases' in i and '.db' in i
+#             os.remove(i)
+        
+
+def merge(args):
     '''
     (list) -> None
     
-    Launch job to copy the database to the server
+    Launch job to merge the project databases into a single database
     
     Parameters
     ----------
     - database (str): Path to the database file
     - mem (str): Memory allocated to jobs
-    - server (str): Server running the application
     - job_names (str): Semi-colon separated list of job names 
     '''
     
+    # check that jobs completely successfully before merging the project databases
+    if args.job_names:
+        # check if jobs are still running
+        jobs = list(map(lambda x: x.strip(), args.job_names.split(',')))
     
-    # check if jobs are still running
-    jobs = list(map(lambda x: x.strip(), args.job_names.split(',')))
-    
-    # make a list of successfully updated project db
-    updated = []
-    databasedir = os.path.join(args.workingdir, 'databases')
-    for job in jobs:
-        # get exit status
-        exit_status = get_job_exit_status(job)
-        if exit_status == 0:
-            db =  os.path.join(databasedir, job.split('.')[0] + '.db')
-            updated.append(db)
-            
+        # make a list of successfully updated project db
+        updated = []
+        databasedir = os.path.join(args.workingdir, 'databases')
+        for job in jobs:
+            # get exit status
+            exit_status = get_job_exit_status(job)
+            if exit_status == 0:
+                db =  os.path.join(databasedir, job.split('.')[0] + '.db')
+                updated.append(db)
+    else:
+        # make a list of any project databases 
+        databasedir = os.path.join(args.workingdir, 'databases')
+        updated = [os.path.join(databasedir, i) for i in os.listdir(databasedir) if '.db' in i]
+       
     # merge all projects databases that were successfully updated
     merge_databases(args.merged_database, updated)
 
-    # copy merged database to server
-    subprocess.call('scp -i {0} {1} {2}:~/provenance-reporter/'.format(args.pemfile, args.merged_database, args.server), shell=True)
-
-    
     if args.remove_db:
         # remove project databases
         project_databases = [os.path.join(databasedir, i) for i in os.listdir(databasedir) if '.db' in i]
         for i in project_databases:
             assert '/scratch2/groups/gsi/bis/rjovelin/provenance_reporter/databases' in i and '.db' in i
             os.remove(i)
-        
-
-
 
 if __name__ == '__main__':
 
@@ -1927,7 +1967,6 @@ if __name__ == '__main__':
     fill_parser.add_argument('-md', '--merged_database', dest='merged_database', help='Path to the merged database', required = True)
     fill_parser.add_argument('-rt', '--run_time', dest='run_time', default=5, help='Run time in hours')
     fill_parser.add_argument('-pf', '--pem_file', dest='pemfile', default='~/.ssh/provenance_reporter.pem', help='Path to the pem file to access the server')
-    fill_parser.add_argument('-s', '--server', dest='server', help='Provenance reporter server.', required=True)
     fill_parser.set_defaults(func=launch_jobs)
 
 
@@ -1941,17 +1980,15 @@ if __name__ == '__main__':
     fill_parser.add_argument('-s', '--samples', dest='samples_info', help='Path to json file with sample info', required = True)
     fill_parser.set_defaults(func=collect_parent_sample_info)
 
-    # launch jobs to fill db with all projects info
-    migrate_parser = subparsers.add_parser('migrate', help="Run job to copy the database to the server", parents=[parent_parser])
-    migrate_parser.add_argument('-m', '--memory', dest='mem', default=20, help='Memory allocated to jobs')
-    migrate_parser.add_argument('-rt', '--run_time', dest='run_time', default=5, help='Run time in hours')
-    migrate_parser.add_argument('-jn', '--job_names', dest='job_names', help='Names of the jobs launched to fill the database')
-    migrate_parser.add_argument('-wd', '--workingdir', dest='workingdir', help='Name of the directory where qsubs scripts are written', required = True)
-    migrate_parser.add_argument('-md', '--merged_database', dest='merged_database', help='Path to the merged database', required = True)
-    migrate_parser.add_argument('-pf', '--pem_file', dest='pemfile', default='~/.ssh/provenance_reporter.pem', help='Path to the pem file to access the server')
-    migrate_parser.add_argument('-s', '--server', dest='server', help='Provenance reporter server.', required=True)
-    migrate_parser.add_argument('-rmdb', '--removedb', dest='remove_db', action='store_true', help='Remove project databases if activated')
-    migrate_parser.set_defaults(func=migrate)
+    # launch job to merge the project dbs 
+    merge_parser = subparsers.add_parser('merge', help="Run job to merge the project databases", parents=[parent_parser])
+    merge_parser.add_argument('-m', '--memory', dest='mem', default=20, help='Memory allocated to jobs')
+    merge_parser.add_argument('-rt', '--run_time', dest='run_time', default=5, help='Run time in hours')
+    merge_parser.add_argument('-jn', '--job_names', dest='job_names', help='Names of the jobs launched to fill the database')
+    merge_parser.add_argument('-wd', '--workingdir', dest='workingdir', help='Name of the directory where qsubs scripts are written', required = True)
+    merge_parser.add_argument('-md', '--merged_database', dest='merged_database', help='Path to the merged database', required = True)
+    merge_parser.add_argument('-rmdb', '--removedb', dest='remove_db', action='store_true', help='Remove project databases if activated')
+    merge_parser.set_defaults(func=merge)
     
     # get arguments from the command line
     args = main_parser.parse_args()
