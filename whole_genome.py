@@ -734,7 +734,7 @@ def is_block_clean(block_workflows, expected_workflows):
             else:
                 # remove call ready workflows
                 call_ready = list(map(lambda x: x.strip(), bmpp.split('.')))
-                callers = set(call_ready).difference(set(call_ready))
+                callers = set(L).difference(set(call_ready))
                 if len(callers) == len(expected_workflows):
                     clean = True
                 else:
