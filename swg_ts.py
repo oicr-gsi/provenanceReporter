@@ -5,7 +5,7 @@ Created on Wed Dec 13 11:39:27 2023
 @author: rjovelin
 """
 
-
+import itertools
 from utilities import connect_to_db
 from whole_genome import map_limskey_to_library, map_library_to_sample, \
     get_workflow_output    
@@ -187,6 +187,15 @@ def create_swg_ts_sample_json(datatype, database, project_name, case, sample, wo
                        Values: standard or all
     '''
     
+    
+    libraries = map_limskey_to_library(project_name, database, table='Workflow_Inputs')
+    sample_names = map_library_to_sample(project_name, database, table = 'Libraries')
+    
+    # create a lambda to evaluate the deliverable files
+    # x is a pair of (file, file_ending)
+    G = lambda x: x[1] in x[0] and x[0][x[0].rindex(x[1]):] == x[1]
+    
+    
     # get the deliverables
     if selection == 'standard':
         deliverables = get_swg_ts_standard_deliverables(datatype)
@@ -202,8 +211,6 @@ def create_swg_ts_sample_json(datatype, database, project_name, case, sample, wo
         workflow_version = workflow_names[workflow_id][1]
                 
         # get workflow output files
-        libraries = map_limskey_to_library(project_name, workflow_id, database, 'Workflow_Inputs')
-        sample_names = map_library_to_sample(project_name, case, database, 'Libraries')
         outputfiles = get_workflow_output(project_name, case, workflow_id, database, libraries, sample_names, 'Files')
                 
         D[case] = {}
@@ -212,20 +219,19 @@ def create_swg_ts_sample_json(datatype, database, project_name, case, sample, wo
         assert workflow_name not in D[case][sample]
         D[case][sample][workflow_name] = []
 
-                
         # check that only workflows in standard WGS deliverables are used
         if deliverables:
             # keep track of the files to be released                                            
             L = []
             key = workflow_name.split('_')[0].lower()
             if key in deliverables:
-                assert sample in outputfiles
-                for i in outputfiles[sample]:
-                    file = i[0]
-                    for file_ending in deliverables[key]:
-                        if file_ending in file and file[file.rindex(file_ending):] == file_ending:
-                            L.append(file)
-                
+                # gather all file paths for workflow and sample(s)
+                files = [i[0] for i in outputfiles[sample]]
+                # map all file endings of deliverables with files
+                groups = list(itertools.product(files, deliverables[key]))
+                # determine which files are part of the deliverables
+                F = list(map(G, groups))
+                L = [groups[k][0] for k in range(len(F)) if F[k]]
                 if L:
                     D[case][sample][workflow_name].append({'workflow_id': workflow_id,
                                                            'workflow_version': workflow_version,
@@ -258,6 +264,14 @@ def create_swg_ts_project_json(database, project_name, data, workflow_names, sel
     - deliverables (None | dict): None or dictionary with file extensions of standard WGS deliverables
     '''
     
+    libraries = map_limskey_to_library(project_name, database, table='Workflow_Inputs')
+    sample_names = map_library_to_sample(project_name, database, table = 'Libraries')
+    
+    # create a lambda to evaluate the deliverable files
+    # x is a pair of (file, file_ending)
+    G = lambda x: x[1] in x[0] and x[0][x[0].rindex(x[1]):] == x[1]
+    
+    
     # organize the data
     D = {}
     
@@ -270,8 +284,6 @@ def create_swg_ts_project_json(database, project_name, data, workflow_names, sel
                     workflow_version = workflow_names[workflow_id][1]
                 
                     # get workflow output files
-                    libraries = map_limskey_to_library(project_name, workflow_id, database, 'Workflow_Inputs')
-                    sample_names = map_library_to_sample(project_name, case, database, 'Libraries')
                     outputfiles = get_workflow_output(project_name, case, workflow_id, database, libraries, sample_names, 'Files')
                 
                     if case not in D:
@@ -288,13 +300,13 @@ def create_swg_ts_project_json(database, project_name, data, workflow_names, sel
                         L = []
                         key = workflow_name.split('_')[0].lower()
                         if key in deliverables:
-                            assert sample in outputfiles
-                            for i in outputfiles[sample]:
-                                file = i[0]
-                                for file_ending in deliverables[key]:
-                                    if file_ending in file and file[file.rindex(file_ending):] == file_ending:
-                                        L.append(file)
-                
+                            # gather all file paths for workflow and sample(s)
+                            files = [i[0] for i in outputfiles[sample]]
+                            # map all file endings of deliverables with files
+                            groups = list(itertools.product(files, deliverables[key]))
+                            # determine which files are part of the deliverables
+                            F = list(map(G, groups))
+                            L = [groups[k][0] for k in range(len(F)) if F[k]]
                             if L:
                                 D[case][sample][workflow_name].append({'workflow_id': workflow_id,
                                                                        'workflow_version': workflow_version,

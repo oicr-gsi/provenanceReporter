@@ -252,9 +252,17 @@ def whole_genome_sequencing(project_name):
     
     if request.method == 'POST':
         deliverable = request.form.get('deliverable')
+        
+        
+        print(deliverable)
+        
+        
         # get the workflow names
         workflow_names = get_workflow_names(project_name, database)
-                
+        
+        print('got workflow names')
+
+        
         if deliverable == 'selected':
             block_data = create_WGS_project_block_json(project_name, database, blocks, block_status, selected, workflow_names)
         elif deliverable == 'standard':
