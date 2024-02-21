@@ -13,7 +13,7 @@ from whole_genome import map_analysis_workflows_to_sample, get_parent_workflows,
     get_block_analysis_date, sort_call_ready_samples, is_block_complete, \
     get_workflow_limskeys, get_file_release_status, get_block_release_status, is_block_clean, \
     get_amount_data, order_blocks, map_limskey_to_library, map_library_to_sample, \
-    get_workflow_output    
+    map_library_to_case, get_workflow_output    
 from networks import get_node_labels, make_adjacency_matrix, plot_workflow_network
 
 
@@ -454,7 +454,9 @@ def create_WT_project_block_json(project_name, database, blocks, block_status, s
     
     libraries = map_limskey_to_library(project_name, database, table='Workflow_Inputs')
     sample_names = map_library_to_sample(project_name, database, table = 'Libraries')
-    
+    donors = map_library_to_case(project_name, database, table = 'Libraries')
+    workflow_outputfiles = get_workflow_output(project_name, database, libraries, sample_names, donors, 'Files')
+        
     # create a lambda to evaluate the deliverable files
     # x is a pair of (file, file_ending)
     G = lambda x: x[1] in x[0] and x[0][x[0].rindex(x[1]):] == x[1]
@@ -480,7 +482,7 @@ def create_WT_project_block_json(project_name, database, blocks, block_status, s
                         # get workflow output files
                         # needed to sort outputs by sample pairs or by sample for call-ready workflows
                         # even if all files are recorded
-                        outputfiles = get_workflow_output(project_name, case, workflow, database, libraries, sample_names, 'Files')
+                        outputfiles = workflow_outputfiles[workflow]
                         
                         # check that only workflows in standard WGS deliverables are used
                         if deliverables:
@@ -507,10 +509,13 @@ def create_WT_project_block_json(project_name, database, blocks, block_status, s
                                             D[case][sample_id] = {}
                                         if workflow_name not in D[case][sample_id]:
                                             D[case][sample_id][workflow_name] = []
-                                        D[case][sample_id][workflow_name].append({'workflow_id': workflow,
-                                                                                 'workflow_version': workflow_version,
-                                                                                 'files': L})
-                            
+                                        
+                                        d = {'workflow_id': workflow,
+                                             'workflow_version': workflow_version,
+                                             'files': L}
+                                        if d not in D[case][sample_id][workflow_name]:
+                                            D[case][sample_id][workflow_name].append(d)
+                                                                        
                         else:
                             for j in outputfiles:
                                 sample_id = j.replace(';', '.')
@@ -523,7 +528,8 @@ def create_WT_project_block_json(project_name, database, blocks, block_status, s
                                     D[case][sample_id] = {}
                                 if workflow_name not in D[case][sample_id]:
                                     D[case][sample_id][workflow_name] = []
-                                D[case][sample_id][workflow_name].append(d)
+                                if d not in D[case][sample_id][workflow_name]:
+                                    D[case][sample_id][workflow_name].append(d)
                                 
     return D
 
@@ -552,6 +558,8 @@ def create_WT_block_json(database, project_name, case, blocks, sample, anchor_wo
     
     libraries = map_limskey_to_library(project_name, database, table='Workflow_Inputs')
     sample_names = map_library_to_sample(project_name, database, table = 'Libraries')
+    donors = map_library_to_case(project_name, database, table = 'Libraries')
+    workflow_outputfiles = get_workflow_output(project_name, database, libraries, sample_names, donors, 'Files')
     
     # create a lambda to evaluate the deliverable files
     # x is a pair of (file, file_ending)
@@ -583,8 +591,8 @@ def create_WT_block_json(database, project_name, case, blocks, sample, anchor_wo
                 # get workflow output files
                 # needed to sort outputs by sample pairs or by sample for call-ready workflows
                 # even if all files are recorded
-                outputfiles = get_workflow_output(project_name, case, workflow_id, database, libraries, sample_names, 'Files')
-                
+                outputfiles = workflow_outputfiles[workflow_id]
+                                
                 # check that only workflows in standard WGS deliverables are used
                 if deliverables:
                     key = workflow_name.split('_')[0].lower()
@@ -608,9 +616,13 @@ def create_WT_block_json(database, project_name, case, blocks, sample, anchor_wo
                                     block_data[case][sample_id] = {}
                                 if workflow_name not in block_data[case][sample_id]:
                                     block_data[case][sample_id][workflow_name] = []
-                                block_data[case][sample_id][workflow_name].append({'workflow_id': workflow_id,
-                                                                      'workflow_version': workflow_version,
-                                                                      'files': L})
+                                
+                                d = {'workflow_id': workflow_id,
+                                     'workflow_version': workflow_version,
+                                     'files': L}
+                                if d not in block_data[case][sample_id][workflow_name]:
+                                    block_data[case][sample_id][workflow_name].append(d)
+                                    
                 else:
                     for j in outputfiles:
                         sample_id = '.'.join(j.split(';'))
@@ -623,6 +635,7 @@ def create_WT_block_json(database, project_name, case, blocks, sample, anchor_wo
                             block_data[case][sample_id] = {}
                         if workflow_name not in block_data[case][sample_id]:
                             block_data[case][sample_id][workflow_name] = []
-                        block_data[case][sample_id][workflow_name].append(d)
+                        if d not in block_data[case][sample_id][workflow_name]:
+                            block_data[case][sample_id][workflow_name].append(d)
                     
     return block_data                

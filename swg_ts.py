@@ -8,7 +8,7 @@ Created on Wed Dec 13 11:39:27 2023
 import itertools
 from utilities import connect_to_db
 from whole_genome import map_limskey_to_library, map_library_to_sample, \
-    get_workflow_output    
+     map_library_to_case, get_workflow_output    
 
 
 def get_swg_ts(project_name, database, workflow, workflow_table = 'Workflows', wf_input_table = 'Workflow_Inputs', library_table='Libraries'):
@@ -190,7 +190,9 @@ def create_swg_ts_sample_json(datatype, database, project_name, case, sample, wo
     
     libraries = map_limskey_to_library(project_name, database, table='Workflow_Inputs')
     sample_names = map_library_to_sample(project_name, database, table = 'Libraries')
-    
+    donors = map_library_to_case(project_name, database, table = 'Libraries')
+    workflow_outputfiles = get_workflow_output(project_name, database, libraries, sample_names, donors, 'Files')
+        
     # create a lambda to evaluate the deliverable files
     # x is a pair of (file, file_ending)
     G = lambda x: x[1] in x[0] and x[0][x[0].rindex(x[1]):] == x[1]
@@ -211,8 +213,8 @@ def create_swg_ts_sample_json(datatype, database, project_name, case, sample, wo
         workflow_version = workflow_names[workflow_id][1]
                 
         # get workflow output files
-        outputfiles = get_workflow_output(project_name, case, workflow_id, database, libraries, sample_names, 'Files')
-                
+        outputfiles = workflow_outputfiles[workflow_id]    
+            
         D[case] = {}
         assert sample not in D[case]
         D[case][sample] = {}
@@ -233,15 +235,19 @@ def create_swg_ts_sample_json(datatype, database, project_name, case, sample, wo
                 F = list(map(G, groups))
                 L = [groups[k][0] for k in range(len(F)) if F[k]]
                 if L:
-                    D[case][sample][workflow_name].append({'workflow_id': workflow_id,
-                                                           'workflow_version': workflow_version,
-                                                           'files': L})
+                    d = {'workflow_id': workflow_id,
+                         'workflow_version': workflow_version,
+                         'files': L}
+                    if d not in D[case][sample][workflow_name]:
+                        D[case][sample][workflow_name].append(d)
+                        
         else:
             assert sample in outputfiles
             d = {'workflow_id': workflow_id,
                  'workflow_version': workflow_version,
                  'files': [i[0] for i in outputfiles[sample]]}
-            D[case][sample][workflow_name].append(d)
+            if d not in D[case][sample][workflow_name]:
+                D[case][sample][workflow_name].append(d)
             
     return D                
 
@@ -266,7 +272,9 @@ def create_swg_ts_project_json(database, project_name, data, workflow_names, sel
     
     libraries = map_limskey_to_library(project_name, database, table='Workflow_Inputs')
     sample_names = map_library_to_sample(project_name, database, table = 'Libraries')
-    
+    donors = map_library_to_case(project_name, database, table = 'Libraries')
+    workflow_outputfiles = get_workflow_output(project_name, database, libraries, sample_names, donors, 'Files')
+        
     # create a lambda to evaluate the deliverable files
     # x is a pair of (file, file_ending)
     G = lambda x: x[1] in x[0] and x[0][x[0].rindex(x[1]):] == x[1]
@@ -284,8 +292,8 @@ def create_swg_ts_project_json(database, project_name, data, workflow_names, sel
                     workflow_version = workflow_names[workflow_id][1]
                 
                     # get workflow output files
-                    outputfiles = get_workflow_output(project_name, case, workflow_id, database, libraries, sample_names, 'Files')
-                
+                    outputfiles = workflow_outputfiles[workflow_id]
+                    
                     if case not in D:
                         D[case] = {}
                     if sample not in D[case]:
@@ -308,15 +316,19 @@ def create_swg_ts_project_json(database, project_name, data, workflow_names, sel
                             F = list(map(G, groups))
                             L = [groups[k][0] for k in range(len(F)) if F[k]]
                             if L:
-                                D[case][sample][workflow_name].append({'workflow_id': workflow_id,
-                                                                       'workflow_version': workflow_version,
-                                                                       'files': L})
+                                d = {'workflow_id': workflow_id,
+                                     'workflow_version': workflow_version,
+                                     'files': L}
+                                if d not in D[case][sample][workflow_name]:
+                                    D[case][sample][workflow_name].append(d)
+                    
                     else:
                         assert sample in outputfiles
                         d = {'workflow_id': workflow_id,
                              'workflow_version': workflow_version,
                              'files': [i[0] for i in outputfiles[sample]]}
-                        D[case][sample][workflow_name].append(d)
+                        if d not in D[case][sample][workflow_name]:
+                            D[case][sample][workflow_name].append(d)
     
     return D                
 
