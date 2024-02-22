@@ -456,7 +456,7 @@ def create_WT_project_block_json(project_name, database, blocks, block_status, s
     sample_names = map_library_to_sample(project_name, database, table = 'Libraries')
     donors = map_library_to_case(project_name, database, table = 'Libraries')
     workflow_outputfiles = get_workflow_output(project_name, database, libraries, sample_names, donors, 'Files')
-        
+            
     # create a lambda to evaluate the deliverable files
     # x is a pair of (file, file_ending)
     G = lambda x: x[1] in x[0] and x[0][x[0].rindex(x[1]):] == x[1]
@@ -560,6 +560,7 @@ def create_WT_block_json(database, project_name, case, blocks, sample, anchor_wo
     sample_names = map_library_to_sample(project_name, database, table = 'Libraries')
     donors = map_library_to_case(project_name, database, table = 'Libraries')
     workflow_outputfiles = get_workflow_output(project_name, database, libraries, sample_names, donors, 'Files')
+    
     
     # create a lambda to evaluate the deliverable files
     # x is a pair of (file, file_ending)

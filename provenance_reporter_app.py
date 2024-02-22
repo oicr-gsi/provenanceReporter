@@ -23,7 +23,7 @@ from whole_genome import get_call_ready_cases, get_amount_data, create_WG_block_
     get_wgs_blocks, create_WGS_project_block_json, get_workflow_output, get_release_status, \
     get_workflow_limskeys, get_file_release_status, map_fileswid_to_filename, \
     map_limskey_to_library, map_library_to_sample, get_WGS_standard_deliverables, \
-    get_block_level_contamination    
+    get_block_level_contamination, map_library_to_case    
 from whole_transcriptome import get_WT_call_ready_cases, get_WT_standard_deliverables, \
     create_WT_project_block_json, create_WT_block_json
 from project import get_project_info, get_cases, get_sample_counts, count_libraries, \
@@ -396,10 +396,17 @@ def workflow(project_name, pipeline, case, sample_pair, workflow_id):
     sequence_status = {i:D[i] for i in limskeys}
     # map file swids to file names
     fastqs = map_fileswid_to_filename(project_name, database, 'Files')
+    
     # map library to limskey
-    libraries = map_limskey_to_library(project_name, workflow_id, database, 'Workflow_Inputs')
+    all_libraries = map_limskey_to_library(project_name, database, table='Workflow_Inputs')
+    libraries = all_libraries[workflow_id]
+    
+    
     # map libraries to samples
-    samples = map_library_to_sample(project_name, case, database, 'Libraries')
+    all_samples = map_library_to_sample(project_name, database, table = 'Libraries')
+    samples = all_samples[case]    
+    
+    
     sequences = []
     for i in limskeys:
         library = libraries[i]
@@ -415,7 +422,10 @@ def workflow(project_name, pipeline, case, sample_pair, workflow_id):
     sequences.sort(key=lambda x: x[0])
     
     # get workflow output files
-    files = get_workflow_output(project_name, case, workflow_id, database, libraries, samples, 'Files')
+    donors = map_library_to_case(project_name, database, table = 'Libraries')
+    workflow_outputfiles = get_workflow_output(project_name, database, all_libraries, all_samples, donors, 'Files')
+    files = workflow_outputfiles[workflow_id]
+     
     
     # get the file release status
     release_status = get_release_status(project_name, database, 'FilesQC')
