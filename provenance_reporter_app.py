@@ -23,7 +23,7 @@ from whole_genome import get_call_ready_cases, get_amount_data, create_WG_block_
     get_wgs_blocks, create_WGS_project_block_json, get_workflow_output, get_release_status, \
     get_workflow_limskeys, get_file_release_status, map_fileswid_to_filename, \
     map_limskey_to_library, map_library_to_sample, get_WGS_standard_deliverables, \
-    get_block_level_contamination, map_library_to_case    
+    get_block_level_contamination, map_library_to_case, get_sample_sequencing_amount    
 from whole_transcriptome import get_WT_call_ready_cases, get_WT_standard_deliverables, \
     create_WT_project_block_json, create_WT_block_json
 from project import get_project_info, get_cases, get_sample_counts, count_libraries, \
@@ -286,7 +286,10 @@ def wgs_case(project_name, case, sample_pair):
     
     database = 'merged.db'
     workflow_db = 'workflows.db'
-        
+    
+    # get the number of lane sequence per sequence and platform and the corresponding release status
+    lanes = get_sample_sequencing_amount(project_name, case, sample_pair, database,
+                                         'Workflows', 'Workflow_Inputs', 'Libraries')
     # get the project info for project_name from db
     project = get_project_info(project_name, database)
     # get the pipelines from the library definitions in db
@@ -343,7 +346,8 @@ def wgs_case(project_name, case, sample_pair):
                            parents=parents,
                            selected = selected,
                            sample_pair=sample_pair,
-                           contamination=contamination
+                           contamination=contamination, 
+                           lanes=lanes
                            )
 
 
@@ -507,7 +511,11 @@ def wt_case(project_name, case, tumor_sample):
     
     database = 'merged.db'
     workflow_db = 'workflows.db'
-        
+    
+    # get the number of lane sequence per sequence and platform and the corresponding release status
+    lanes = get_sample_sequencing_amount(project_name, case, tumor_sample, database,
+                                         'Workflows', 'Workflow_Inputs', 'Libraries')
+
     # get the project info for project_name from db
     project = get_project_info(project_name, database)
     # get the pipelines from the library definitions in db
@@ -558,7 +566,8 @@ def wt_case(project_name, case, tumor_sample):
                                creation_dates=creation_dates,
                                parents=parents,
                                selected=selected,
-                               tumor_sample=tumor_sample
+                               tumor_sample=tumor_sample,
+                               lanes=lanes
                                )
 
 
@@ -621,7 +630,11 @@ def swg_sample(project_name, case, sample):
     
     database = 'merged.db'
     workflow_db = 'workflows.db'
-        
+
+    # get the number of lane sequence per sequence and platform and the corresponding release status
+    lanes = get_sample_sequencing_amount(project_name, case, sample, database,
+                                         'Workflows', 'Workflow_Inputs', 'Libraries')
+
     # get the project info for project_name from db
     project = get_project_info(project_name, database)
     # get the pipelines from the library definitions in db
@@ -666,7 +679,8 @@ def swg_sample(project_name, case, sample):
                            amount_data=amount_data,
                            creation_dates=creation_dates,
                            selected = selected,
-                           ordered_workflows = ordered_workflows
+                           ordered_workflows = ordered_workflows,
+                           lanes=lanes
                            )
 
 
@@ -730,7 +744,11 @@ def TS_sample(project_name, case, sample):
     
     database = 'merged.db'
     workflow_db = 'workflows.db'
-        
+    
+    # get the number of lane sequence per sequence and platform and the corresponding release status
+    lanes = get_sample_sequencing_amount(project_name, case, sample, database,
+                                         'Workflows', 'Workflow_Inputs', 'Libraries')
+  
     # get the project info for project_name from db
     project = get_project_info(project_name, database)
     # get the pipelines from the library definitions in db
@@ -775,7 +793,8 @@ def TS_sample(project_name, case, sample):
                            amount_data=amount_data,
                            creation_dates=creation_dates,
                            selected = selected,
-                           ordered_workflows = ordered_workflows
+                           ordered_workflows = ordered_workflows,
+                           lanes=lanes
                            )
 
 

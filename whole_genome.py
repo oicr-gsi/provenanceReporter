@@ -1974,5 +1974,116 @@ def get_block_level_contamination(project_name, database, blocks, sample_pair):
     
     return D       
     
+
+
+def map_workflow_to_platform(project_name, database, table = 'Workflow_Inputs'):
+    '''
+    (str, str, str) -> dict
     
     
+    Parameters
+    ----------
+    - project_name (str): Name of project of interest
+    - database (str): Path to the sqlite database
+    - table (str): Table storing workflow_input information
+    '''
+    
+    # connect to db
+    conn = connect_to_db(database)
+    # extract library source
+    data = conn.execute("SELECT DISTINCT wfrun_id, limskey, platform FROM {0} WHERE project_id = '{1}';".format(table, project_name)).fetchall()
+    conn.close()
+    
+    D = {}
+    for i in data:
+        workflow = i['wfrun_id']
+        limskey = i['limskey']
+        platform = i['platform']
+        
+        if workflow in D:
+            D[workflow]['limskey'].add(limskey)
+            D[workflow]['platform'].add(platform)
+        
+        else:
+            D[workflow] = {'limskey': {limskey}, 'platform' : {platform}}
+    
+    return D
+    
+
+def get_sample_sequencing_amount(project_name, case, samples, database, workflow_table = 'Workflows', workflow_input = 'Workflow_Inputs', library_table = 'Libraries'):
+    '''
+    (str, str, str, str, str, str, str) -> dict
+
+    Returns a dictionary with the lane counts and release status for sequencing workflows
+    for each sequencing platform for each sample in samples 
+
+    Parameters
+    ----------
+    - project_name (str): Name of project of interest 
+    - case (str): Donor identifier
+    - samples (str): Sample or sample pair
+    - database (str): Path to the sqlite database
+    - workflow_table (str): Table storing the workflow information
+    - workflow_input (str): Table storing the workflow input information
+    - library_table (str): Table storing the library information
+    '''    
+        
+    libraries = map_limskey_to_library(project_name, database, table = workflow_input)
+    sample_names = map_library_to_sample(project_name, database, table = library_table)
+    workflow_names = get_workflow_names(project_name, database)
+    amount_data = get_amount_data(project_name, database, workflow_table)
+    platforms = map_workflow_to_platform(project_name, database, table = workflow_input)
+
+    sequencing_workflows = ('casava', 'bcl2fastq', 'fileimportforanalysis', 'fileimport', 'import_fastq')
+    workflows = [i for i in workflow_names if workflow_names[i][0].lower() in sequencing_workflows]
+
+    release_status = get_file_release_status(project_name, database)
+    
+    
+    # find libraries for each sample
+    L = {}
+    for sample in samples.split('|'):
+        sample = sample.strip()
+        L[sample] = []
+        for i in sample_names[case]:
+            if sample_names[case][i] == sample:
+                L[sample].append(i)
+    # find sequencing workflows for each sample
+    wfs = {}
+    for sample in L:
+        for workflow in libraries:
+            for limskey in libraries[workflow]:
+                if workflow in workflows and libraries[workflow][limskey] in L[sample]:
+                    if sample not in wfs:
+                        wfs[sample] = []
+                    wfs[sample].append(workflow)
+          
+    # sort lane counts, workflow and limskey by sample and platform    
+    lanes = {}
+    for sample in wfs:
+        for workflow in wfs[sample]:
+            platform = platforms[workflow]['platform']
+            assert len(platform) == 1
+            platform = list(platform)[0]
+            if sample not in lanes:
+                lanes[sample] = {}
+            if platform not in lanes[sample]:
+                lanes[sample][platform] = {'count': 0, 'workflows': [], 'released': [], 'limskeys': []}
+            lanes[sample][platform]['count'] += amount_data[workflow]    
+            lanes[sample][platform]['workflows'].append(workflow)  
+    
+    
+    # get the release status of OICR-generated sequences
+    for sample in lanes:
+        for platform in lanes[sample]:
+            for workflow in lanes[sample][platform]['workflows']:
+                if workflow_names[workflow][0].lower() in ['casava', 'bcl2fastq']:
+                    limskeys = list(libraries[workflow].keys())
+                    lanes[sample][platform]['limskeys'].extend(limskeys)
+                    status = []
+                    for i in limskeys:
+                        for j in release_status[i]:
+                            status.append(j[1])
+                    lanes[sample][platform]['released'] = all(map(lambda x: x.lower() == 'pass', status))
+    return lanes    
+       
