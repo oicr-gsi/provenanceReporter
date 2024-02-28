@@ -531,6 +531,33 @@ button.select_button:focus {
 }
 
 
+#seq_table {
+  margin-left: 0;
+  margin-right: auto;
+  margin-top: 2px;
+  margin-bottom: 60px;
+  border-collapse: collapse;
+  width: 50%;
+}
+#seq_table td, #seq_table th {
+  border: 1px solid #ddd;
+  padding: 8px;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 10px;
+  font-weight: normal;
+  text-align: left;
+}
+#seq_table td {
+  color: #595959;
+}
+#seq_table th {
+  background-color: grey;
+  color: white;
+}
+
+
+
+
 
 .checkbox {
   accent-color: #196719;

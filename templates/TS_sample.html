@@ -60,12 +60,10 @@
         {% endfor %}
     {% endfor %}
   </table>
-
-
-
+ 
 
   
-  {% if swg %}
+  {% if CC %}
     {% for workflow_id in ordered_workflows[case][sample] %}
       <form method="POST" action = "">
         <div class="somatic_block">
@@ -86,9 +84,9 @@
               <div class="download-dropdown-small">
                 <button class="download-dropbtn-small">Download json</button>
                   <div class="download-dropdown-content-small">
-                    <button class="download_button_small"><a href="{{url_for('download_swg_ts_data', datatype='swg', project_name=project['project_id'], case=case, sample=sample, workflow_id=workflow_id, selection='all')}}">all</a></button>
+                    <button class="download_button_small"><a href="{{url_for('download_swg_ts_data', datatype='ts', project_name=project['project_id'], case=case, sample=sample, workflow_id=workflow_id, selection='all')}}">all</a></button>
                     <br>
-                    <button class="download_button_small"><a href="{{url_for('download_swg_ts_data', datatype='swg', project_name=project['project_id'], case=case, sample=sample, workflow_id=workflow_id, selection='standard')}}">standard</a></button>
+                    <button class="download_button_small"><a href="{{url_for('download_swg_ts_data', datatype='ts', project_name=project['project_id'], case=case, sample=sample, workflow_id=workflow_id, selection='standard')}}">standard</a></button>
                   </div>
               </div>
             </td>
@@ -107,7 +105,7 @@
                 
             <tr>
               <td>
-                <a class="workflow" href="{{ url_for('workflow', project_name=project['project_id'], pipeline='shallow_whole_genome', case=case, sample_pair=sample, workflow_id=workflow_id) }}">
+                <a class="workflow" href="{{ url_for('workflow', project_name=project['project_id'], pipeline='targeted_sequencing', case=case, sample_pair=sample, workflow_id=workflow_id) }}">
                   {{ workflow_id | shorten_workflow_id }}
                 </a>
               </td>
@@ -115,7 +113,7 @@
                   {{workflow_names[workflow_id][0]}}
               </td>
               <td>
-                {% for i in swg[case][sample][workflow_id]['platform'] | list %}
+                {% for i in CC[case][sample][workflow_id]['platform'] | list %}
                   {{i}}
                 {% endfor %} 
               </td>

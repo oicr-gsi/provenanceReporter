@@ -24,7 +24,45 @@
     {% endfor %}
   </div> 
 
-  
+  <h2 style="font-size:14px; font-family: Arial, Helvetica, sans-serif; font-weight:normal;color: #595959"> Available sequences</h2> 
+   
+  <table id="seq_table">
+    <th>Sample</th>
+    <th>Platform</th>
+    <th>Lane count</th>
+    <th><div class="tooltip">Release status<span class="tooltiptext">Input raw sequences released?</span></div></th>
+    
+    
+    {% for i in lanes %}
+      {% set platforms = lanes[i].keys() | list | sort %}
+      {% set rowNum = platforms | length %}
+      <tr>  
+        <td rowspan = {{rowNum}}>{{i}}</td>
+        <td>{{platforms.0}}</td>
+        <td>{{lanes[i][platforms.0]['count']}}</td>
+        <td>
+          {% if lanes[i][platforms.0]['released'] %}
+            <span style="font-size:20px;color:#70db70">&#10004;</span>
+          {% else %}
+            <span style="font-size:20px;color:#ff3300;">&#10006;</span>
+          {% endif %}
+        </td>
+      </tr> 
+        {% for j in platforms[1:] %}
+          <tr>  
+            <td>{{j}}</td>
+            <td>{{lanes[i][j]['count']}}</td>
+            <td>
+              {% if lanes[i][j]['released'] %}
+                <span style="font-size:20px;color:#70db70">&#10004;</span>
+              {% else %}
+                <span style="font-size:20px;color:#ff3300;">&#10006;</span>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+    {% endfor %}
+  </table> 
 
   {% for pair in sample_pairs_names %}
     {% if pair == sample_pair %}
@@ -49,6 +87,11 @@
                   <td><div class="tooltip">Release Status:<span class="tooltiptext">Input raw sequences released?</span></div> <span style="font-size:32px;color:#70db70">&#10004;</span></td>
                 {% else %}
                   <td><div class="tooltip">Release Status:<span class="tooltiptext">Input raw sequences released?</span></div> <span style="font-size:32px;color:#ff3300;">&#10006;</span></td>
+                {% endif %}
+                {% if contamination[block['anchor_wf']] < 4 %}
+                  <td> Contamination: {{contamination[block['anchor_wf']]}}% <span style="font-size:32px;color:#70db70">&#10004;</span></td>
+                {% else %}:
+                  <td> Contamination: {{contamination[block['anchor_wf']]}}% <span style="font-size:32px;color:#ff3300">&#10004;</span></td>
                 {% endif %}
                   <td>
                     <button class="select_button" id="select" type = "submit" value="submit">Select workflows</button>

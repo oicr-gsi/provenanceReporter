@@ -691,7 +691,7 @@ def define_column_names():
     '''
 
     # create dict to store column names for each table {table: [column names]}
-    column_names = {'Workflows': ['wfrun_id', 'wf', 'wfv', 'project_id', 'attributes', 'file_count', 'lane_count', 'skip', 'stale', 'selected'],
+    column_names = {'Workflows': ['wfrun_id', 'wf', 'wfv', 'project_id', 'attributes', 'file_count', 'lane_count', 'skip', 'stale'],
                     'Parents': ['parents_id', 'children_id', 'project_id'],
                     'Projects': ['project_id', 'pipeline', 'description', 'active', 'contact_name', 'contact_email', 'last_updated', 'expected_samples', 'sequenced_samples', 'library_types'],
                     'Files': ['file_swid', 'project_id', 'md5sum', 'workflow', 'version', 'wfrun_id', 'file', 'library_type', 'attributes', 'creation_date', 'limskey', 'skip', 'stale'],
@@ -701,7 +701,10 @@ def define_column_names():
                     'Workflow_Inputs': ['library', 'run', 'lane', 'wfrun_id', 'limskey', 'barcode', 'platform', 'project_id'],
                     'Samples': ['case_id', 'donor_id', 'species', 'sex', 'miso', 'created_date', 'modified_date', 'project_id', 'parent_project'],
                     'WGS_blocks': ['project_id', 'case_id', 'samples', 'anchor_wf', 'workflows', 'name', 'date', 'release_status', 'complete', 'clean', 'network'],
-                    'WT_blocks': ['project_id', 'case_id', 'samples', 'anchor_wf', 'workflows', 'name', 'date', 'release_status', 'complete', 'clean', 'network']}
+                    'WT_blocks': ['project_id', 'case_id', 'samples', 'anchor_wf', 'workflows', 'name', 'date', 'release_status', 'complete', 'clean', 'network'],
+                    #'Calculate_Contamination': ['sample_id', 'project_id', 'group_id', 'case_id', 'library_type', 'tissue_origin', 'tissue_type', 'contamination', 'merged_limskey']
+                    'Calculate_Contamination': ['sample_id', 'group_id', 'case_id', 'library_type', 'tissue_origin', 'tissue_type', 'contamination', 'merged_limskey']
+                    }
         
     return column_names
 
@@ -714,7 +717,7 @@ def define_column_types():
     '''
     
     # create dict to store column names for each table {table: [column names]}
-    column_types = {'Workflows': ['VARCHAR(572)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'TEXT', 'INT', 'INT', 'INT', 'VARCHAR(128)', 'INT'],
+    column_types = {'Workflows': ['VARCHAR(572)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'TEXT', 'INT', 'INT', 'INT', 'VARCHAR(128)'],
                     'Parents': ['VARCHAR(572)', 'VARCHAR(572)', 'VARCHAR(128)'],
                     'Projects': ['VARCHAR(128) PRIMARY KEY NOT NULL UNIQUE', 'VARCHAR(128)',
                                   'TEXT', 'VARCHAR(128)', 'VARCHAR(256)', 'VARCHAR(256)', 'VARCHAR(256)', 'INT', 'INT', 'VARCHAR(256)'],
@@ -732,7 +735,10 @@ def define_column_types():
                                         'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)'],
                     'Samples': ['VARCHAR(128) PRIMARY KEY NOT NULL', 'VARCHAR(256)', 'VARCHAR(256)', 'VARCHAR(128)', 'VARCHAR(572)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)'],
                     'WGS_blocks': ['VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(572)', 'VARCHAR(572)', 'TEXT', 'VARCHAR(256)', 'VARCHAR(128)', 'INT', 'INT', 'INT', 'TEXT'],
-                    'WT_blocks': ['VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(572)', 'VARCHAR(572)', 'TEXT', 'VARCHAR(256)', 'VARCHAR(128)', 'INT', 'INT', 'INT', 'TEXT']}
+                    'WT_blocks': ['VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(572)', 'VARCHAR(572)', 'TEXT', 'VARCHAR(256)', 'VARCHAR(128)', 'INT', 'INT', 'INT', 'TEXT'],
+                    #'Calculate_Contamination': ['VARCHAR(128) PRIMARY KEY NOT NULL UNIQUE', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(572)']
+                    'Calculate_Contamination': ['VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'FLOAT', 'VARCHAR(572)']
+                    }
                     
     
     return column_types
@@ -759,6 +765,7 @@ def create_table(database, table):
     table_format = ', '.join(list(map(lambda x: ' '.join(x), list(zip(column_names, column_types)))))
 
 
+    #if table  in ['Workflows', 'Parents', 'Files', 'FilesQC', 'Libraries', 'Workflow_Inputs', 'Samples', 'WGS_blocks', 'WT_blocks', 'Calculate_Contamination']:
     if table  in ['Workflows', 'Parents', 'Files', 'FilesQC', 'Libraries', 'Workflow_Inputs', 'Samples', 'WGS_blocks', 'WT_blocks']:
         constraints = '''FOREIGN KEY (project_id)
             REFERENCES Projects (project_id)
@@ -843,7 +850,7 @@ def initiate_db(database):
     tables = [i[0] for i in tables]    
     conn.close()
     for i in ['Projects', 'Workflows', 'Parents', 'Files', 'FilesQC', 'Libraries',
-              'Workflow_Inputs', 'Samples', 'WGS_blocks', 'WT_blocks']:
+              'Workflow_Inputs', 'Samples', 'WGS_blocks', 'WT_blocks', 'Calculate_Contamination']:
         if i not in tables:
             create_table(database, i)
 
@@ -950,7 +957,7 @@ def add_workflows(workflows, database, project_name, table = 'Workflows'):
         # insert data into table
         values = [workflows[project_name][workflow_run][i] for i in column_names if i in workflows[project_name][workflow_run]]
         values.insert(3, project_name)
-        values.append(0)
+        
         
         cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(values)))
         conn.commit()
@@ -987,6 +994,101 @@ def add_workflow_relationships(parent_workflows, database, project, table = 'Par
                             
     conn.close()
 
+
+
+def parse_calculate_contamination_db(calcontaqc_db):
+    '''
+    (str) -> dict
+    
+    Returns a dictionary with information collected from the calculate contamination
+    QC-etl sqlite cache
+    
+    Parameters
+    ----------
+    - calcontaqc_db (str): Path to the calculate contamination database
+    '''
+
+    # get tables in db
+    conn = sqlite3.connect(calcontaqc_db)
+    cur = conn.cursor()
+    cur.execute("SELECT name FROM sqlite_master WHERE type='table';")
+    tables = cur.fetchall()
+    tables = [i[0] for i in tables]    
+    conn.close()
+    # connect to db and retrieve all data
+    conn = connect_to_db(calcontaqc_db)
+    data = conn.execute('SELECT * FROM {0}'.format(tables[0])).fetchall()  
+    conn.close()
+
+    D = {}
+    
+    for i in data:
+        case_id = i['Donor']
+        group_id = i['Group ID']
+        library_type = i['Library Design']
+        tissue_origin = i['Tissue Origin']
+        tissue_type = i['Tissue Type']
+        contamination = i['contamination']
+        merged_limskey = i['Merged Pinery Lims ID']
+        merged_limskey = list(map(lambda x: x.strip(), merged_limskey.replace('[', '').replace(']', '').replace('\"', '').split(',')))
+        merged_limskey = ';'.join(sorted(merged_limskey))
+        sample_id = '_'.join([i['Donor'], i['Tissue Type'], i['Tissue Origin'],
+                              i['Library Design'], i['Group ID']])
+        
+        if case_id not in D:
+            D[case_id] = {}
+        if sample_id not in D[case_id]:
+            D[case_id][sample_id] = []
+        d = {'case_id': case_id,
+             'group_id': group_id,
+             'library_type': library_type, 
+             'tissue_origin': tissue_origin,
+             'tissue_type': tissue_type,
+             'contamination': contamination,
+             'merged_limskey': merged_limskey,
+             'sample_id': sample_id
+             }
+        D[case_id][sample_id].append(d)
+           
+    return D                         
+                         
+                         
+
+
+def add_contamination_info(database, calcontaqc_db, table = 'Calculate_Contamination'):
+    '''
+    (str, str, str) -> None
+    
+    Parse the calcontaqc_db, reformat data and add information to the Calculate_Contamination
+    table of the database
+    
+    Parameters
+    ----------
+    - database (str): Path to the sqlite database
+    - calcontaqc_db (db): Path to the calculate contamination database
+    - table (str): name of the table in the database. Default is Calculate_Contamination 
+    '''
+
+    # collect ata from the calculate contamination cache
+    D = parse_calculate_contamination_db(calcontaqc_db)
+        
+    if D:
+        # connect to db
+        conn = sqlite3.connect(database)
+        cur = conn.cursor()
+        
+        # get column names
+        column_names = define_column_names()[table]
+
+        # add data
+        for case_id in D:
+            for sample_id in D[case_id]:
+                for i in D[case_id][sample_id]:
+                    L = [i[j] for j in  column_names]
+                    cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
+                    conn.commit()
+        
+        conn.close()
 
 
 
@@ -1499,12 +1601,13 @@ def add_info(args):
     print('added wgs blocks')  
     
     # add WT blocks
-    expected_WT_workflows = sorted(['arriba', 'rsem', 'star', 'starfusion', 'mavis'])
+    expected_WT_workflows = sorted(['arriba', 'rsem', 'starfusion', 'mavis'])
     add_blocks_to_db(args.database, args.project, expected_WT_workflows, 'WT_blocks', 'WT')
     print('added WT blocks')  
         
-      
-
+    # add calculate contamination info
+    add_contamination_info(args.database, args.calcontaqc_db, table = 'Calculate_Contamination')
+    print('added call-ready contamination')
 
 def launch_jobs(args):
     '''
@@ -1578,11 +1681,11 @@ def launch_jobs(args):
         # store job names
         job_names.append(jobName)
     
-    # launch job to copy database to server
-    cmd4 = '/u/rjovelin/SOFT/anaconda3/bin/python3.6 {0} migrate -md {1} -jn "{2}" -wd {3} -pf {4} -s {5}'
-    bashScript = os.path.join(qsubdir, 'migrate_db.sh')
+    # launch job to merge the project databases
+    cmd4 = '/u/rjovelin/SOFT/anaconda3/bin/python3.6 {0} merge -md {1} -jn "{2}" -wd {3}'
+    bashScript = os.path.join(qsubdir, 'merge_db.sh')
     with open(bashScript, 'w') as newfile:
-        newfile.write(cmd4.format(dbfiller, args.merged_database, ','.join(job_names), args.workingdir, args.pemfile, args.server))
+        newfile.write(cmd4.format(dbfiller, args.merged_database, ','.join(job_names), args.workingdir))
     qsubCmd = "qsub -b y -P gsi -l h_vmem={0}g,h_rt={1}:0:0 -N {2}  -hold_jid \"{3}\" -e {4} -o {4} \"bash {5}\"".format(args.mem, args.run_time, 'provdb.migration', ','.join(job_names), logdir, bashScript)
     subprocess.call(qsubCmd, shell=True)
 
@@ -1750,51 +1853,91 @@ def get_job_exit_status(job):
     return exit_status
 
 
+   
+# def migrate(args):
+#     '''
+#     (list) -> None
     
-def migrate(args):
+#     Launch job to copy the database to the server
+    
+#     Parameters
+#     ----------
+#     - database (str): Path to the database file
+#     - mem (str): Memory allocated to jobs
+#     - server (str): Server running the application
+#     - job_names (str): Semi-colon separated list of job names 
+#     '''
+    
+    
+#     # check if jobs are still running
+#     jobs = list(map(lambda x: x.strip(), args.job_names.split(',')))
+    
+#     # make a list of successfully updated project db
+#     updated = []
+#     databasedir = os.path.join(args.workingdir, 'databases')
+#     for job in jobs:
+#         # get exit status
+#         exit_status = get_job_exit_status(job)
+#         if exit_status == 0:
+#             db =  os.path.join(databasedir, job.split('.')[0] + '.db')
+#             updated.append(db)
+            
+#     # merge all projects databases that were successfully updated
+#     merge_databases(args.merged_database, updated)
+
+#     # copy merged database to server
+#     subprocess.call('scp -i {0} {1} {2}:~/provenance-reporter/'.format(args.pemfile, args.merged_database, args.server), shell=True)
+
+    
+#     if args.remove_db:
+#         # remove project databases
+#         project_databases = [os.path.join(databasedir, i) for i in os.listdir(databasedir) if '.db' in i]
+#         for i in project_databases:
+#             assert '/scratch2/groups/gsi/bis/rjovelin/provenance_reporter/databases' in i and '.db' in i
+#             os.remove(i)
+        
+
+def merge(args):
     '''
     (list) -> None
     
-    Launch job to copy the database to the server
+    Launch job to merge the project databases into a single database
     
     Parameters
     ----------
     - database (str): Path to the database file
     - mem (str): Memory allocated to jobs
-    - server (str): Server running the application
     - job_names (str): Semi-colon separated list of job names 
     '''
     
+    # check that jobs completely successfully before merging the project databases
+    if args.job_names:
+        # check if jobs are still running
+        jobs = list(map(lambda x: x.strip(), args.job_names.split(',')))
     
-    # check if jobs are still running
-    jobs = list(map(lambda x: x.strip(), args.job_names.split(',')))
-    
-    # make a list of successfully updated project db
-    updated = []
-    databasedir = os.path.join(args.workingdir, 'databases')
-    for job in jobs:
-        # get exit status
-        exit_status = get_job_exit_status(job)
-        if exit_status == 0:
-            db =  os.path.join(databasedir, job.split('.')[0] + '.db')
-            updated.append(db)
-            
+        # make a list of successfully updated project db
+        updated = []
+        databasedir = os.path.join(args.workingdir, 'databases')
+        for job in jobs:
+            # get exit status
+            exit_status = get_job_exit_status(job)
+            if exit_status == 0:
+                db =  os.path.join(databasedir, job.split('.')[0] + '.db')
+                updated.append(db)
+    else:
+        # make a list of any project databases 
+        databasedir = os.path.join(args.workingdir, 'databases')
+        updated = [os.path.join(databasedir, i) for i in os.listdir(databasedir) if '.db' in i]
+       
     # merge all projects databases that were successfully updated
     merge_databases(args.merged_database, updated)
 
-    # copy merged database to server
-    subprocess.call('scp -i {0} {1} {2}:~/provenance-reporter/'.format(args.pemfile, args.merged_database, args.server), shell=True)
-
-    
     if args.remove_db:
         # remove project databases
         project_databases = [os.path.join(databasedir, i) for i in os.listdir(databasedir) if '.db' in i]
         for i in project_databases:
             assert '/scratch2/groups/gsi/bis/rjovelin/provenance_reporter/databases' in i and '.db' in i
             os.remove(i)
-        
-
-
 
 if __name__ == '__main__':
 
@@ -1804,7 +1947,8 @@ if __name__ == '__main__':
     parent_parser.add_argument('-f', '--fpr', dest='fpr', default = '/scratch2/groups/gsi/production/vidarr/vidarr_files_report_latest.tsv.gz', help='Path to the File Provenance Report. Default is /scratch2/groups/gsi/production/vidarr/vidarr_files_report_latest.tsv.gz')
     parent_parser.add_argument('-n', '--nabu', dest='nabu', default='https://nabu-prod.gsi.oicr.on.ca', help='URL of the Nabu API. Default is https://nabu-prod.gsi.oicr.on.ca')
     parent_parser.add_argument('-p', '--pinery', dest = 'pinery', default = 'http://pinery.gsi.oicr.on.ca', help = 'Pinery API. Default is http://pinery.gsi.oicr.on.ca')
-        
+    parent_parser.add_argument('-cq', '--calcontaqc', dest = 'calcontaqc_db', default = '/scratch2/groups/gsi/production/qcetl_v1/calculatecontamination/latest', help = 'Path to the merged rnaseq calculateContamination database. Default is /scratch2/groups/gsi/production/qcetl_v1/calculatecontamination/latest')
+                               
     main_parser = argparse.ArgumentParser(prog = 'prov_reporter_db_filler.py', description = 'Add data to the Provenance Reporter database')
     subparsers = main_parser.add_subparsers(title='sub-commands', description='valid sub-commands', dest= 'subparser_name', help = 'sub-commands help')
     
@@ -1823,7 +1967,6 @@ if __name__ == '__main__':
     fill_parser.add_argument('-md', '--merged_database', dest='merged_database', help='Path to the merged database', required = True)
     fill_parser.add_argument('-rt', '--run_time', dest='run_time', default=5, help='Run time in hours')
     fill_parser.add_argument('-pf', '--pem_file', dest='pemfile', default='~/.ssh/provenance_reporter.pem', help='Path to the pem file to access the server')
-    fill_parser.add_argument('-s', '--server', dest='server', help='Provenance reporter server.', required=True)
     fill_parser.set_defaults(func=launch_jobs)
 
 
@@ -1837,17 +1980,15 @@ if __name__ == '__main__':
     fill_parser.add_argument('-s', '--samples', dest='samples_info', help='Path to json file with sample info', required = True)
     fill_parser.set_defaults(func=collect_parent_sample_info)
 
-    # launch jobs to fill db with all projects info
-    migrate_parser = subparsers.add_parser('migrate', help="Run job to copy the database to the server", parents=[parent_parser])
-    migrate_parser.add_argument('-m', '--memory', dest='mem', default=20, help='Memory allocated to jobs')
-    migrate_parser.add_argument('-rt', '--run_time', dest='run_time', default=5, help='Run time in hours')
-    migrate_parser.add_argument('-jn', '--job_names', dest='job_names', help='Names of the jobs launched to fill the database')
-    migrate_parser.add_argument('-wd', '--workingdir', dest='workingdir', help='Name of the directory where qsubs scripts are written', required = True)
-    migrate_parser.add_argument('-md', '--merged_database', dest='merged_database', help='Path to the merged database', required = True)
-    migrate_parser.add_argument('-pf', '--pem_file', dest='pemfile', default='~/.ssh/provenance_reporter.pem', help='Path to the pem file to access the server')
-    migrate_parser.add_argument('-s', '--server', dest='server', help='Provenance reporter server.', required=True)
-    migrate_parser.add_argument('-rmdb', '--removedb', dest='remove_db', action='store_true', help='Remove project databases if activated')
-    migrate_parser.set_defaults(func=migrate)
+    # launch job to merge the project dbs 
+    merge_parser = subparsers.add_parser('merge', help="Run job to merge the project databases", parents=[parent_parser])
+    merge_parser.add_argument('-m', '--memory', dest='mem', default=20, help='Memory allocated to jobs')
+    merge_parser.add_argument('-rt', '--run_time', dest='run_time', default=5, help='Run time in hours')
+    merge_parser.add_argument('-jn', '--job_names', dest='job_names', help='Names of the jobs launched to fill the database')
+    merge_parser.add_argument('-wd', '--workingdir', dest='workingdir', help='Name of the directory where qsubs scripts are written', required = True)
+    merge_parser.add_argument('-md', '--merged_database', dest='merged_database', help='Path to the merged database', required = True)
+    merge_parser.add_argument('-rmdb', '--removedb', dest='remove_db', action='store_true', help='Remove project databases if activated')
+    merge_parser.set_defaults(func=merge)
     
     # get arguments from the command line
     args = main_parser.parse_args()

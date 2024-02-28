@@ -9,21 +9,10 @@ Created on Tue May  3 14:32:40 2022
 import json
 from flask import Flask, render_template, request, url_for, flash, redirect, Response, send_file
 #from werkzeug.exceptions import abort
-#import requests
-#import gzip
-#import os
 import time
 import pandas as pd
-#import itertools
-
 import matplotlib
 matplotlib.use('agg')
-#import matplotlib.pyplot as plt
-#import networkx as nx
-#import numpy as np
-#import io
-#import base64
-
 from utilities import connect_to_db, get_miso_sample_link,\
     get_pipelines, get_workflow_names, get_library_design, secret_key_generator, \
     get_children_workflows
@@ -33,22 +22,24 @@ from whole_genome import get_call_ready_cases, get_amount_data, create_WG_block_
     review_wgs_blocks, get_case_workflows, update_wf_selection, get_block_counts, \
     get_wgs_blocks, create_WGS_project_block_json, get_workflow_output, get_release_status, \
     get_workflow_limskeys, get_file_release_status, map_fileswid_to_filename, \
-    map_limskey_to_library, map_library_to_sample, get_WGS_standard_deliverables    
-    
+    map_limskey_to_library, map_library_to_sample, get_WGS_standard_deliverables, \
+    get_block_level_contamination, map_library_to_case, get_sample_sequencing_amount    
 from whole_transcriptome import get_WT_call_ready_cases, get_WT_standard_deliverables, \
     create_WT_project_block_json, create_WT_block_json
 from project import get_project_info, get_cases, get_sample_counts, count_libraries, \
      get_library_types, add_missing_donors, get_last_sequencing
 from sequencing import get_sequences, collect_sequence_info, platform_name
-from shallow_whole_genome import get_shallow_wg, review_swg, get_input_release_status, \
-    create_swg_sample_json, create_swg_project_json, get_SWG_standard_deliverables, \
-    order_ichorcna_workflows    
-
+from swg_ts import get_swg_ts, review_data, get_input_release_status, \
+    create_swg_ts_sample_json, create_swg_ts_project_json, get_swg_ts_standard_deliverables, \
+    order_workflows    
    
+
+
 # map pipelines to views
 routes = {'Whole Genome': 'whole_genome_sequencing',
           'Whole Transcriptome': 'whole_transcriptome',
-          'Shallow Whole Genome': 'shallow_whole_genome'}
+          'Shallow Whole Genome': 'shallow_whole_genome',
+          'Targeted Sequencing': 'targeted_sequencing'}
 
 
 app = Flask(__name__)
@@ -140,7 +131,7 @@ def format_created_time(created_time):
 def index():
     
     # connect to db and extract project info
-    conn = connect_to_db('merged.db')
+    conn = connect_to_db('waterzooi.db')
     projects = conn.execute('SELECT * FROM Projects').fetchall()
     conn.close()
     
@@ -152,7 +143,7 @@ def index():
 @app.route('/<project_name>')
 def project_page(project_name):
     
-    database = 'merged.db'
+    database = 'waterzooi.db'
     # get the project info for project_name from db
     project = get_project_info(project_name, database)
     # get the pipelines from the library definitions in db
@@ -185,7 +176,7 @@ def project_page(project_name):
 @app.route('/<project_name>/sequencing', methods = ['GET', 'POST'])
 def sequencing(project_name):
     
-    database = 'merged.db'
+    database = 'waterzooi.db'
     # get the project info for project_name from db
     project = get_project_info(project_name, database)
     # get the pipelines from the library definitions in db
@@ -240,7 +231,8 @@ def sequencing(project_name):
 @app.route('/<project_name>/whole_genome_sequencing/', methods=['POST', 'GET'])
 def whole_genome_sequencing(project_name):
     
-    database = 'merged.db'
+    database = 'waterzooi.db'
+    workflow_db = 'workflows.db'
     # get the project info for project_name from db
     project = get_project_info(project_name, database)
     # get the pipelines from the library definitions in db
@@ -254,7 +246,7 @@ def whole_genome_sequencing(project_name):
        
     # get analysis block status
     # extract selected status of each workflow
-    selected = get_selected_workflows(project_name, database, 'Workflows')
+    selected = get_selected_workflows(project_name, workflow_db, 'Workflows')
     block_status = review_wgs_blocks(blocks, selected)
     # make a list of donor ids with block status
     
@@ -262,7 +254,6 @@ def whole_genome_sequencing(project_name):
         deliverable = request.form.get('deliverable')
         # get the workflow names
         workflow_names = get_workflow_names(project_name, database)
-                
         if deliverable == 'selected':
             block_data = create_WGS_project_block_json(project_name, database, blocks, block_status, selected, workflow_names)
         elif deliverable == 'standard':
@@ -293,11 +284,12 @@ def whole_genome_sequencing(project_name):
 @app.route('/<project_name>/whole_genome_sequencing/<case>/<sample_pair>', methods = ['POST', 'GET'])
 def wgs_case(project_name, case, sample_pair):
     
+    database = 'waterzooi.db'
+    workflow_db = 'workflows.db'
     
-    print('method', request.method)
-    
-    database = 'merged.db'
-    
+    # get the number of lane sequence per sequence and platform and the corresponding release status
+    lanes = get_sample_sequencing_amount(project_name, case, sample_pair, database,
+                                         'Workflows', 'Workflow_Inputs', 'Libraries')
     # get the project info for project_name from db
     project = get_project_info(project_name, database)
     # get the pipelines from the library definitions in db
@@ -321,8 +313,10 @@ def wgs_case(project_name, case, sample_pair):
     # find the parents of each workflow
     parents = get_parent_workflows(project_name, database)
     # extract selected status of each workflow
-    selected = get_selected_workflows(project_name, database, 'Workflows')
-    
+    selected = get_selected_workflows(project_name, workflow_db, 'Workflows')
+    # get the contamination for each anchor workflow 
+    contamination = get_block_level_contamination(project_name, database, blocks, sample_pair)
+        
     if request.method == 'POST':
         # get the list of checked workflows        
         selected_workflows = request.form.getlist('workflow')
@@ -334,7 +328,7 @@ def wgs_case(project_name, case, sample_pair):
         workflows = []
         for i in case_workflows[sample_pair]:
             workflows.extend(case_workflows[sample_pair][i])
-        update_wf_selection(workflows, selected_workflows, selected, database, 'Workflows')
+        update_wf_selection(workflows, selected_workflows, selected, workflow_db, 'Workflows')
         return redirect(url_for('wgs_case', case=case, project_name=project_name, sample_pair=sample_pair))
     else:
         return render_template('WGS_case.html',
@@ -351,7 +345,9 @@ def wgs_case(project_name, case, sample_pair):
                            platforms=platforms,
                            parents=parents,
                            selected = selected,
-                           sample_pair=sample_pair
+                           sample_pair=sample_pair,
+                           contamination=contamination, 
+                           lanes=lanes
                            )
 
 
@@ -359,7 +355,7 @@ def wgs_case(project_name, case, sample_pair):
 @app.route('/<project_name>/<pipeline>/<case>/<sample_pair>/<workflow_id>')
 def workflow(project_name, pipeline, case, sample_pair, workflow_id):
     
-    database = 'merged.db'
+    database = 'waterzooi.db'
     
     # get the project info for project_name from db
     project = get_project_info(project_name, database)
@@ -404,10 +400,17 @@ def workflow(project_name, pipeline, case, sample_pair, workflow_id):
     sequence_status = {i:D[i] for i in limskeys}
     # map file swids to file names
     fastqs = map_fileswid_to_filename(project_name, database, 'Files')
+    
     # map library to limskey
-    libraries = map_limskey_to_library(project_name, workflow_id, database, 'Workflow_Inputs')
+    all_libraries = map_limskey_to_library(project_name, database, table='Workflow_Inputs')
+    libraries = all_libraries[workflow_id]
+    
+    
     # map libraries to samples
-    samples = map_library_to_sample(project_name, case, database, 'Libraries')
+    all_samples = map_library_to_sample(project_name, database, table = 'Libraries')
+    samples = all_samples[case]    
+    
+    
     sequences = []
     for i in limskeys:
         library = libraries[i]
@@ -423,7 +426,10 @@ def workflow(project_name, pipeline, case, sample_pair, workflow_id):
     sequences.sort(key=lambda x: x[0])
     
     # get workflow output files
-    files = get_workflow_output(project_name, case, workflow_id, database, libraries, samples, 'Files')
+    donors = map_library_to_case(project_name, database, table = 'Libraries')
+    workflow_outputfiles = get_workflow_output(project_name, database, all_libraries, all_samples, donors, 'Files')
+    files = workflow_outputfiles[workflow_id]
+     
     
     # get the file release status
     release_status = get_release_status(project_name, database, 'FilesQC')
@@ -449,7 +455,9 @@ def workflow(project_name, pipeline, case, sample_pair, workflow_id):
 @app.route('/<project_name>/whole_transcriptome', methods = ['POST', 'GET'])
 def whole_transcriptome(project_name):
     
-    database = 'merged.db'
+    database = 'waterzooi.db'
+    workflow_db = 'workflows.db'
+        
     # get the project info for project_name from db
     project = get_project_info(project_name, database)
     # get the pipelines from the library definitions in db
@@ -463,7 +471,7 @@ def whole_transcriptome(project_name):
     
     # get analysis block status
     # extract selected status of each workflow
-    selected = get_selected_workflows(project_name, database, 'Workflows')
+    selected = get_selected_workflows(project_name, workflow_db, 'Workflows')
     block_status = review_wgs_blocks(blocks, selected)
     
     if request.method == 'POST':
@@ -501,9 +509,13 @@ def whole_transcriptome(project_name):
 def wt_case(project_name, case, tumor_sample):
         
     
-    database = 'merged.db'
-    expected_workflows = sorted(['arriba', 'rsem', 'star', 'starfusion', 'mavis'])  
+    database = 'waterzooi.db'
+    workflow_db = 'workflows.db'
     
+    # get the number of lane sequence per sequence and platform and the corresponding release status
+    lanes = get_sample_sequencing_amount(project_name, case, tumor_sample, database,
+                                         'Workflows', 'Workflow_Inputs', 'Libraries')
+
     # get the project info for project_name from db
     project = get_project_info(project_name, database)
     # get the pipelines from the library definitions in db
@@ -525,7 +537,7 @@ def wt_case(project_name, case, tumor_sample):
     # find the parents of each workflow
     parents = get_parent_workflows(project_name, database)
     # extract selected status of each workflow
-    selected = get_selected_workflows(project_name, database, 'Workflows')
+    selected = get_selected_workflows(project_name, workflow_db, 'Workflows')
     
     if request.method == 'POST':
         # get the list of checked workflows        
@@ -538,7 +550,7 @@ def wt_case(project_name, case, tumor_sample):
         workflows = []
         for i in case_workflows[tumor_sample]:
             workflows.extend(case_workflows[tumor_sample][i])
-        update_wf_selection(workflows, selected_workflows, selected, database, 'Workflows')
+        update_wf_selection(workflows, selected_workflows, selected, workflow_db, 'Workflows')
         return redirect(url_for('wt_case', case=case, project_name=project_name, tumor_sample=tumor_sample))
     else:
         return render_template('WT_case.html',
@@ -554,7 +566,8 @@ def wt_case(project_name, case, tumor_sample):
                                creation_dates=creation_dates,
                                parents=parents,
                                selected=selected,
-                               tumor_sample=tumor_sample
+                               tumor_sample=tumor_sample,
+                               lanes=lanes
                                )
 
 
@@ -562,21 +575,21 @@ def wt_case(project_name, case, tumor_sample):
 def shallow_whole_genome(project_name):
         
     
-    database = 'merged.db'
-    #expected_workflows = sorted(['arriba', 'rsem', 'star', 'starfusion', 'mavis'])  
+    database = 'waterzooi.db'
+    workflow_db = 'workflows.db'
     
     # get the project info for project_name from db
     project = get_project_info(project_name, database)
     # get the pipelines from the library definitions in db
     pipelines = get_pipelines(project_name, database)
     # get the shallow whole genome data
-    swg = get_shallow_wg(project_name, database, workflow_table = 'Workflows', wf_input_table = 'Workflow_Inputs', library_table='Libraries')
+    swg = get_swg_ts(project_name, database, 'ichorcna', workflow_table = 'Workflows', wf_input_table = 'Workflow_Inputs', library_table='Libraries')
     # get the selection status of workflows
-    selected = get_selected_workflows(project_name, database, 'Workflows')
+    selected = get_selected_workflows(project_name, workflow_db, 'Workflows')
     # get the input fastqs release status
     release_status = get_file_release_status(project_name, database)
     workflow_release_status = get_input_release_status(swg, release_status)
-    status = review_swg(swg, selected, workflow_release_status)
+    status = review_data(swg, selected, workflow_release_status)
     
     row_counts = {}
     for i in swg:
@@ -588,10 +601,10 @@ def shallow_whole_genome(project_name):
         # get the workflow names
         workflow_names = get_workflow_names(project_name, database)
         if deliverable == 'selected':
-            data = create_swg_project_json(database, project_name, swg, workflow_names, selected)
+            data = create_swg_ts_project_json(database, project_name, swg, workflow_names, selected)
         elif deliverable == 'standard':
-            deliverables = get_SWG_standard_deliverables()
-            data = create_swg_project_json(database, project_name, swg, workflow_names, selected, deliverables)
+            deliverables = get_swg_ts_standard_deliverables('swg')
+            data = create_swg_ts_project_json(database, project_name, swg, workflow_names, selected, deliverables)
         else:
             data = {}
                          
@@ -615,8 +628,13 @@ def shallow_whole_genome(project_name):
 @app.route('/<project_name>/shallow_whole_genome/<case>/<sample>', methods=['POST', 'GET'])
 def swg_sample(project_name, case, sample):
     
-    database = 'merged.db'
-    
+    database = 'waterzooi.db'
+    workflow_db = 'workflows.db'
+
+    # get the number of lane sequence per sequence and platform and the corresponding release status
+    lanes = get_sample_sequencing_amount(project_name, case, sample, database,
+                                         'Workflows', 'Workflow_Inputs', 'Libraries')
+
     # get the project info for project_name from db
     project = get_project_info(project_name, database)
     # get the pipelines from the library definitions in db
@@ -624,9 +642,9 @@ def swg_sample(project_name, case, sample):
     # get miso link
     miso_link = get_miso_sample_link(project_name, case, database)
     # get the shallow whole genome data
-    swg = get_shallow_wg(project_name, database, workflow_table = 'Workflows', wf_input_table = 'Workflow_Inputs', library_table='Libraries')
+    swg = get_swg_ts(project_name, database, 'ichorcna', workflow_table = 'Workflows', wf_input_table = 'Workflow_Inputs', library_table='Libraries')
     # get the selection status of workflows
-    selected = get_selected_workflows(project_name, database, 'Workflows')
+    selected = get_selected_workflows(project_name, workflow_db, 'Workflows')
     # get the input fastqs release status
     release_status = get_file_release_status(project_name, database)
     status = get_input_release_status(swg, release_status)
@@ -638,14 +656,14 @@ def swg_sample(project_name, case, sample):
     # get the creation date of all workflows
     creation_dates = get_workflows_analysis_date(project_name, database)
     # sort workflows according to amount of data, release status and creation date
-    ordered_workflows = order_ichorcna_workflows(swg, amount_data, status, creation_dates)
+    ordered_workflows = order_workflows(swg, amount_data, status, creation_dates)
       
     if request.method == 'POST':
         # get the selected workflow        
         selected_workflow = request.form.getlist('workflow')
         # get the workflows for the given sample
         workflows = list(swg[case][sample].keys())
-        update_wf_selection(workflows, selected_workflow, selected, database, 'Workflows')
+        update_wf_selection(workflows, selected_workflow, selected, workflow_db, 'Workflows')
         return redirect(url_for('swg_sample', case=case, project_name=project_name, sample=sample))
     else:
         return render_template('SWG_sample.html',
@@ -661,21 +679,139 @@ def swg_sample(project_name, case, sample):
                            amount_data=amount_data,
                            creation_dates=creation_dates,
                            selected = selected,
-                           ordered_workflows = ordered_workflows
+                           ordered_workflows = ordered_workflows,
+                           lanes=lanes
                            )
+
+
+
+
+@app.route('/<project_name>/targeted_sequencing/', methods=['POST', 'GET'])
+def targeted_sequencing(project_name):
+    
+    database = 'waterzooi.db'
+    workflow_db = 'workflows.db'
+    
+    # get the project info for project_name from db
+    project = get_project_info(project_name, database)
+    # get the pipelines from the library definitions in db
+    pipelines = get_pipelines(project_name, database)
+    # get the consensus cruncher genome data
+    CC = get_swg_ts(project_name, database, 'consensuscruncher', workflow_table = 'Workflows', wf_input_table = 'Workflow_Inputs', library_table='Libraries')
+    # get the selection status of workflows
+    selected = get_selected_workflows(project_name, workflow_db, 'Workflows')
+    # get the input fastqs release status
+    release_status = get_file_release_status(project_name, database)
+    workflow_release_status = get_input_release_status(CC, release_status)
+    status = review_data(CC, selected, workflow_release_status)
+    
+    row_counts = {}
+    for i in CC:
+        for j in CC[i]:
+            row_counts[i] = len(CC[i][j])
+    
+    if request.method == 'POST':
+        deliverable = request.form.get('deliverable')
+        # get the workflow names
+        workflow_names = get_workflow_names(project_name, database)
+        if deliverable == 'selected':
+            data = create_swg_ts_project_json(database, project_name, CC, workflow_names, selected)
+        elif deliverable == 'standard':
+            deliverables = get_swg_ts_standard_deliverables('ts')
+            data = create_swg_ts_project_json(database, project_name, CC, workflow_names, selected, deliverables)
+        else:
+            data = {}
+    
+        return Response(
+                response=json.dumps(data),
+                mimetype="application/json",
+                status=200,
+                headers={"Content-disposition": "attachment; filename={0}.TS.json".format(project_name)})
+    
+    else:
+        return render_template('targeted_sequencing.html',
+                               project=project,
+                               routes = routes,
+                               pipelines=pipelines,
+                               CC=CC,
+                               status=status,
+                               row_counts=row_counts
+                               )
+
+
+@app.route('/<project_name>/targeted_sequencing/<case>/<sample>', methods=['POST', 'GET'])
+def TS_sample(project_name, case, sample):
+    
+    database = 'waterzooi.db'
+    workflow_db = 'workflows.db'
+    
+    # get the number of lane sequence per sequence and platform and the corresponding release status
+    lanes = get_sample_sequencing_amount(project_name, case, sample, database,
+                                         'Workflows', 'Workflow_Inputs', 'Libraries')
+  
+    # get the project info for project_name from db
+    project = get_project_info(project_name, database)
+    # get the pipelines from the library definitions in db
+    pipelines = get_pipelines(project_name, database)
+    # get miso link
+    miso_link = get_miso_sample_link(project_name, case, database)
+    # get the consensus cruncher data
+    CC = get_swg_ts(project_name, database, 'consensuscruncher', workflow_table = 'Workflows', wf_input_table = 'Workflow_Inputs', library_table='Libraries')
+    # get the selection status of workflows
+    selected = get_selected_workflows(project_name, workflow_db, 'Workflows')
+    # get the input fastqs release status
+    release_status = get_file_release_status(project_name, database)
+    status = get_input_release_status(CC, release_status)
+    # get the workflow names
+    workflow_names = get_workflow_names(project_name, database)
+    file_counts = get_workflow_file_count(project_name, database)
+    # get the amount of data for each workflow
+    amount_data = get_amount_data(project_name, database)
+    # get the creation date of all workflows
+    creation_dates = get_workflows_analysis_date(project_name, database)
+    # sort workflows according to amount of data, release status and creation date
+    ordered_workflows = order_workflows(CC, amount_data, status, creation_dates)
+      
+    if request.method == 'POST':
+        # get the selected workflow        
+        selected_workflow = request.form.getlist('workflow')
+        # get the workflows for the given sample
+        workflows = list(CC[case][sample].keys())
+        update_wf_selection(workflows, selected_workflow, selected, workflow_db, 'Workflows')
+        return redirect(url_for('TS_sample', case=case, project_name=project_name, sample=sample))
+    else:
+        return render_template('TS_sample.html',
+                           project=project,
+                           routes = routes,
+                           pipelines=pipelines,
+                           CC=CC,
+                           status=status,
+                           case=case,
+                           sample=sample,
+                           workflow_names=workflow_names,
+                           file_counts=file_counts,
+                           amount_data=amount_data,
+                           creation_dates=creation_dates,
+                           selected = selected,
+                           ordered_workflows = ordered_workflows,
+                           lanes=lanes
+                           )
+
 
 
 @app.route('/download_block/<project_name>/<pipeline>/<case>/<pair>/<anchor_wf>/<table>/<selection>')
 def download_block_data(project_name, pipeline, case, pair, anchor_wf, table, selection):
         
-    database = 'merged.db'
+    database = 'waterzooi.db'
+    workflow_db = 'workflows.db'
+    
     
     # get the WGS blocks
     blocks = get_WGTS_blocks_info(project_name, case, database, table)
     # get the workflow names
     workflow_names = get_workflow_names(project_name, database)
     # get selected workflows
-    selected_workflows = get_selected_workflows(project_name, database)
+    selected_workflows = get_selected_workflows(project_name, workflow_db)
     # create json with workflow information for block for DARE
     #block_data = create_block_json(project_name, blocks, pair, anchor_wf, workflow_names, selected_workflows, selection)
     
@@ -694,27 +830,25 @@ def download_block_data(project_name, pipeline, case, pair, anchor_wf, table, se
         headers={"Content-disposition": "attachment; filename={0}.{1}.{2}.{3}.{4}.{5}.json".format(project_name, pipeline, case, pair_name, anchor_wf, selection)})
 
 
-@app.route('/download_swg/<project_name>/SWG/<case>/<sample>/<workflow_id>/<selection>')
-def download_SWG_data(project_name, case, sample, workflow_id, selection):
+@app.route('/download_swg/<project_name>/<datatype>/<case>/<sample>/<workflow_id>/<selection>')
+def download_swg_ts_data(project_name, datatype, case, sample, workflow_id, selection):
         
-    database = 'merged.db'
+    database = 'waterzooi.db'
+    workflow_db = 'workflows.db'
     
-    # get the shallow whole genome data
-    swg = get_shallow_wg(project_name, database, workflow_table = 'Workflows', wf_input_table = 'Workflow_Inputs', library_table='Libraries')
     # get the selection status of workflows
-    selected_workflows = get_selected_workflows(project_name, database, 'Workflows')
+    selected_workflows = get_selected_workflows(project_name, workflow_db, 'Workflows')
     # get the workflow names
     workflow_names = get_workflow_names(project_name, database)
     
-    data = create_swg_sample_json(database, project_name, swg, case, sample, workflow_id, workflow_names, selected_workflows, selection)
-    
-        
+    data = create_swg_ts_sample_json(datatype, database, project_name, case, sample, workflow_id, workflow_names, selected_workflows, selection)
+            
     # send the json to outoutfile                    
     return Response(
         response=json.dumps(data),
         mimetype="application/json",
         status=200,
-        headers={"Content-disposition": "attachment; filename={0}.{1}.{2}.{3}.{4}.{5}.json".format(project_name, 'SWG', case, sample, workflow_id, selection)})
+        headers={"Content-disposition": "attachment; filename={0}.{1}.{2}.{3}.{4}.{5}.json".format(project_name, datatype.upper(), case, sample, workflow_id, selection)})
 
 
 
@@ -730,7 +864,7 @@ def download_cases_table(project_name):
     - project_name (str): Name of project of interest
     '''
     
-    database = 'merged.db'
+    database = 'waterzooi.db'
     
     # get case information
     cases = get_cases(project_name, database)
@@ -757,40 +891,6 @@ def download_cases_table(project_name):
    
     return send_file("{0}_cases.xlsx".format(project_name), as_attachment=True)
 
-
-
-# @app.route('/download_identifiers/<project_name>')
-# def download_identifiers_table(project_name):
-#     '''
-    
-    
-#     '''
-    
-#     # get sequence file information
-#     files = collect_sequence_info(project_name, 'merged.db')
-#     # re-organize sequence information
-#     sequences = get_sequences(files)
-    
-#     D = {}
-#     for i in sequences:
-#         d = {'Case': i['case'],
-#              'Donor': i['sample'],
-#              'SampleID': i['group_id'],
-#              'Sample': i['sample_id'],
-#              'Description': i['group_description'],
-#              'Library': i['library'],
-#              'Library Type': i['library_type'],
-#              'Tissue Origin': i['tissue_origin'],
-#              'Tissue Type': i['tissue_type'],
-#              'File Prefix': i['prefix']}
-#         D[i['case']] = d     
-             
-#     data = pd.DataFrame(D.values())
-     
-#     outputfile = '{0}_libraries.xlsx'.format(project_name)
-#     data.to_excel(outputfile, index=False)
-    
-#     return send_file(outputfile, as_attachment=True)
 
 
 # if __name__ == "__main__":
