@@ -131,7 +131,7 @@ def format_created_time(created_time):
 def index():
     
     # connect to db and extract project info
-    conn = connect_to_db('merged.db')
+    conn = connect_to_db('waterzooi.db')
     projects = conn.execute('SELECT * FROM Projects').fetchall()
     conn.close()
     
@@ -143,7 +143,7 @@ def index():
 @app.route('/<project_name>')
 def project_page(project_name):
     
-    database = 'merged.db'
+    database = 'waterzooi.db'
     # get the project info for project_name from db
     project = get_project_info(project_name, database)
     # get the pipelines from the library definitions in db
@@ -176,7 +176,7 @@ def project_page(project_name):
 @app.route('/<project_name>/sequencing', methods = ['GET', 'POST'])
 def sequencing(project_name):
     
-    database = 'merged.db'
+    database = 'waterzooi.db'
     # get the project info for project_name from db
     project = get_project_info(project_name, database)
     # get the pipelines from the library definitions in db
@@ -231,7 +231,7 @@ def sequencing(project_name):
 @app.route('/<project_name>/whole_genome_sequencing/', methods=['POST', 'GET'])
 def whole_genome_sequencing(project_name):
     
-    database = 'merged.db'
+    database = 'waterzooi.db'
     workflow_db = 'workflows.db'
     # get the project info for project_name from db
     project = get_project_info(project_name, database)
@@ -284,7 +284,7 @@ def whole_genome_sequencing(project_name):
 @app.route('/<project_name>/whole_genome_sequencing/<case>/<sample_pair>', methods = ['POST', 'GET'])
 def wgs_case(project_name, case, sample_pair):
     
-    database = 'merged.db'
+    database = 'waterzooi.db'
     workflow_db = 'workflows.db'
     
     # get the number of lane sequence per sequence and platform and the corresponding release status
@@ -355,7 +355,7 @@ def wgs_case(project_name, case, sample_pair):
 @app.route('/<project_name>/<pipeline>/<case>/<sample_pair>/<workflow_id>')
 def workflow(project_name, pipeline, case, sample_pair, workflow_id):
     
-    database = 'merged.db'
+    database = 'waterzooi.db'
     
     # get the project info for project_name from db
     project = get_project_info(project_name, database)
@@ -455,7 +455,7 @@ def workflow(project_name, pipeline, case, sample_pair, workflow_id):
 @app.route('/<project_name>/whole_transcriptome', methods = ['POST', 'GET'])
 def whole_transcriptome(project_name):
     
-    database = 'merged.db'
+    database = 'waterzooi.db'
     workflow_db = 'workflows.db'
         
     # get the project info for project_name from db
@@ -509,7 +509,7 @@ def whole_transcriptome(project_name):
 def wt_case(project_name, case, tumor_sample):
         
     
-    database = 'merged.db'
+    database = 'waterzooi.db'
     workflow_db = 'workflows.db'
     
     # get the number of lane sequence per sequence and platform and the corresponding release status
@@ -575,7 +575,7 @@ def wt_case(project_name, case, tumor_sample):
 def shallow_whole_genome(project_name):
         
     
-    database = 'merged.db'
+    database = 'waterzooi.db'
     workflow_db = 'workflows.db'
     
     # get the project info for project_name from db
@@ -628,7 +628,7 @@ def shallow_whole_genome(project_name):
 @app.route('/<project_name>/shallow_whole_genome/<case>/<sample>', methods=['POST', 'GET'])
 def swg_sample(project_name, case, sample):
     
-    database = 'merged.db'
+    database = 'waterzooi.db'
     workflow_db = 'workflows.db'
 
     # get the number of lane sequence per sequence and platform and the corresponding release status
@@ -689,7 +689,7 @@ def swg_sample(project_name, case, sample):
 @app.route('/<project_name>/targeted_sequencing/', methods=['POST', 'GET'])
 def targeted_sequencing(project_name):
     
-    database = 'merged.db'
+    database = 'waterzooi.db'
     workflow_db = 'workflows.db'
     
     # get the project info for project_name from db
@@ -742,7 +742,7 @@ def targeted_sequencing(project_name):
 @app.route('/<project_name>/targeted_sequencing/<case>/<sample>', methods=['POST', 'GET'])
 def TS_sample(project_name, case, sample):
     
-    database = 'merged.db'
+    database = 'waterzooi.db'
     workflow_db = 'workflows.db'
     
     # get the number of lane sequence per sequence and platform and the corresponding release status
@@ -802,7 +802,7 @@ def TS_sample(project_name, case, sample):
 @app.route('/download_block/<project_name>/<pipeline>/<case>/<pair>/<anchor_wf>/<table>/<selection>')
 def download_block_data(project_name, pipeline, case, pair, anchor_wf, table, selection):
         
-    database = 'merged.db'
+    database = 'waterzooi.db'
     workflow_db = 'workflows.db'
     
     
@@ -833,7 +833,7 @@ def download_block_data(project_name, pipeline, case, pair, anchor_wf, table, se
 @app.route('/download_swg/<project_name>/<datatype>/<case>/<sample>/<workflow_id>/<selection>')
 def download_swg_ts_data(project_name, datatype, case, sample, workflow_id, selection):
         
-    database = 'merged.db'
+    database = 'waterzooi.db'
     workflow_db = 'workflows.db'
     
     # get the selection status of workflows
@@ -864,7 +864,7 @@ def download_cases_table(project_name):
     - project_name (str): Name of project of interest
     '''
     
-    database = 'merged.db'
+    database = 'waterzooi.db'
     
     # get case information
     cases = get_cases(project_name, database)
@@ -891,40 +891,6 @@ def download_cases_table(project_name):
    
     return send_file("{0}_cases.xlsx".format(project_name), as_attachment=True)
 
-
-
-# @app.route('/download_identifiers/<project_name>')
-# def download_identifiers_table(project_name):
-#     '''
-    
-    
-#     '''
-    
-#     # get sequence file information
-#     files = collect_sequence_info(project_name, 'merged.db')
-#     # re-organize sequence information
-#     sequences = get_sequences(files)
-    
-#     D = {}
-#     for i in sequences:
-#         d = {'Case': i['case'],
-#              'Donor': i['sample'],
-#              'SampleID': i['group_id'],
-#              'Sample': i['sample_id'],
-#              'Description': i['group_description'],
-#              'Library': i['library'],
-#              'Library Type': i['library_type'],
-#              'Tissue Origin': i['tissue_origin'],
-#              'Tissue Type': i['tissue_type'],
-#              'File Prefix': i['prefix']}
-#         D[i['case']] = d     
-             
-#     data = pd.DataFrame(D.values())
-     
-#     outputfile = '{0}_libraries.xlsx'.format(project_name)
-#     data.to_excel(outputfile, index=False)
-    
-#     return send_file(outputfile, as_attachment=True)
 
 
 # if __name__ == "__main__":
