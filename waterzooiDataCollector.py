@@ -15,7 +15,7 @@ import time
 import traceback
 import os
 import subprocess
-from utilities import connect_to_db
+from utilities import connect_to_db, secret_key_generator
 from whole_genome import get_workflow_limskeys, find_WGS_blocks
 from whole_transcriptome import find_WT_blocks
 
@@ -1644,7 +1644,7 @@ def launch_jobs(args):
     os.makedirs(databasedir, exist_ok=True)
     
     
-    dbfiller = os.path.join(args.workingdir, 'prov_reporter_db_filler.py')
+    dbfiller = os.path.join(args.workingdir, 'waterzooiDataCollector.py')
 
     cmd1 = '/u/rjovelin/SOFT/anaconda3/bin/python3.6 {0} collect_lims -p {1} -l {2}'
     bashScript = os.path.join(qsubdir, 'collect_lims.sh')
@@ -1675,7 +1675,9 @@ def launch_jobs(args):
         with open(bashScript, 'w') as newfile:
             newfile.write(cmd3.format(dbfiller, args.fpr, args.nabu, args.pinery, database, project, lims_info_file, samples_info_file))
         # launch qsub directly, collect job names and exit codes
-        jobName = '{0}.provdb'.format(project)
+        #jobName = '{0}.provdb'.format(project)
+        jobName = '{0}.{1}'.format(project, secret_key_generator(20))
+              
         qsubCmd = 'qsub -b y -P gsi -l h_vmem={0}g,h_rt={1}:0:0 -N {2} -hold_jid "{3}" -e {4} -o {4} "bash {5}"'.format(args.mem, args.run_time, jobName, 'provdb.lims,provdb.samples', logdir, bashScript)
         subprocess.call(qsubCmd, shell=True)
         # store job names
@@ -1800,7 +1802,10 @@ def merge_databases(merged_database, databases):
               
     for db in databases:
         print(os.path.basename(db))
-        merge_two_databases(merged_database, db)
+        try:
+            merge_two_databases(merged_database, db)
+        except:
+            print('could not merge {0} database'.format(os.path.basename(db)))
     
     end = time.time()
     print('merged databases', end - start)
@@ -1821,7 +1826,7 @@ def get_job_exit_status(job):
         output = subprocess.check_output('qacct -j {0}'.format(job), shell=True).decode('utf-8').rstrip().split('\n')
     except:
         output = ''
-               
+    
     if output:
         # record all exit status, the same job may have run multiple times
         d = {}
@@ -1853,50 +1858,6 @@ def get_job_exit_status(job):
     return exit_status
 
 
-   
-# def migrate(args):
-#     '''
-#     (list) -> None
-    
-#     Launch job to copy the database to the server
-    
-#     Parameters
-#     ----------
-#     - database (str): Path to the database file
-#     - mem (str): Memory allocated to jobs
-#     - server (str): Server running the application
-#     - job_names (str): Semi-colon separated list of job names 
-#     '''
-    
-    
-#     # check if jobs are still running
-#     jobs = list(map(lambda x: x.strip(), args.job_names.split(',')))
-    
-#     # make a list of successfully updated project db
-#     updated = []
-#     databasedir = os.path.join(args.workingdir, 'databases')
-#     for job in jobs:
-#         # get exit status
-#         exit_status = get_job_exit_status(job)
-#         if exit_status == 0:
-#             db =  os.path.join(databasedir, job.split('.')[0] + '.db')
-#             updated.append(db)
-            
-#     # merge all projects databases that were successfully updated
-#     merge_databases(args.merged_database, updated)
-
-#     # copy merged database to server
-#     subprocess.call('scp -i {0} {1} {2}:~/provenance-reporter/'.format(args.pemfile, args.merged_database, args.server), shell=True)
-
-    
-#     if args.remove_db:
-#         # remove project databases
-#         project_databases = [os.path.join(databasedir, i) for i in os.listdir(databasedir) if '.db' in i]
-#         for i in project_databases:
-#             assert '/scratch2/groups/gsi/bis/rjovelin/provenance_reporter/databases' in i and '.db' in i
-#             os.remove(i)
-        
-
 def merge(args):
     '''
     (list) -> None
@@ -1914,7 +1875,8 @@ def merge(args):
     if args.job_names:
         # check if jobs are still running
         jobs = list(map(lambda x: x.strip(), args.job_names.split(',')))
-    
+        jobs.sort()  
+        
         # make a list of successfully updated project db
         updated = []
         databasedir = os.path.join(args.workingdir, 'databases')
@@ -1928,10 +1890,10 @@ def merge(args):
         # make a list of any project databases 
         databasedir = os.path.join(args.workingdir, 'databases')
         updated = [os.path.join(databasedir, i) for i in os.listdir(databasedir) if '.db' in i]
-       
+    
     # merge all projects databases that were successfully updated
     merge_databases(args.merged_database, updated)
-
+        
     if args.remove_db:
         # remove project databases
         project_databases = [os.path.join(databasedir, i) for i in os.listdir(databasedir) if '.db' in i]
