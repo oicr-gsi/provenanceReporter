@@ -1922,7 +1922,6 @@ if __name__ == '__main__':
     fill_parser.add_argument('-m', '--memory', dest='mem', default=20, help='Memory allocated to jobs')
     fill_parser.add_argument('-md', '--merged_database', dest='merged_database', help='Path to the merged database', required = True)
     fill_parser.add_argument('-rt', '--run_time', dest='run_time', default=5, help='Run time in hours')
-    fill_parser.add_argument('-pf', '--pem_file', dest='pemfile', default='~/.ssh/provenance_reporter.pem', help='Path to the pem file to access the server')
     fill_parser.set_defaults(func=launch_jobs)
 
 
