@@ -15,7 +15,7 @@ import time
 import traceback
 import os
 import subprocess
-from utilities import connect_to_db
+from utilities import connect_to_db, secret_key_generator
 from whole_genome import get_workflow_limskeys, find_WGS_blocks
 from whole_transcriptome import find_WT_blocks
 
@@ -1637,33 +1637,33 @@ def launch_jobs(args):
     qsubdir = os.path.join(args.workingdir, 'qsubs')
     os.makedirs(qsubdir, exist_ok=True)
     # create a log dir
-    logdir = os.path.join(qsubdir, 'log')
+    logdir = os.path.join(qsubdir, 'logs')
     os.makedirs(logdir, exist_ok=True)
     # make a directory to store the project databases
     databasedir = os.path.join(args.workingdir, 'databases')
     os.makedirs(databasedir, exist_ok=True)
     
-    
-    dbfiller = os.path.join(args.workingdir, 'prov_reporter_db_filler.py')
-
-    cmd1 = '/u/rjovelin/SOFT/anaconda3/bin/python3.6 {0} collect_lims -p {1} -l {2}'
+    cmd1 = 'waterzooiDataCollector collect_lims -p {0} -l {1}'
+        
     bashScript = os.path.join(qsubdir, 'collect_lims.sh')
     lims_info_file = os.path.join(args.workingdir, 'lims_info.json')
     with open(bashScript, 'w') as newfile:
-        newfile.write(cmd1.format(dbfiller, args.pinery, lims_info_file))
-    qsubCmd = "qsub -b y -P gsi -l h_vmem={0}g -N {1}  -e {2} -o {2} \"bash {3}\"".format(args.mem, 'provdb.lims', logdir, bashScript)
+        #newfile.write(cmd1.format(dbfiller, args.pinery, lims_info_file))
+        newfile.write(cmd1.format(args.pinery, lims_info_file))
+    
+    qsubCmd = "qsub -b y -P gsi -l h_vmem={0}g -N {1}  -e {2} -o {2} \"bash {3}\"".format(args.mem, 'waterzooidb.lims', logdir, bashScript)
     subprocess.call(qsubCmd, shell=True)
 
-
-    cmd2 = '/u/rjovelin/SOFT/anaconda3/bin/python3.6 {0} collect_samples -p {1} -s {2}'
+    cmd2 = 'waterzooiDataCollector collect_samples -p {0} -s {1}'
+        
     bashScript = os.path.join(qsubdir, 'collect_samples.sh')
     samples_info_file = os.path.join(args.workingdir, 'samples_info.json')
     with open(bashScript, 'w') as newfile:
-        newfile.write(cmd2.format(dbfiller, args.pinery, samples_info_file))
-    qsubCmd = "qsub -b y -P gsi -l h_vmem={0}g -N {1}  -e {2} -o {2} \"bash {3}\"".format(args.mem, 'provdb.samples', logdir, bashScript)
+        newfile.write(cmd2.format(args.pinery, samples_info_file))
+    qsubCmd = "qsub -b y -P gsi -l h_vmem={0}g -N {1}  -e {2} -o {2} \"bash {3}\"".format(args.mem, 'waterzooidb.samples', logdir, bashScript)
     subprocess.call(qsubCmd, shell=True)
 
-    cmd3 = '/u/rjovelin/SOFT/anaconda3/bin/python3.6 {0} add_project -f {1} -n {2} -p {3} -d {4} -pr {5} -l {6} -s {7}'
+    cmd3 = 'waterzooiDataCollector add_project -f {0} -n {1} -p {2} -d {3} -pr {4} -l {5} -s {6}'
     
     # record job names and job exit codes    
     job_names = []
@@ -1673,20 +1673,22 @@ def launch_jobs(args):
         # get name of output file
         bashScript = os.path.join(qsubdir, '{0}_add_project_info.sh'.format(project))
         with open(bashScript, 'w') as newfile:
-            newfile.write(cmd3.format(dbfiller, args.fpr, args.nabu, args.pinery, database, project, lims_info_file, samples_info_file))
+            newfile.write(cmd3.format(args.fpr, args.nabu, args.pinery, database, project, lims_info_file, samples_info_file))
         # launch qsub directly, collect job names and exit codes
-        jobName = '{0}.provdb'.format(project)
-        qsubCmd = 'qsub -b y -P gsi -l h_vmem={0}g,h_rt={1}:0:0 -N {2} -hold_jid "{3}" -e {4} -o {4} "bash {5}"'.format(args.mem, args.run_time, jobName, 'provdb.lims,provdb.samples', logdir, bashScript)
+        jobName = '{0}.{1}'.format(project, secret_key_generator(20))
+              
+        qsubCmd = 'qsub -b y -P gsi -l h_vmem={0}g,h_rt={1}:0:0 -N {2} -hold_jid "{3}" -e {4} -o {4} "bash {5}"'.format(args.mem, args.run_time, jobName, 'waterzooidb.lims,waterzooidb.samples', logdir, bashScript)
         subprocess.call(qsubCmd, shell=True)
         # store job names
         job_names.append(jobName)
     
     # launch job to merge the project databases
-    cmd4 = '/u/rjovelin/SOFT/anaconda3/bin/python3.6 {0} merge -md {1} -jn "{2}" -wd {3}'
+    cmd4 = 'waterzooiDataCollector merge -md {0} -jn "{1}" -wd {2}'
+       
     bashScript = os.path.join(qsubdir, 'merge_db.sh')
     with open(bashScript, 'w') as newfile:
-        newfile.write(cmd4.format(dbfiller, args.merged_database, ','.join(job_names), args.workingdir))
-    qsubCmd = "qsub -b y -P gsi -l h_vmem={0}g,h_rt={1}:0:0 -N {2}  -hold_jid \"{3}\" -e {4} -o {4} \"bash {5}\"".format(args.mem, args.run_time, 'provdb.migration', ','.join(job_names), logdir, bashScript)
+        newfile.write(cmd4.format(args.merged_database, ','.join(job_names), args.workingdir))
+    qsubCmd = "qsub -b y -P gsi -l h_vmem={0}g,h_rt={1}:0:0 -N {2}  -hold_jid \"{3}\" -e {4} -o {4} \"bash {5}\"".format(args.mem, args.run_time, 'waterzooidb.merging', ','.join(job_names), logdir, bashScript)
     subprocess.call(qsubCmd, shell=True)
 
 
@@ -1800,7 +1802,10 @@ def merge_databases(merged_database, databases):
               
     for db in databases:
         print(os.path.basename(db))
-        merge_two_databases(merged_database, db)
+        try:
+            merge_two_databases(merged_database, db)
+        except:
+            print('could not merge {0} database'.format(os.path.basename(db)))
     
     end = time.time()
     print('merged databases', end - start)
@@ -1821,7 +1826,7 @@ def get_job_exit_status(job):
         output = subprocess.check_output('qacct -j {0}'.format(job), shell=True).decode('utf-8').rstrip().split('\n')
     except:
         output = ''
-               
+    
     if output:
         # record all exit status, the same job may have run multiple times
         d = {}
@@ -1853,50 +1858,6 @@ def get_job_exit_status(job):
     return exit_status
 
 
-   
-# def migrate(args):
-#     '''
-#     (list) -> None
-    
-#     Launch job to copy the database to the server
-    
-#     Parameters
-#     ----------
-#     - database (str): Path to the database file
-#     - mem (str): Memory allocated to jobs
-#     - server (str): Server running the application
-#     - job_names (str): Semi-colon separated list of job names 
-#     '''
-    
-    
-#     # check if jobs are still running
-#     jobs = list(map(lambda x: x.strip(), args.job_names.split(',')))
-    
-#     # make a list of successfully updated project db
-#     updated = []
-#     databasedir = os.path.join(args.workingdir, 'databases')
-#     for job in jobs:
-#         # get exit status
-#         exit_status = get_job_exit_status(job)
-#         if exit_status == 0:
-#             db =  os.path.join(databasedir, job.split('.')[0] + '.db')
-#             updated.append(db)
-            
-#     # merge all projects databases that were successfully updated
-#     merge_databases(args.merged_database, updated)
-
-#     # copy merged database to server
-#     subprocess.call('scp -i {0} {1} {2}:~/provenance-reporter/'.format(args.pemfile, args.merged_database, args.server), shell=True)
-
-    
-#     if args.remove_db:
-#         # remove project databases
-#         project_databases = [os.path.join(databasedir, i) for i in os.listdir(databasedir) if '.db' in i]
-#         for i in project_databases:
-#             assert '/scratch2/groups/gsi/bis/rjovelin/provenance_reporter/databases' in i and '.db' in i
-#             os.remove(i)
-        
-
 def merge(args):
     '''
     (list) -> None
@@ -1914,7 +1875,8 @@ def merge(args):
     if args.job_names:
         # check if jobs are still running
         jobs = list(map(lambda x: x.strip(), args.job_names.split(',')))
-    
+        jobs.sort()  
+        
         # make a list of successfully updated project db
         updated = []
         databasedir = os.path.join(args.workingdir, 'databases')
@@ -1928,17 +1890,11 @@ def merge(args):
         # make a list of any project databases 
         databasedir = os.path.join(args.workingdir, 'databases')
         updated = [os.path.join(databasedir, i) for i in os.listdir(databasedir) if '.db' in i]
-       
+    
     # merge all projects databases that were successfully updated
     merge_databases(args.merged_database, updated)
-
-    if args.remove_db:
-        # remove project databases
-        project_databases = [os.path.join(databasedir, i) for i in os.listdir(databasedir) if '.db' in i]
-        for i in project_databases:
-            assert '/scratch2/groups/gsi/bis/rjovelin/provenance_reporter/databases' in i and '.db' in i
-            os.remove(i)
-
+        
+    
 if __name__ == '__main__':
 
     
@@ -1966,7 +1922,6 @@ if __name__ == '__main__':
     fill_parser.add_argument('-m', '--memory', dest='mem', default=20, help='Memory allocated to jobs')
     fill_parser.add_argument('-md', '--merged_database', dest='merged_database', help='Path to the merged database', required = True)
     fill_parser.add_argument('-rt', '--run_time', dest='run_time', default=5, help='Run time in hours')
-    fill_parser.add_argument('-pf', '--pem_file', dest='pemfile', default='~/.ssh/provenance_reporter.pem', help='Path to the pem file to access the server')
     fill_parser.set_defaults(func=launch_jobs)
 
 
@@ -1987,7 +1942,6 @@ if __name__ == '__main__':
     merge_parser.add_argument('-jn', '--job_names', dest='job_names', help='Names of the jobs launched to fill the database')
     merge_parser.add_argument('-wd', '--workingdir', dest='workingdir', help='Name of the directory where qsubs scripts are written', required = True)
     merge_parser.add_argument('-md', '--merged_database', dest='merged_database', help='Path to the merged database', required = True)
-    merge_parser.add_argument('-rmdb', '--removedb', dest='remove_db', action='store_true', help='Remove project databases if activated')
     merge_parser.set_defaults(func=merge)
     
     # get arguments from the command line

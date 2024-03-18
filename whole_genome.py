@@ -1965,12 +1965,19 @@ def get_block_level_contamination(project_name, database, blocks, sample_pair):
             workflow_limskeys = limskeys[workflow_id]
             # group the limskeys by sample
             workflow_limskeys = group_limskeys(workflow_limskeys)
+            
             # use the maximum contamination of each sample 
-            conta = max([contamination[i] for i in workflow_limskeys if i in contamination]) * 100
-            conta = round(conta, 3)
+            conta = [contamination[i] for i in workflow_limskeys if i in contamination]
+            if conta:
+                conta = round(max(conta) * 100, 3)
+            else:
+                conta = 'NA'
             block_conta.append(conta)
         # use the maximum contamination of each bmpp workflow
-        D[workflow] = max(block_conta)
+        if 'NA' in block_conta:
+            D[workflow] = 'NA'
+        else:
+            D[workflow] = max(block_conta)
     
     return D       
     
