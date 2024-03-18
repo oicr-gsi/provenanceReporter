@@ -1894,13 +1894,7 @@ def merge(args):
     # merge all projects databases that were successfully updated
     merge_databases(args.merged_database, updated)
         
-    if args.remove_db:
-        # remove project databases
-        project_databases = [os.path.join(databasedir, i) for i in os.listdir(databasedir) if '.db' in i]
-        for i in project_databases:
-            assert '/scratch2/groups/gsi/bis/rjovelin/provenance_reporter/databases' in i and '.db' in i
-            os.remove(i)
-
+    
 if __name__ == '__main__':
 
     
@@ -1949,7 +1943,6 @@ if __name__ == '__main__':
     merge_parser.add_argument('-jn', '--job_names', dest='job_names', help='Names of the jobs launched to fill the database')
     merge_parser.add_argument('-wd', '--workingdir', dest='workingdir', help='Name of the directory where qsubs scripts are written', required = True)
     merge_parser.add_argument('-md', '--merged_database', dest='merged_database', help='Path to the merged database', required = True)
-    merge_parser.add_argument('-rmdb', '--removedb', dest='remove_db', action='store_true', help='Remove project databases if activated')
     merge_parser.set_defaults(func=merge)
     
     # get arguments from the command line
