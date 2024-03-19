@@ -1643,7 +1643,7 @@ def launch_jobs(args):
     databasedir = os.path.join(args.workingdir, 'databases')
     os.makedirs(databasedir, exist_ok=True)
     
-    cmd1 = 'waterzooiDataCollector collect_lims -p {0} -l {1}'
+    cmd1 = 'module load waterzooi-tools; waterzooiDataCollector collect_lims -p {0} -l {1}'
         
     bashScript = os.path.join(qsubdir, 'collect_lims.sh')
     lims_info_file = os.path.join(args.workingdir, 'lims_info.json')
@@ -1654,7 +1654,7 @@ def launch_jobs(args):
     qsubCmd = "qsub -b y -P gsi -l h_vmem={0}g -N {1}  -e {2} -o {2} \"bash {3}\"".format(args.mem, 'waterzooidb.lims', logdir, bashScript)
     subprocess.call(qsubCmd, shell=True)
 
-    cmd2 = 'waterzooiDataCollector collect_samples -p {0} -s {1}'
+    cmd2 = 'module load waterzooi-tools; waterzooiDataCollector collect_samples -p {0} -s {1}'
         
     bashScript = os.path.join(qsubdir, 'collect_samples.sh')
     samples_info_file = os.path.join(args.workingdir, 'samples_info.json')
@@ -1663,7 +1663,7 @@ def launch_jobs(args):
     qsubCmd = "qsub -b y -P gsi -l h_vmem={0}g -N {1}  -e {2} -o {2} \"bash {3}\"".format(args.mem, 'waterzooidb.samples', logdir, bashScript)
     subprocess.call(qsubCmd, shell=True)
 
-    cmd3 = 'waterzooiDataCollector add_project -f {0} -n {1} -p {2} -d {3} -pr {4} -l {5} -s {6}'
+    cmd3 = 'module load waterzooi-tools; waterzooiDataCollector add_project -f {0} -n {1} -p {2} -d {3} -pr {4} -l {5} -s {6}'
     
     # record job names and job exit codes    
     job_names = []
@@ -1683,7 +1683,7 @@ def launch_jobs(args):
         job_names.append(jobName)
     
     # launch job to merge the project databases
-    cmd4 = 'waterzooiDataCollector merge -md {0} -jn "{1}" -wd {2}'
+    cmd4 = 'module load waterzooi-tools; waterzooiDataCollector merge -md {0} -jn "{1}" -wd {2}'
        
     bashScript = os.path.join(qsubdir, 'merge_db.sh')
     with open(bashScript, 'w') as newfile:
