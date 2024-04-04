@@ -959,6 +959,19 @@ def add_workflows(workflows, database, project_name, table = 'Workflows'):
         values.insert(3, project_name)
         
         
+        if len(values) != len(column_names):
+            print(workflow_run)
+            print(len(values))
+            print(sorted(column_names))
+            
+            print(workflows[project_name][workflow_run])
+        
+            present = [i for i in column_names if i in workflows[project_name][workflow_run]]
+            present.sort()
+            print(present)
+            missing = [i for i in column_names if i not in present]
+            print(missing)
+        
         cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(values)))
         conn.commit()
         
@@ -1156,10 +1169,31 @@ def add_workflows_info_to_db(fpr, database, project_name, workflow_table = 'Work
     # get the workflow inputs and workflow info
     workflows, parents, files = get_workflow_relationships(fpr, project_name)
     
+    print('parsed workflows')
+    
     # get the file count for each workflow
     counts = count_files(project_name, database, file_table)
     # update workflow information with file count
     update_workflow_information(project_name, workflows, counts, 'file_count')
+    
+    print('added file count')
+    
+    
+    
+    
+    missing_file_count = 0
+    present_file_count = 0
+    total = 0
+    
+    for i in workflows:
+        for j in workflows[i]:
+            total += 1
+            if 'file_count' not in workflows[i][j]:
+                missing_file_count += 1
+            else:
+                present_file_count += 1
+    
+    
     
     # get the amount of data for each workflow
     limskeys = get_workflow_limskeys(project_name, database, workflow_input_table)
@@ -1167,7 +1201,13 @@ def add_workflows_info_to_db(fpr, database, project_name, workflow_table = 'Work
         limskeys[i] = len(limskeys[i])
     # update workflow information with lane count
     update_workflow_information(project_name, workflows, limskeys, 'lane_count')
-        
+    
+    print('added lane count')
+    
+
+
+
+    
     # check that project is defined in FPR (ie, may be defined in Pinery but no data recorded in FPR)
     if workflows and parents and files:
         # create a dict {workflow: [parent workflows]}
@@ -1181,9 +1221,9 @@ def add_workflows_info_to_db(fpr, database, project_name, workflow_table = 'Work
        
 
     
-def add_fileQC_info_to_db(database, project, fpr, nabu_api, table='FilesQC'):
+def add_fileQC_info_to_db(database, project, nabu_api, table='FilesQC'):
     '''
-    (str, str, str, str, str) -> None
+    (str, str, str, str) -> None
     
     Inserts file QC information in database's FilesQC table
        
@@ -1191,7 +1231,6 @@ def add_fileQC_info_to_db(database, project, fpr, nabu_api, table='FilesQC'):
     ----------
     - database (str): Path to the database file
     - project (str): Name of project of interest
-    - fpr (str): Path to the File Provenance Report
     - nabu_api (str): URL of the nabu API
     - table (str): Table in database storing the QC or file information. Default is FilesQC
     '''
@@ -1220,11 +1259,11 @@ def add_fileQC_info_to_db(database, project, fpr, nabu_api, table='FilesQC'):
 
 
 
-def add_file_info_to_db(database, project, fpr, nabu_api, table = 'Files'):
+def add_file_info_to_db(database, project, fpr, table = 'Files'):
     '''
-    (str, str, str, str, str, str, str) -> None
+    (str, str, str, str) -> None
     
-    Inserts or updates file QC information in database's FilesQC table
+    Inserts file information in database's Files table
        
     Parameters
     ----------
@@ -1232,7 +1271,6 @@ def add_file_info_to_db(database, project, fpr, nabu_api, table = 'Files'):
     - project (str): Name of project of interest
     - fpr (str): Path to the File Provenance Report
     - file_table (str): Table in database storing file information. Default is Files 
-    - nabu_api (str): URL of the nabu API
     - table (str): Table in database storing file information. Default is Files
     '''
 
@@ -1573,7 +1611,7 @@ def add_info(args):
     
     
     # add file info
-    add_file_info_to_db(args.database, args.project, args.fpr, args.nabu, 'Files')
+    add_file_info_to_db(args.database, args.project, args.fpr, 'Files')
     print('added files')
     
     
@@ -1588,7 +1626,7 @@ def add_info(args):
     print('added workflows')
     
     # add file QC info
-    add_fileQC_info_to_db(args.database, args.project, args.fpr, args.nabu, 'FilesQC')
+    add_fileQC_info_to_db(args.database, args.project, args.nabu, 'FilesQC')
     print('added filesqc')
     
     # add library information
