@@ -493,11 +493,11 @@ def get_workflow_relationships(fpr, project_name):
             if workflow_run in W[project]:
                 assert W[project][workflow_run] == {'wfrun_id': workflow_run, 'wfv': workflow_version,
                                                     'wf': workflow, 'attributes': attributes,
-                                                    'skip': skip, 'stale': stale}
+                                                    'skip': skip, 'stale': stale, 'project_id': project}
             else:
                 W[project][workflow_run] = {'wfrun_id': workflow_run, 'wfv': workflow_version,
                                             'wf': workflow, 'attributes': attributes,
-                                            'skip': skip, 'stale': stale}
+                                            'skip': skip, 'stale': stale, 'project_id': project}
         
             if project not in F:
                 F[project] = {}
@@ -956,8 +956,7 @@ def add_workflows(workflows, database, project_name, table = 'Workflows'):
     for workflow_run in workflows[project_name]:
         # insert data into table
         values = [workflows[project_name][workflow_run][i] for i in column_names if i in workflows[project_name][workflow_run]]
-        values.insert(3, project_name)
-        
+               
         
         if len(values) != len(column_names):
             print(workflow_run)
