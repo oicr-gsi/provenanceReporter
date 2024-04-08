@@ -146,11 +146,13 @@ def get_WT_call_ready_samples(project_name, star_id, database):
     # only considering tumour samples for WT data     
     samples = {'tumour': []}
     for i in data:
+        tissue = ''
         if i['tissue_type'] != 'R':
             tissue = 'tumour'
-        sample = '_'.join([i['sample'], i['tissue_type'], i['tissue_origin'], i['library_type'], i['group_id']]) 
-        if sample not in samples[tissue]:
-            samples[tissue].append(sample)
+        if tissue == 'tumour':
+            sample = '_'.join([i['sample'], i['tissue_type'], i['tissue_origin'], i['library_type'], i['group_id']]) 
+            if sample not in samples[tissue]:
+                samples[tissue].append(sample)
 
     return samples
 
@@ -193,7 +195,8 @@ def map_samples_to_star_runs(project_name, star_ids, database):
     for i in star_ids:
         # initiate dictionary
         samples = get_WT_call_ready_samples(project_name, i, database)
-        D[i] = samples
+        if samples['tumour']:
+            D[i] = samples
     return D
 
 
@@ -313,10 +316,12 @@ def find_case_WT_blocks(project_name, case, database, expected_workflows):
     # build the somatic calling block
     # identify all call ready star runs for novaseq
     star = get_star_case(project_name, case, 'novaseq', 'WT', database)
+    
     # proceed only in star ids exist
     if star:
         # get the tumor samples for each star id
         star_samples = map_samples_to_star_runs(project_name, star, database)
+        
         # identify all the samples processed
         samples = get_WT_case_call_ready_samples(project_name, star_samples)
         if samples['tumour']:
