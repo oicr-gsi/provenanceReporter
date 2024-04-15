@@ -105,7 +105,7 @@ def remove_non_analysis_workflows(L):
                               'fileimportforanalysis', 'fileimport', 'import_fastq',
                               'dnaseqqc', 'hotspotfingerprintcollector', 'rnaseqqc')
     
-    to_remove = [i for i in L if i['wf'].split('_')[0].lower() in non_analysis_workflows]
+    to_remove = [i for i in L if i['wf'].split('_')[0].lower() in non_analysis_workflows or i['wf'].lower() in non_analysis_workflows]
     for i in to_remove:
         L.remove(i)
     
