@@ -412,7 +412,7 @@ def open_fpr(fpr):
     if is_gzipped(fpr):
         infile = gzip.open(fpr, 'rt', errors='ignore')
     else:
-        infile = open(fpr)
+        infile = open(fpr, encoding='utf-8')
     return infile
 
 
