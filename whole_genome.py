@@ -160,7 +160,7 @@ def map_analysis_workflows_to_sample(project_name, sample, platform, database):
     
     # remove non analysis worfkflows
     data = remove_non_analysis_workflows(data)
-        
+    
     to_remove = [i for i in data if platform not in i['platform'].lower()]
     for i in to_remove:
         data.remove(i)

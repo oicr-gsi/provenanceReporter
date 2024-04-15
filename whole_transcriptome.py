@@ -324,6 +324,7 @@ def find_case_WT_blocks(project_name, case, database, expected_workflows):
         
         # identify all the samples processed
         samples = get_WT_case_call_ready_samples(project_name, star_samples)
+        
         if samples['tumour']:
             # remove samples without analysis workflows
             D = map_workflows_to_samples(project_name, 'novaseq', samples, database)
