@@ -292,15 +292,18 @@ def collect_file_info_from_fpr(fpr, project_name):
                 skip = 0
             stale = line[52]
             
-            # collect file info
-            if file_swid not in D[project]:
-                D[project][file_swid] = {'creation_date': creation_date, 'md5sum': md5sum,
-                                         'workflow': workflow, 'version': version,
-                                         'wfrun_id': workflow_run, 'file': file,
-                                         'library_type': library_type, 'attributes': attributes,
-                                         'limskey': [limskey], 'skip': skip, 'stale': stale}
-            else:
-                D[project][file_swid]['limskey'].append(limskey)
+            # skip stale records
+            if stale.lower() != 'stale':
+            
+                # collect file info
+                if file_swid not in D[project]:
+                    D[project][file_swid] = {'creation_date': creation_date, 'md5sum': md5sum,
+                                             'workflow': workflow, 'version': version,
+                                             'wfrun_id': workflow_run, 'file': file,
+                                             'library_type': library_type, 'attributes': attributes,
+                                             'limskey': [limskey], 'skip': skip, 'stale': stale}
+                else:
+                    D[project][file_swid]['limskey'].append(limskey)
     infile.close()
     return D
 
@@ -409,7 +412,7 @@ def open_fpr(fpr):
     if is_gzipped(fpr):
         infile = gzip.open(fpr, 'rt', errors='ignore')
     else:
-        infile = open(fpr)
+        infile = open(fpr, encoding='utf-8')
     return infile
 
 
@@ -461,50 +464,48 @@ def get_workflow_relationships(fpr, project_name):
                 skip = 0
             stale = line[52]
             
-            # keep only unique string. file swid doesn't match file swid of worklow input files
-            #file_swid = os.path.basename(file_swid)
             
-            input_files = line[38]
-            if input_files:
-                input_files = sorted(input_files.split(','))
+            # do not include stale records
+            if stale.lower() != 'stale':
+                input_files = line[38]
+                if input_files:
+                    input_files = sorted(input_files.split(','))
+                else:
+                    input_files = []
             
-                #input_files = sorted(list(set((map(lambda x: os.path.basename(x), input_files.split(','))))))
-            else:
-                input_files = []
-            
-            # get workflow attributes
-            attributes = line[37]
-            if attributes:
-               attributes = attributes.split(';')
-               attributes = json.dumps({k.split('=')[0]: k.split('=')[1] for k in attributes if k.split('=')[0] not in ['cromwell-workflow-id', 'major_olive_version']})
-            else:
-               attributes = ''                
+                # get workflow attributes
+                attributes = line[37]
+                if attributes:
+                    attributes = attributes.split(';')
+                    attributes = json.dumps({k.split('=')[0]: k.split('=')[1] for k in attributes if k.split('=')[0] not in ['cromwell-workflow-id', 'major_olive_version']})
+                else:
+                    attributes = ''                
        
-            if project not in P:
-                P[project] = {}
+                if project not in P:
+                    P[project] = {}
       
-            if workflow_run in P[project]:
-                assert P[project][workflow_run] == input_files
-            else:
-                P[project][workflow_run] = input_files
+                if workflow_run in P[project]:
+                    assert P[project][workflow_run] == input_files
+                else:
+                    P[project][workflow_run] = input_files
                 
-            if project not in W:
-                W[project] = {}
-            if workflow_run in W[project]:
-                assert W[project][workflow_run] == {'wfrun_id': workflow_run, 'wfv': workflow_version,
-                                                    'wf': workflow, 'attributes': attributes,
-                                                    'skip': skip, 'stale': stale}
-            else:
-                W[project][workflow_run] = {'wfrun_id': workflow_run, 'wfv': workflow_version,
-                                            'wf': workflow, 'attributes': attributes,
-                                            'skip': skip, 'stale': stale}
+                if project not in W:
+                    W[project] = {}
+                if workflow_run in W[project]:
+                    recorded = sorted([W[project][workflow_run][i] for i in W[project][workflow_run] if i not in ['skip', 'stale']])
+                    newrecord = sorted([workflow_run, workflow_version, workflow, attributes, project])
+                    assert recorded == newrecord
+                else:
+                    W[project][workflow_run] = {'wfrun_id': workflow_run, 'wfv': workflow_version,
+                                                'wf': workflow, 'attributes': attributes,
+                                                'skip': skip, 'stale': stale, 'project_id': project}
         
-            if project not in F:
-                F[project] = {}
-            if file_swid in F[project]:
-                assert F[project][file_swid] == workflow_run
-            else:
-                F[project][file_swid] = workflow_run
+                if project not in F:
+                    F[project] = {}
+                if file_swid in F[project]:
+                    assert F[project][file_swid] == workflow_run
+                else:
+                    F[project][file_swid] = workflow_run
     
     infile.close()
     
@@ -616,11 +617,6 @@ def get_parent_sample_info(pinery, project, sample_info):
     return L   
 
 
-
-
-
-    
-
 def extract_workflow_info(fpr, project_name):
     '''
     (str, str) -> dict
@@ -650,36 +646,36 @@ def extract_workflow_info(fpr, project_name):
             if project != project_name:
                 continue             
     
-            # if line[51].lower() == 'true':
-            #     continue
+            # do not include stale records
+            stale = line[52]
+            if stale.lower() != 'stale':
     
-    
-            # get sample name
-            sample = line[7]
-            # get workflow name and workflow run accession
-            workflow, workflow_run = line[30], line[36]
+                # get sample name
+                sample = line[7]
+                # get workflow name and workflow run accession
+                workflow, workflow_run = line[30], line[36]
                                   
-            # get lane and run
-            run, lane = line[18], line[24]            
-            # get library and limskey
-            library, limskey  = line[13], line[56]
+                # get lane and run
+                run, lane = line[18], line[24]            
+                # get library and limskey
+                library, limskey  = line[13], line[56]
             
-            # get barcode and platform
-            barcode, platform = line[27], line[22]
+                # get barcode and platform
+                barcode, platform = line[27], line[22]
             
-            d = {'run': run, 'lane': lane, 'library': library, 'limskey': limskey, 'barcode': barcode, 'platform': platform}
+                d = {'run': run, 'lane': lane, 'library': library, 'limskey': limskey, 'barcode': barcode, 'platform': platform}
             
-            if project not in D:
-                D[project] = {}
-            if workflow_run not in D[project]:
-                D[project][workflow_run] = {}
-            if sample not in D[project][workflow_run]:
-                D[project][workflow_run][sample] = {'sample': sample, 'workflow': workflow, 'libraries': [d]}
-            else:
-                assert sample == D[project][workflow_run][sample]['sample']
-                assert workflow == D[project][workflow_run][sample]['workflow']
-                if d not in D[project][workflow_run][sample]['libraries']:
-                    D[project][workflow_run][sample]['libraries'].append(d)
+                if project not in D:
+                    D[project] = {}
+                if workflow_run not in D[project]:
+                    D[project][workflow_run] = {}
+                if sample not in D[project][workflow_run]:
+                    D[project][workflow_run][sample] = {'sample': sample, 'workflow': workflow, 'libraries': [d]}
+                else:
+                    assert sample == D[project][workflow_run][sample]['sample']
+                    assert workflow == D[project][workflow_run][sample]['workflow']
+                    if d not in D[project][workflow_run][sample]['libraries']:
+                        D[project][workflow_run][sample]['libraries'].append(d)
     return D            
 
 
@@ -956,9 +952,7 @@ def add_workflows(workflows, database, project_name, table = 'Workflows'):
     for workflow_run in workflows[project_name]:
         # insert data into table
         values = [workflows[project_name][workflow_run][i] for i in column_names if i in workflows[project_name][workflow_run]]
-        values.insert(3, project_name)
-        
-        
+               
         cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(values)))
         conn.commit()
         
@@ -1161,13 +1155,25 @@ def add_workflows_info_to_db(fpr, database, project_name, workflow_table = 'Work
     # update workflow information with file count
     update_workflow_information(project_name, workflows, counts, 'file_count')
     
+    missing_file_count = 0
+    present_file_count = 0
+    total = 0
+    
+    for i in workflows:
+        for j in workflows[i]:
+            total += 1
+            if 'file_count' not in workflows[i][j]:
+                missing_file_count += 1
+            else:
+                present_file_count += 1
+    
     # get the amount of data for each workflow
     limskeys = get_workflow_limskeys(project_name, database, workflow_input_table)
     for i in limskeys:
         limskeys[i] = len(limskeys[i])
     # update workflow information with lane count
     update_workflow_information(project_name, workflows, limskeys, 'lane_count')
-        
+    
     # check that project is defined in FPR (ie, may be defined in Pinery but no data recorded in FPR)
     if workflows and parents and files:
         # create a dict {workflow: [parent workflows]}
@@ -1181,9 +1187,9 @@ def add_workflows_info_to_db(fpr, database, project_name, workflow_table = 'Work
        
 
     
-def add_fileQC_info_to_db(database, project, fpr, nabu_api, table='FilesQC'):
+def add_fileQC_info_to_db(database, project, nabu_api, table='FilesQC'):
     '''
-    (str, str, str, str, str) -> None
+    (str, str, str, str) -> None
     
     Inserts file QC information in database's FilesQC table
        
@@ -1191,7 +1197,6 @@ def add_fileQC_info_to_db(database, project, fpr, nabu_api, table='FilesQC'):
     ----------
     - database (str): Path to the database file
     - project (str): Name of project of interest
-    - fpr (str): Path to the File Provenance Report
     - nabu_api (str): URL of the nabu API
     - table (str): Table in database storing the QC or file information. Default is FilesQC
     '''
@@ -1220,11 +1225,11 @@ def add_fileQC_info_to_db(database, project, fpr, nabu_api, table='FilesQC'):
 
 
 
-def add_file_info_to_db(database, project, fpr, nabu_api, table = 'Files'):
+def add_file_info_to_db(database, project, fpr, table = 'Files'):
     '''
-    (str, str, str, str, str, str, str) -> None
+    (str, str, str, str) -> None
     
-    Inserts or updates file QC information in database's FilesQC table
+    Inserts file information in database's Files table
        
     Parameters
     ----------
@@ -1232,7 +1237,6 @@ def add_file_info_to_db(database, project, fpr, nabu_api, table = 'Files'):
     - project (str): Name of project of interest
     - fpr (str): Path to the File Provenance Report
     - file_table (str): Table in database storing file information. Default is Files 
-    - nabu_api (str): URL of the nabu API
     - table (str): Table in database storing file information. Default is Files
     '''
 
@@ -1573,7 +1577,7 @@ def add_info(args):
     
     
     # add file info
-    add_file_info_to_db(args.database, args.project, args.fpr, args.nabu, 'Files')
+    add_file_info_to_db(args.database, args.project, args.fpr, 'Files')
     print('added files')
     
     
@@ -1588,7 +1592,7 @@ def add_info(args):
     print('added workflows')
     
     # add file QC info
-    add_fileQC_info_to_db(args.database, args.project, args.fpr, args.nabu, 'FilesQC')
+    add_fileQC_info_to_db(args.database, args.project, args.nabu, 'FilesQC')
     print('added filesqc')
     
     # add library information
