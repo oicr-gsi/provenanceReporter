@@ -1130,6 +1130,15 @@ def add_project_info_to_db(database, pinery, project, lims_info, table = 'Projec
     - table (str): Name of Table in database. Default is Projects
     '''
     
+    # remove project info from table
+    conn = sqlite3.connect(database)
+    cur = conn.cursor()
+    cur.execute('DELETE FROM {0} WHERE project_id = \"{1}\"'.format(table, project))
+    conn.commit()
+    conn.close()
+
+    # add project info in database
+    
     # get project info
     projects = extract_project_info(pinery)
     projects = {project: projects[project]}
@@ -1972,12 +1981,6 @@ def add_info(args):
     donors_to_update = donors_info_to_update(args.database, args.fpr, args.project, 'Checksums')
     print('donors to update', len(donors_to_update))
     
-    
-    # Generate entire Projects table
-    # drop Projects table
-    remove_table(args.database, 'Projects')
-    # create Projects table
-    create_table(args.database, 'Projects')
     # add project information    
     add_project_info_to_db(args.database, args.pinery, args.project, args.lims_info, 'Projects')
     print('added projects')
