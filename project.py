@@ -64,18 +64,18 @@ def get_sample_counts(project_name, database):
     
     conn = connect_to_db(database)
     
-    data = conn.execute("SELECT DISTINCT sample, tissue_type, group_id FROM Libraries WHERE project_id = '{0}';".format(project_name)).fetchall()
+    data = conn.execute("SELECT DISTINCT case_id, tissue_type, group_id FROM Libraries WHERE project_id = '{0}';".format(project_name)).fetchall()
     conn.close()
 
     counts = {}
     for i in data:
-        donor = i['sample']
+        donor = i['case_id']
         if i['tissue_type'] == 'R':
-            normal = i['sample'] + '_' + i['group_id']      
+            normal = i['case_id'] + '_' + i['group_id']      
             tumor = ''
         else:
             normal = ''
-            tumor = i['sample'] + '_' + i['group_id']
+            tumor = i['case_id'] + '_' + i['group_id']
         if donor not in counts:
             counts[donor] = {}
         if 'normal' not in counts[donor]:
@@ -154,7 +154,7 @@ def count_libraries(project_name, library_types, cases, database):
     # connect to db
     conn = connect_to_db(database)
     # extract library source
-    data = conn.execute("SELECT DISTINCT sample, library_type, library FROM Libraries WHERE project_id = '{0}';".format(project_name)).fetchall()
+    data = conn.execute("SELECT DISTINCT case_id, library_type, library FROM Libraries WHERE project_id = '{0}';".format(project_name)).fetchall()
     conn.close()
     
     libraries= {}
@@ -167,7 +167,7 @@ def count_libraries(project_name, library_types, cases, database):
     
     # record libraries for each library type
     for i in data:
-        libraries[i['sample']][i['library_type']].add(i['library'])
+        libraries[i['case_id']][i['library_type']].add(i['library'])
     
     return libraries
 

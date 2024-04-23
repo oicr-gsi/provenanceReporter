@@ -31,7 +31,7 @@ def get_swg_ts(project_name, database, workflow, workflow_table = 'Workflows', w
     
     conn = connect_to_db(database)
     data = conn.execute('SELECT {0}.wfrun_id, {0}.wf, {1}.library, {1}.limskey, \
-                        {1}.platform, {2}.sample, {2}.tissue_type, {2}.tissue_origin, \
+                        {1}.platform, {2}.case_id, {2}.tissue_type, {2}.tissue_origin, \
                         {2}.library_type, {2}.group_id FROM {0} JOIN {1} JOIN {2} WHERE \
                         {0}.wfrun_id = {1}.wfrun_id AND {0}.project_id = {1}.project_id AND \
                         {0}.project_id = {2}.project_id AND {0}.project_id="{3}" AND \
@@ -45,7 +45,7 @@ def get_swg_ts(project_name, database, workflow, workflow_table = 'Workflows', w
     D = {}
     
     for i in L:
-        donor = i['sample']
+        donor = i['case_id']
         sample =  '_'.join([donor, i['tissue_type'], i['tissue_origin'], i['library_type'], i['group_id']]) 
         workflow_id = i['wfrun_id']
         library = i['library']

@@ -1657,16 +1657,16 @@ def map_library_to_sample(project_name, database, table = 'Libraries'):
     # data = conn.execute("SELECT DISTINCT library, sample, tissue_type, tissue_origin, \
     #                      library_type, group_id FROM {0} WHERE project_id = '{1}' AND sample = '{2}'".format(table, project_name, case)).fetchall()
     
-    data = conn.execute("SELECT DISTINCT library, sample, tissue_type, tissue_origin, \
+    data = conn.execute("SELECT DISTINCT library, case_id, tissue_type, tissue_origin, \
                         library_type, group_id FROM {0} WHERE project_id = '{1}'".format(table, project_name)).fetchall()
     conn.close()
     
     
     D = {}
     for i in data:
-        donor = i['sample']
+        donor = i['case_id']
         library = i['library']
-        sample = [i['sample'], i['tissue_type'], i['tissue_origin'],
+        sample = [i['case_id'], i['tissue_type'], i['tissue_origin'],
                            i['library_type'], i['group_id']]
         if not i['group_id']:
             sample = sample[:-1]
@@ -1738,13 +1738,13 @@ def map_library_to_case(project_name, database, table = 'Libraries'):
     
     # get the workflow output files sorted by sample
     conn = connect_to_db(database)
-    data = conn.execute("SELECT DISTINCT library, sample FROM {0} WHERE project_id = '{1}'".format(table, project_name)).fetchall()
+    data = conn.execute("SELECT DISTINCT library, case_id FROM {0} WHERE project_id = '{1}'".format(table, project_name)).fetchall()
     conn.close()
     
     D = {}
     for i in data:
         assert i['library'] not in D
-        D[i['library']] = i['sample']
+        D[i['library']] = i['case_id']
           
     return D
 
