@@ -2353,50 +2353,53 @@ def generate_database(args):
     # create database if file doesn't exist
     if os.path.isfile(args.database) == False:
         initiate_db(args.database)
-    
+        
     # loop over projects
     for project in projects:
         print(project)
         try:
+            # get the donors for which records need to be updated
+            donors_to_update = donors_info_to_update(args.database, args.fpr, project, 'Checksums')
+            print('donors to update', len(donors_to_update))
             # add project information    
             add_project_info_to_db(args.database, args.pinery, project, args.lims_info, 'Projects')
             print('added projects')
-            # add sample information
-            add_samples_info_to_db(args.database, project, args.pinery, 'Samples', args.samples_info)
-            print('added samples') 
             # add file info
-            add_file_info_to_db(args.database, project, args.fpr, 'Files')
+            add_file_info_to_db(args.database, project, args.fpr, donors_to_update, 'Files')
             print('added files')
-            # add workflow input
-            add_workflow_inputs_to_db(args.database, args.fpr, project, 'Workflow_Inputs')
-            print('added workflow inputs')
-            # add workflow information
-            add_workflows_info_to_db(args.fpr, args.database, project, 'Workflows', 'Parents', 'Children', 'Files', 'Workflow_Inputs')
-            print('added workflows')
-            # add file QC info
-            add_fileQC_info_to_db(args.database, project, args.nabu, 'FilesQC')
-            print('added filesqc')
             # add library information
-            add_library_info_to_db(args.database, project, args.pinery, args.lims_info, 'Libraries')
+            add_library_info_to_db(args.database, project, args.pinery, args.lims_info, donors_to_update, 'Libraries')
             print('added libraries')
+            # add sample information
+            add_samples_info_to_db(args.database, project, args.pinery, 'Samples', donors_to_update, args.samples_info)
+            print('added samples') 
+            # add workflow input
+            add_workflow_inputs_to_db(args.database, args.fpr, project, donors_to_update, 'Workflow_Inputs')
+            print('added workflow inputs')
+            # add calculate contamination info
+            add_contamination_info(args.database, args.calcontaqc_db, donors_to_update, table = 'Calculate_Contamination')
+            print('added call-ready contamination')
+            # add file QC info
+            add_fileQC_info_to_db(args.database, project, args.nabu, args.fpr, donors_to_update, 'FilesQC')
+            print('added filesqc')
+            # add workflow information
+            add_workflows_info_to_db(args.fpr, args.database, project, donors_to_update, 'Workflows', 'Parents', 'Children', 'Files', 'Workflow_Inputs')
+            print('added workflows')
             # add WGS blocks
             expected_WGS_workflows = sorted(['mutect2', 'variantEffectPredictor', 'delly', 'varscan', 'sequenza', 'mavis']) 
-            add_blocks_to_db(args.database, project, expected_WGS_workflows, 'WGS_blocks', 'WGS')
+            add_blocks_to_db(args.database, project, expected_WGS_workflows, 'WGS_blocks', 'WGS', donors_to_update)
             print('added wgs blocks')  
             # add WT blocks
             expected_WT_workflows = sorted(['arriba', 'rsem', 'starfusion', 'mavis'])
-            add_blocks_to_db(args.database, project, expected_WT_workflows, 'WT_blocks', 'WT')
+            add_blocks_to_db(args.database, project, expected_WT_workflows, 'WT_blocks', 'WT', donors_to_update)
             print('added WT blocks')  
-            # add calculate contamination info
-            add_contamination_info(args.database, args.calcontaqc_db, table = 'Calculate_Contamination')
-            print('added call-ready contamination')
-            print('----')
+            # update the checksums for donors
+            add_checksums_info_to_db(args.database, project, donors_to_update, 'Checksums')
+            print('added checksums')
         except:
             print('could not add data for {0}'.format(project))
-        
-
     
-
+    
     
 if __name__ == '__main__':
 
