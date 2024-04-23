@@ -35,7 +35,7 @@ def get_WT_call_ready_cases(project_name, platform, database, library_type='WT')
 
     # get all the samples for project name 
     conn = connect_to_db(database)
-    data = conn.execute("SELECT DISTINCT Libraries.library, Libraries.sample, Libraries.project_id, \
+    data = conn.execute("SELECT DISTINCT Libraries.library, Libraries.case_id, Libraries.project_id, \
                           Libraries.ext_id, Libraries.group_id, Libraries.library_type, \
                           Libraries.tissue_type, Libraries.tissue_origin, \
                           Workflows.wf, Workflows.wfrun_id, Workflow_Inputs.platform \
@@ -50,12 +50,12 @@ def get_WT_call_ready_cases(project_name, platform, database, library_type='WT')
         # select star data sequenced on novaseq
         if platform in i['platform'].lower():
             if 'star_call_ready' in i['wf'].lower():
-                if i['sample'] not in cases:
-                    cases[i['sample']] = {'project': i['project_id'], 'samples': [], 'libraries': [], 'star': []}
-                cases[i['sample']]['star'].append(i['wfrun_id'])
-                sample = '_'.join([i['sample'], i['tissue_type'], i['tissue_origin'], i['library_type'], i['group_id']]) 
-                cases[i['sample']]['samples'].append(sample)
-                cases[i['sample']]['libraries'].append(i['library'])
+                if i['case_id'] not in cases:
+                    cases[i['case_id']] = {'project': i['project_id'], 'samples': [], 'libraries': [], 'star': []}
+                cases[i['case_id']]['star'].append(i['wfrun_id'])
+                sample = '_'.join([i['case_id'], i['tissue_type'], i['tissue_origin'], i['library_type'], i['group_id']]) 
+                cases[i['case_id']]['samples'].append(sample)
+                cases[i['case_id']]['libraries'].append(i['library'])
             
     # get parent-children workflow relationships
     parents = get_children_workflows(project_name, database)
@@ -108,7 +108,7 @@ def get_star_case(project_name, case, platform, library_type, database):
                         AND Workflows.wfrun_id = Workflow_Inputs.wfrun_id \
                         AND Workflow_Inputs.library = Libraries.library \
                         AND LOWER(Workflows.wf) = 'star_call_ready' \
-                        AND Libraries.sample ='{1}'".format(project_name, case)).fetchall()
+                        AND Libraries.case_id ='{1}'".format(project_name, case)).fetchall()
     conn.close()
 
     stars = list(set([i['wfrun_id'] for i in data if platform in i['platform'].lower() and library_type == i['library_type']]))
@@ -134,7 +134,7 @@ def get_WT_call_ready_samples(project_name, star_id, database):
     '''
     
     conn = connect_to_db(database)
-    data = conn.execute("SELECT Libraries.sample, Libraries.group_id, Libraries.library, Libraries.tissue_type, \
+    data = conn.execute("SELECT Libraries.case_id, Libraries.group_id, Libraries.library, Libraries.tissue_type, \
                         Libraries.tissue_origin, Libraries.library_type \
                         FROM Libraries JOIN Workflow_Inputs WHERE Workflow_Inputs.library = Libraries.library \
                         AND Workflow_Inputs.wfrun_id = '{0}' AND Libraries.project_id = '{1}' \
@@ -150,7 +150,7 @@ def get_WT_call_ready_samples(project_name, star_id, database):
         if i['tissue_type'] != 'R':
             tissue = 'tumour'
         if tissue == 'tumour':
-            sample = '_'.join([i['sample'], i['tissue_type'], i['tissue_origin'], i['library_type'], i['group_id']]) 
+            sample = '_'.join([i['case_id'], i['tissue_type'], i['tissue_origin'], i['library_type'], i['group_id']]) 
             if sample not in samples[tissue]:
                 samples[tissue].append(sample)
 
@@ -394,9 +394,9 @@ def find_case_WT_blocks(project_name, case, database, expected_workflows):
 
 
 
-def find_WT_blocks(project_name, database, expected_workflows):
+def find_WT_blocks(project_name, database, expected_workflows, donors_to_update):
     '''
-    (str, str, list) -> list
+    (str, str, list, dict) -> list
     
     Returns a list of WGS blocks for donors in project in which WGS blocks exist
     
@@ -405,15 +405,17 @@ def find_WT_blocks(project_name, database, expected_workflows):
     - project_name (str): Name of project of interest
     - database (str): Path to the sqlite database
     - expected_workflows (list): List of expected workflow names to define a complete block
+    - donors_to_update (dict): Dictionary with donors for which records needs to be updated
     '''
     
     # make a list of donors:
     donors = get_donors(project_name, database)
     L = []
     for case in donors:
-        blocks = find_case_WT_blocks(project_name, case, database, expected_workflows)
-        if blocks:
-            L.append(blocks)
+        if case in donors_to_update and donors_to_update[case] != 'delete':
+            blocks = find_case_WT_blocks(project_name, case, database, expected_workflows)
+            if blocks:
+                L.append(blocks)
        
     return L
 
