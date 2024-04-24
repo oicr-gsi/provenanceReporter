@@ -28,7 +28,7 @@ def collect_sequence_info(project_name, database):
     conn = connect_to_db(database)
     files = conn.execute("SELECT Files.file, Files.workflow, Files.version, Files.wfrun_id, Files.attributes, \
                          FilesQC.status, FilesQC.ticket, Workflow_Inputs.run, Workflow_Inputs.lane, Workflow_Inputs.platform, \
-                         Libraries.library, Libraries.sample, Libraries.ext_id, Libraries.group_id, Libraries.group_id_description, \
+                         Libraries.library, Libraries.case_id, Libraries.ext_id, Libraries.group_id, Libraries.group_id_description, \
                          Libraries.library_type, Libraries.tissue_origin, Libraries.tissue_type \
                          from Files JOIN FilesQC JOIN Workflow_Inputs JOIN Libraries WHERE Files.project_id = '{0}' \
                          AND FilesQC.project_id = '{0}' AND FilesQC.file_swid = Files.file_swid \
@@ -61,7 +61,7 @@ def get_sequences(L):
     for i in range(len(L)):
         # keep only read1
         if json.loads(L[i]['attributes'])['read_number'] == '1':
-            case = L[i]['sample']
+            case = L[i]['case_id']
             sample = L[i]['ext_id']
             library =  L[i]['library']
             library_type =  L[i]['library_type']

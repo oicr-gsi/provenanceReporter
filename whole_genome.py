@@ -36,7 +36,7 @@ def get_bmpp_case(project_name, case, platform, library_type, database):
                         AND Workflows.project_id = '{0}' AND Workflows.wfrun_id = Workflow_Inputs.wfrun_id \
                         AND Workflow_Inputs.library = Libraries.library \
                         AND LOWER(SUBSTR(Workflows.wf, 1, 21)) = 'bammergepreprocessing' \
-                        AND Libraries.sample ='{1}'".format(project_name, case)).fetchall()
+                        AND Libraries.case_id ='{1}'".format(project_name, case)).fetchall()
     conn.close()
 
     bmpps = list(set([i['wfrun_id'] for i in data if platform in i['platform'].lower() and library_type == i['library_type']]))
@@ -60,7 +60,7 @@ def get_call_ready_samples(project_name, bmpp_run_id, database):
     '''
     
     conn = connect_to_db(database)
-    data = conn.execute("SELECT Libraries.sample, Libraries.group_id, Libraries.library, Libraries.tissue_type, \
+    data = conn.execute("SELECT Libraries.case_id, Libraries.group_id, Libraries.library, Libraries.tissue_type, \
                         Libraries.tissue_origin, Libraries.library_type \
                         FROM Libraries JOIN Workflow_Inputs WHERE Workflow_Inputs.library = Libraries.library \
                         AND Workflow_Inputs.wfrun_id = '{0}' AND Libraries.project_id = '{1}' \
@@ -75,7 +75,7 @@ def get_call_ready_samples(project_name, bmpp_run_id, database):
             tissue = 'normal'
         else:
             tissue = 'tumour'
-        sample = '_'.join([i['sample'], i['tissue_type'], i['tissue_origin'], i['library_type'], i['group_id']]) 
+        sample = '_'.join([i['case_id'], i['tissue_type'], i['tissue_origin'], i['library_type'], i['group_id']]) 
         if sample not in samples[tissue]:
             samples[tissue].append(sample)
 
@@ -152,7 +152,7 @@ def map_analysis_workflows_to_sample(project_name, sample, platform, database):
                           Workflow_Inputs JOIN Workflows JOIN Libraries WHERE Workflow_Inputs.library = Libraries.library \
                           AND Workflow_Inputs.wfrun_id = Workflows.wfrun_id AND \
                           Workflow_Inputs.project_id = '{0}' AND Libraries.project_id = '{0}' \
-                          AND Workflows.project_id = '{0}' AND Libraries.sample = '{1}' AND \
+                          AND Workflows.project_id = '{0}' AND Libraries.case_id = '{1}' AND \
                           Libraries.library_type = '{2}' AND Libraries.tissue_origin = '{3}' AND \
                           Libraries.tissue_type = '{4}' AND Libraries.group_id = '{5}'".format(project_name, case, library_type, tissue_origin, tissue_type, group_id)).fetchall()
     conn.close()   
@@ -271,7 +271,7 @@ def get_sample_bmpp(project_name, sample, platform, database):
     data = conn.execute("SELECT Libraries.library, Workflow_Inputs.platform, Workflow_Inputs.wfrun_id \
                         FROM Libraries JOIN Workflow_Inputs JOIN Workflows WHERE \
                         Libraries.project_id = '{0}' AND Workflow_Inputs.project_id = '{0}' \
-                        AND Workflows.project_id = '{0}' AND Libraries.sample = '{1}' AND \
+                        AND Workflows.project_id = '{0}' AND Libraries.case_id = '{1}' AND \
                         Libraries.library_type = '{2}' AND Libraries.tissue_origin = '{3}' \
                         AND Libraries.tissue_type = '{4}' AND Libraries.group_id = '{5}' \
                         AND Workflows.wfrun_id = Workflow_Inputs.wfrun_id \
@@ -1081,7 +1081,7 @@ def get_call_ready_cases(project_name, platform, library_type, database):
 
     # get all the samples for project name 
     conn = connect_to_db(database)
-    data = conn.execute("SELECT Libraries.library, Libraries.sample, Libraries.project_id, \
+    data = conn.execute("SELECT Libraries.library, Libraries.case_id, Libraries.project_id, \
                           Libraries.ext_id, Libraries.group_id, Libraries.library_type, \
                           Libraries.tissue_type, Libraries.tissue_origin, \
                           Workflows.wf, Workflows.wfrun_id, Workflow_Inputs.platform \
@@ -1096,12 +1096,12 @@ def get_call_ready_cases(project_name, platform, library_type, database):
         # select bmpp data sequenced on novaseq
         if platform in i['platform'].lower():
             if 'bammergepreprocessing' in i['wf'].lower():
-                if i['sample'] not in cases:
-                    cases[i['sample']] = {'project': i['project_id'], 'samples': set(), 'libraries': set(), 'bmpp': set()}
-                cases[i['sample']]['bmpp'].add(i['wfrun_id'])
-                sample = '_'.join([i['sample'], i['tissue_type'], i['tissue_origin'], i['library_type'], i['group_id']]) 
-                cases[i['sample']]['samples'].add(sample)
-                cases[i['sample']]['libraries'].add(i['library'])
+                if i['case_id'] not in cases:
+                    cases[i['case_id']] = {'project': i['project_id'], 'samples': set(), 'libraries': set(), 'bmpp': set()}
+                cases[i['case_id']]['bmpp'].add(i['wfrun_id'])
+                sample = '_'.join([i['case_id'], i['tissue_type'], i['tissue_origin'], i['library_type'], i['group_id']]) 
+                cases[i['case_id']]['samples'].add(sample)
+                cases[i['case_id']]['libraries'].add(i['library'])
             
     # get parent-children workflow relationships
     parents = get_children_workflows(project_name, database)
@@ -1130,9 +1130,9 @@ def get_call_ready_cases(project_name, platform, library_type, database):
 
 
 
-def find_WGS_blocks(project_name, database, expected_workflows):
+def find_WGS_blocks(project_name, database, expected_workflows, donors_to_update):
     '''
-    (str, str, list) -> list
+    (str, str, list, dict) -> list
     
     Returns a list of WGS blocks for donors in project in which WGS blocks exist
     
@@ -1141,15 +1141,18 @@ def find_WGS_blocks(project_name, database, expected_workflows):
     - project_name (str): Name of project of interest
     - database (str): Path to the sqlite database
     - expected_workflows (list): List of expected workflow names to define a complete block
+    - donors_to_update (dict): Dictionary with donors for which records needs to be updated
     '''
     
     # make a list of donors:
     donors = get_donors(project_name, database)
     L = []
     for case in donors:
-        blocks = find_case_WGS_blocks(project_name, case, database, expected_workflows)
-        if blocks:
-            L.append(blocks)
+        # compute blocks only if information for donor needs to be updated
+        if case in donors_to_update and donors_to_update[case] != 'delete':
+            blocks = find_case_WGS_blocks(project_name, case, database, expected_workflows)
+            if blocks:
+                L.append(blocks)
        
     return L
 
@@ -1654,16 +1657,16 @@ def map_library_to_sample(project_name, database, table = 'Libraries'):
     # data = conn.execute("SELECT DISTINCT library, sample, tissue_type, tissue_origin, \
     #                      library_type, group_id FROM {0} WHERE project_id = '{1}' AND sample = '{2}'".format(table, project_name, case)).fetchall()
     
-    data = conn.execute("SELECT DISTINCT library, sample, tissue_type, tissue_origin, \
+    data = conn.execute("SELECT DISTINCT library, case_id, tissue_type, tissue_origin, \
                         library_type, group_id FROM {0} WHERE project_id = '{1}'".format(table, project_name)).fetchall()
     conn.close()
     
     
     D = {}
     for i in data:
-        donor = i['sample']
+        donor = i['case_id']
         library = i['library']
-        sample = [i['sample'], i['tissue_type'], i['tissue_origin'],
+        sample = [i['case_id'], i['tissue_type'], i['tissue_origin'],
                            i['library_type'], i['group_id']]
         if not i['group_id']:
             sample = sample[:-1]
@@ -1735,13 +1738,13 @@ def map_library_to_case(project_name, database, table = 'Libraries'):
     
     # get the workflow output files sorted by sample
     conn = connect_to_db(database)
-    data = conn.execute("SELECT DISTINCT library, sample FROM {0} WHERE project_id = '{1}'".format(table, project_name)).fetchall()
+    data = conn.execute("SELECT DISTINCT library, case_id FROM {0} WHERE project_id = '{1}'".format(table, project_name)).fetchall()
     conn.close()
     
     D = {}
     for i in data:
         assert i['library'] not in D
-        D[i['library']] = i['sample']
+        D[i['library']] = i['case_id']
           
     return D
 
