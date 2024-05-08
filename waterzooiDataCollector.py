@@ -1109,10 +1109,12 @@ def delete_records(donors, database, table):
     
     conn = sqlite3.connect(database)
     cur = conn.cursor()
-    for i in donors:
-        cur.execute('DELETE FROM {0} WHERE case_id = \"{1}\"'.format(table, i))
-        conn.commit()
+    id_list = list(donors.keys())
+    query = "DELETE FROM {0} WHERE case_id IN ({1})".format(table, ", ".join("?" * len(id_list)))
+    cur.execute(query, id_list)
+    conn.commit()
     conn.close()
+
 
 
 def add_project_info_to_db(database, pinery, project, lims_info, table = 'Projects'):
@@ -1182,6 +1184,44 @@ def add_project_info_to_db(database, pinery, project, lims_info, table = 'Projec
 
 
 
+# def add_workflows(workflows, database, project_name, donors_to_update,  table = 'Workflows'):
+#     '''
+#     (dict, str, str, dict, str) -> None
+    
+#     Inserts or updates workflow information to table Workflows in database
+           
+#     Parameters
+#     ----------
+#     - workflows (dict): Dictionary with workflow information
+#     - database (str): Path to the database file
+#     - project_name (str): Name of project of interest
+#     - donors_to_update (dict): Dictionary with donors for which records needs to be updated
+#     - workflow_table (str): Name of the table storing workflow information. Default is Workflows
+#     '''
+    
+#     # remove rows for donors to update
+#     if donors_to_update:
+#         delete_records(donors_to_update, database, table)
+    
+#         # get column names
+#         column_names = define_column_names()[table]
+    
+#         # connect to db
+#         conn = sqlite3.connect(database, timeout=30)
+#         cur = conn.cursor()
+    
+#         for workflow_run in workflows[project_name]:
+#             case_id = workflows[project_name][workflow_run]['case_id'] 
+#             if case_id in donors_to_update and donors_to_update[case_id] != 'delete':
+#                 # insert data into table
+#                 values = [workflows[project_name][workflow_run][i] for i in column_names if i in workflows[project_name][workflow_run]]
+#                 cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(values)))
+#                 conn.commit()
+#         conn.close()
+
+
+
+
 def add_workflows(workflows, database, project_name, donors_to_update,  table = 'Workflows'):
     '''
     (dict, str, str, dict, str) -> None
@@ -1199,24 +1239,65 @@ def add_workflows(workflows, database, project_name, donors_to_update,  table = 
     
     # remove rows for donors to update
     if donors_to_update:
+        # make a list of data to insert
+        newdata = []
+        
         delete_records(donors_to_update, database, table)
     
         # get column names
         column_names = define_column_names()[table]
-    
         # connect to db
         conn = sqlite3.connect(database, timeout=30)
-        cur = conn.cursor()
-    
+        
         for workflow_run in workflows[project_name]:
             case_id = workflows[project_name][workflow_run]['case_id'] 
             if case_id in donors_to_update and donors_to_update[case_id] != 'delete':
                 # insert data into table
-                values = [workflows[project_name][workflow_run][i] for i in column_names if i in workflows[project_name][workflow_run]]
-                cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(values)))
-                conn.commit()
+                L = [workflows[project_name][workflow_run][i] for i in column_names if i in workflows[project_name][workflow_run]]
+                newdata.append(L)
+        
+        vals = '(' + ','.join(['?'] * len(newdata[0])) + ')'
+        conn.executemany('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), vals), newdata)
+        conn.commit()
         conn.close()
 
+
+# def add_workflow_relationships(workflows, parent_workflows, database, project, donors_to_update, table = 'Parents'):    
+#     '''
+#     (dict, dict, str, str, str) -> None
+    
+#     Inserts or updates parent-children workflow relatiionships to table Parents in database
+    
+#     Parameters
+#     ----------    
+#     - workflows (dict): Dictionary with workflow information  
+#     - parent_workflows (dict): Dictionary with children-parents workflow relationships 
+#     - database (str): Path to the database file
+#     - project (str): name of project of interest
+#     - table (str): Name of the table storing parents-children workflow relationships
+#     '''
+    
+#     # remove rows for donors to update
+#     if donors_to_update:
+#         delete_records(donors_to_update, database, table)
+       
+#         # get column names
+#         column_names = define_column_names()[table]
+    
+#         # connect to db
+#         conn = sqlite3.connect(database, timeout=30)
+#         cur = conn.cursor()
+    
+#         for workflow in parent_workflows[project]:
+#             for parent in parent_workflows[project][workflow]:
+#                 if parent != 'NA':
+#                     assert workflows[project][workflow]['case_id'] == workflows[project][parent]['case_id']
+#                 case_id = workflows[project][workflow]['case_id']
+#                 if case_id in donors_to_update and donors_to_update[case_id] != 'delete':
+#                     # insert data into table
+#                     cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), (parent, workflow, project, case_id)))
+#                     conn.commit()
+#         conn.close()
 
 def add_workflow_relationships(workflows, parent_workflows, database, project, donors_to_update, table = 'Parents'):    
     '''
@@ -1235,26 +1316,28 @@ def add_workflow_relationships(workflows, parent_workflows, database, project, d
     
     # remove rows for donors to update
     if donors_to_update:
+        # make a list of data to insert
+        newdata = []
+               
         delete_records(donors_to_update, database, table)
        
         # get column names
         column_names = define_column_names()[table]
-    
         # connect to db
         conn = sqlite3.connect(database, timeout=30)
-        cur = conn.cursor()
-    
+            
         for workflow in parent_workflows[project]:
             for parent in parent_workflows[project][workflow]:
                 if parent != 'NA':
                     assert workflows[project][workflow]['case_id'] == workflows[project][parent]['case_id']
                 case_id = workflows[project][workflow]['case_id']
                 if case_id in donors_to_update and donors_to_update[case_id] != 'delete':
-                    # insert data into table
-                    cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), (parent, workflow, project, case_id)))
-                    conn.commit()
+                    L = (parent, workflow, project, case_id)
+                    newdata.append(L)
+        vals = '(' + ','.join(['?'] * len(newdata[0])) + ')'
+        conn.executemany('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), vals), newdata)
+        conn.commit()
         conn.close()
-
 
 
 def parse_calculate_contamination_db(calcontaqc_db):
@@ -1316,6 +1399,48 @@ def parse_calculate_contamination_db(calcontaqc_db):
                          
 
 
+# def add_contamination_info(database, calcontaqc_db, donors_to_update, table = 'Calculate_Contamination'):
+#     '''
+#     (str, str, dict, str) -> None
+    
+#     Parse the calcontaqc_db, reformat data and add information to the Calculate_Contamination
+#     table of the database
+    
+#     Parameters
+#     ----------
+#     - database (str): Path to the sqlite database
+#     - calcontaqc_db (db): Path to the calculate contamination database
+#     - donors_to_update (dict): Dictionary with donors for which records needs to be updated
+#     - table (str): name of the table in the database. Default is Calculate_Contamination 
+#     '''
+
+#     # remove rows for donors to update
+#     if donors_to_update:
+#         delete_records(donors_to_update, database, table)
+
+#         # collect ata from the calculate contamination cache
+#         D = parse_calculate_contamination_db(calcontaqc_db)
+        
+#         if D:
+#             # connect to db
+#             conn = sqlite3.connect(database)
+#             cur = conn.cursor()
+        
+#             # get column names
+#             column_names = define_column_names()[table]
+
+#             # add data
+#             for case_id in D:
+#                 if case_id in donors_to_update and donors_to_update[case_id] != 'delete':
+#                     for sample_id in D[case_id]:
+#                         for i in D[case_id][sample_id]:
+#                            L = [i[j] for j in  column_names]
+#                            cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
+#                            conn.commit()
+        
+#         conn.close()
+
+
 def add_contamination_info(database, calcontaqc_db, donors_to_update, table = 'Calculate_Contamination'):
     '''
     (str, str, dict, str) -> None
@@ -1334,15 +1459,16 @@ def add_contamination_info(database, calcontaqc_db, donors_to_update, table = 'C
     # remove rows for donors to update
     if donors_to_update:
         delete_records(donors_to_update, database, table)
+        print('deleted records in Calculate_Contamination')
 
         # collect ata from the calculate contamination cache
         D = parse_calculate_contamination_db(calcontaqc_db)
         
         if D:
+            # make a list of data to insert
+            newdata = []
             # connect to db
             conn = sqlite3.connect(database)
-            cur = conn.cursor()
-        
             # get column names
             column_names = define_column_names()[table]
 
@@ -1352,11 +1478,14 @@ def add_contamination_info(database, calcontaqc_db, donors_to_update, table = 'C
                     for sample_id in D[case_id]:
                         for i in D[case_id][sample_id]:
                            L = [i[j] for j in  column_names]
-                           cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
-                           conn.commit()
+                           newdata.append(L)
         
-        conn.close()
-
+        if newdata:
+            vals = '(' + ','.join(['?'] * len(newdata[0])) + ')'
+            conn.executemany('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), vals), newdata)
+            conn.commit()
+            conn.close()
+        
 
 
 def count_files(project_name, database, file_table = 'Files'):
@@ -1477,6 +1606,55 @@ def add_workflows_info_to_db(fpr, database, project_name, donors_to_update, work
             add_workflow_relationships(workflows, parent_workflows, database, project_name, donors_to_update, parent_table)    
        
     
+# def add_fileQC_info_to_db(database, project, nabu_api, fpr, donors_to_update, table='FilesQC'):
+#     '''
+#     (str, str, str, dict, str, str) -> None
+    
+#     Inserts file QC information in database's FilesQC table
+       
+#     Parameters
+#     ----------
+#     - database (str): Path to the database file
+#     - fpr (str): Path to the File Provenance Report
+#     - project (str): Name of project of interest
+#     - nabu_api (str): URL of the nabu API
+#     - donors_to_update (dict): Dictionary with donors for which records needs to be updated
+#     - table (str): Table in database storing the file QC. Default is FilesQC
+#     '''
+
+#     # remove rows for donors to update
+#     if donors_to_update:
+#         delete_records(donors_to_update, database, table)
+
+#         # collect QC info from nabu
+#         D = collect_qc_info(project, database, nabu_api)
+    
+#         # check that data is recorded in nabu for project
+#         if D:
+#             # match file swids to case id
+#             F = match_donor_to_file_swid(fpr, project)
+                        
+#             # connect to db
+#             conn = sqlite3.connect(database)
+#             cur = conn.cursor()
+        
+#             # get column names
+#             column_names = define_column_names()[table]
+
+#             # add data
+#             for file_swid in D[project]:
+#                 # check that file swid is recorded in FPR for the same project
+#                 if file_swid in F:
+#                     if F[file_swid] in donors_to_update and donors_to_update[F[file_swid]] != 'delete':
+#                         L = [D[project][file_swid][i] for i in column_names if i in D[project][file_swid]]
+#                         L.insert(0, F[file_swid])
+#                         L.insert(0, project)
+#                         L.insert(0, file_swid)
+#                         cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
+#                         conn.commit()
+    
+#             conn.close()
+
 def add_fileQC_info_to_db(database, project, nabu_api, fpr, donors_to_update, table='FilesQC'):
     '''
     (str, str, str, dict, str, str) -> None
@@ -1496,19 +1674,21 @@ def add_fileQC_info_to_db(database, project, nabu_api, fpr, donors_to_update, ta
     # remove rows for donors to update
     if donors_to_update:
         delete_records(donors_to_update, database, table)
+        print('deleted records in FilesQC')
 
         # collect QC info from nabu
         D = collect_qc_info(project, database, nabu_api)
     
         # check that data is recorded in nabu for project
         if D:
+            # make a list of data to insert
+            newdata = []
+                        
             # match file swids to case id
             F = match_donor_to_file_swid(fpr, project)
                         
             # connect to db
             conn = sqlite3.connect(database)
-            cur = conn.cursor()
-        
             # get column names
             column_names = define_column_names()[table]
 
@@ -1521,13 +1701,12 @@ def add_fileQC_info_to_db(database, project, nabu_api, fpr, donors_to_update, ta
                         L.insert(0, F[file_swid])
                         L.insert(0, project)
                         L.insert(0, file_swid)
-                        cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
-                        conn.commit()
-    
+                        newdata.append(L)
+            vals = '(' + ','.join(['?'] * len(newdata[0])) + ')'
+            conn.executemany('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), vals), newdata)
+            conn.commit()
             conn.close()
-
-
-
+            
 # def add_checksum_to_db(database, project, fpr, table = 'Checksums'):
 #     '''
 #     (str, str, str, str) -> None
@@ -1569,6 +1748,52 @@ def add_fileQC_info_to_db(database, project, nabu_api, fpr, donors_to_update, ta
 
 
 
+# def add_file_info_to_db(database, project, fpr, donors_to_update, table = 'Files'):
+#     '''
+#     (str, str, str, dict, str) -> None
+    
+#     Inserts file information in database's Files table
+       
+#     Parameters
+#     ----------
+#     - database (str): Path to the database file
+#     - project (str): Name of project of interest
+#     - fpr (str): Path to the File Provenance Report
+#     - file_table (str): Table in database storing file information. Default is Files 
+#     - donors_to_update (dict): Dictionary with donors for which records needs to be updated
+#     - table (str): Table in database storing file information. Default is Files
+#     '''
+        
+#     # remove rows for donors to update
+#     if donors_to_update:
+#         delete_records(donors_to_update, database, table)
+    
+#         # collect file info from FPR
+#         D = collect_file_info_from_fpr(fpr, project)
+        
+#         # get column names
+#         column_names = define_column_names()[table]
+
+#         # check that data is recorded in FPR for project
+#         if D:
+#             # connect to db
+#             conn = sqlite3.connect(database)
+#             cur = conn.cursor()
+#             # add data
+#             for case in D[project]:
+#                 if case in donors_to_update and donors_to_update[case] != 'delete':
+#                     for file_swid in D[project][case]:
+#                         D[project][case][file_swid]['limskey'] = ';'.join(list(set(D[project][case][file_swid]['limskey'])))
+#                         L = [D[project][case][file_swid][i] for i in column_names if i in D[project][case][file_swid]]
+#                         L.insert(0, project)
+#                         L.insert(0, file_swid)
+#                         cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
+#                         conn.commit()
+#             conn.close()
+
+
+
+
 def add_file_info_to_db(database, project, fpr, donors_to_update, table = 'Files'):
     '''
     (str, str, str, dict, str) -> None
@@ -1588,18 +1813,19 @@ def add_file_info_to_db(database, project, fpr, donors_to_update, table = 'Files
     # remove rows for donors to update
     if donors_to_update:
         delete_records(donors_to_update, database, table)
+        print('deleted records in Files')
     
         # collect file info from FPR
         D = collect_file_info_from_fpr(fpr, project)
+        print('collected files')
         
         # get column names
         column_names = define_column_names()[table]
 
         # check that data is recorded in FPR for project
         if D:
-            # connect to db
-            conn = sqlite3.connect(database)
-            cur = conn.cursor()
+            # make a list of row data
+            newdata = []
             # add data
             for case in D[project]:
                 if case in donors_to_update and donors_to_update[case] != 'delete':
@@ -1608,9 +1834,70 @@ def add_file_info_to_db(database, project, fpr, donors_to_update, table = 'Files
                         L = [D[project][case][file_swid][i] for i in column_names if i in D[project][case][file_swid]]
                         L.insert(0, project)
                         L.insert(0, file_swid)
-                        cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
-                        conn.commit()
+                        newdata.append(L)
+            print('organized data')
+            
+            # connect to db
+            conn = sqlite3.connect(database)
+            print('connected to db')
+            #cur = conn.cursor()
+            # add data
+            vals = '(' + ','.join(['?'] * len(newdata[0])) + ')'
+            conn.executemany('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), vals), newdata)
+            print('inserted data')
+            conn.commit()
+            print('commit changes')
             conn.close()
+
+
+# def add_library_info_to_db(database, project, pinery, lims_info, donors_to_update, table = 'Libraries'):
+#     '''
+#     (str, str, str, dict, str) -> None
+    
+#     Inserts or updates library information in Libraries table of database    
+    
+#     Parameters
+#     ----------
+#     - database (str): Path to the databae file
+#     - project (str): Name of project of interest
+#     - pinery (str): URL of the sample provenance API: 
+#     - lims_info (str): Path to the json file with lims information
+#     - donors_to_update (dict): Dictionary with donors for which records needs to be updated
+#     - table (str): Table storing library in database. Default is Libraries
+#     '''
+
+#     # remove rows for donors to update
+#     if donors_to_update:
+#         delete_records(donors_to_update, database, table)
+
+#         # collect lims information
+#         infile = open(lims_info)
+#         lims = json.load(infile)
+#         infile.close()
+        
+#         # check that data is recorded for that project
+#         if project in lims and lims[project]:
+#             lims = {project: lims[project]}
+    
+#             # get column names
+#             column_names = define_column_names()[table]
+        
+#             # connect to db
+#             conn = sqlite3.connect(database)
+#             cur = conn.cursor()
+#             # add data
+#             for sample in lims[project]:
+#                 if sample in donors_to_update and donors_to_update[sample] != 'delete':
+#                     for library in lims[project][sample]:
+#                         L = [lims[project][sample][library][i] for i in column_names if i in lims[project][sample][library]]
+#                         L.insert(0, sample)
+#                         L.insert(0, library)
+#                         L.append(project)
+#                         # insert project info
+#                         cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
+#                         conn.commit()
+#             conn.close()
+
 
 
 def add_library_info_to_db(database, project, pinery, lims_info, donors_to_update, table = 'Libraries'):
@@ -1632,6 +1919,7 @@ def add_library_info_to_db(database, project, pinery, lims_info, donors_to_updat
     # remove rows for donors to update
     if donors_to_update:
         delete_records(donors_to_update, database, table)
+        print('deleted records in Libraries')
 
         # collect lims information
         infile = open(lims_info)
@@ -1641,13 +1929,14 @@ def add_library_info_to_db(database, project, pinery, lims_info, donors_to_updat
         # check that data is recorded for that project
         if project in lims and lims[project]:
             lims = {project: lims[project]}
-    
+   
+            # make a list of row data
+            newdata = []
             # get column names
             column_names = define_column_names()[table]
-        
+            
             # connect to db
             conn = sqlite3.connect(database)
-            cur = conn.cursor()
             # add data
             for sample in lims[project]:
                 if sample in donors_to_update and donors_to_update[sample] != 'delete':
@@ -1656,10 +1945,67 @@ def add_library_info_to_db(database, project, pinery, lims_info, donors_to_updat
                         L.insert(0, sample)
                         L.insert(0, library)
                         L.append(project)
-                        # insert project info
-                        cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
-                        conn.commit()
+                        newdata.append(L)
+            vals = '(' + ','.join(['?'] * len(newdata[0])) + ')'
+            conn.executemany('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), vals), newdata)
+            conn.commit()
             conn.close()
+
+
+# def add_workflow_inputs_to_db(database, fpr, project, donors_to_update, table = 'Workflow_Inputs'):
+#     '''
+#     (str, str, dict, str) -> None
+    
+#     Inserts or updates workflow input library information in table Workflow_Inputs of database    
+    
+#     Parameters
+#     ----------
+#     - database (str): Path to the databae file
+#     - fpr (str): Path to the File Provenance Report
+#     - project (str): Name of project of interest
+#     - donors_to_update (dict): Dictionary with donors for which records needs to be updated
+#     - table (str): Table storing library in database. Default is Libraries
+#     '''
+
+
+#     # remove rows for donors to update
+#     if donors_to_update:
+#         delete_records(donors_to_update, database, table)
+
+#         # collect information about library inputs
+#         libraries = extract_workflow_info(fpr, project)
+    
+#         # check that data is recorded in FPR for project
+#         if libraries:
+#             # connect to db
+#             conn = sqlite3.connect(database)
+#             cur = conn.cursor()
+       
+#             # get column names
+#             data = cur.execute("SELECT * FROM {0} WHERE project_id = '{1}';".format(table, project))
+#             column_names = [column[0] for column in data.description]
+    
+#             # add or update data
+#             for workflow_run in libraries[project]:
+#                 for sample in libraries[project][workflow_run]:
+#                     if sample in donors_to_update and donors_to_update[sample] != 'delete':
+#                         for i in libraries[project][workflow_run][sample]['libraries']:
+#                             L = []
+#                             for j in column_names:
+#                                 if j in i:
+#                                     if j != 'lane':
+#                                         L.append(i[j])
+#                                     else:
+#                                         L.append(int(i[j]))
+#                             L.append(project)
+#                             L.insert(3, workflow_run)
+#                             L.append(sample)
+                    
+#                             # insert project info
+#                             cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
+#                             conn.commit()
+     
+#             conn.close()
 
 
 
@@ -1682,18 +2028,19 @@ def add_workflow_inputs_to_db(database, fpr, project, donors_to_update, table = 
     # remove rows for donors to update
     if donors_to_update:
         delete_records(donors_to_update, database, table)
+        print('deleted records in Workflow_Inputs')
 
         # collect information about library inputs
         libraries = extract_workflow_info(fpr, project)
     
         # check that data is recorded in FPR for project
         if libraries:
+            # make a list of data to insert
+            newdata = []
             # connect to db
             conn = sqlite3.connect(database)
-            cur = conn.cursor()
-       
             # get column names
-            data = cur.execute("SELECT * FROM {0} WHERE project_id = '{1}';".format(table, project))
+            data = conn.execute("SELECT * FROM {0} WHERE project_id = '{1}';".format(table, project))
             column_names = [column[0] for column in data.description]
     
             # add or update data
@@ -1711,13 +2058,11 @@ def add_workflow_inputs_to_db(database, fpr, project, donors_to_update, table = 
                             L.append(project)
                             L.insert(3, workflow_run)
                             L.append(sample)
-                    
-                            # insert project info
-                            cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
-                            conn.commit()
-     
+                            newdata.append(L)                      
+            vals = '(' + ','.join(['?'] * len(newdata[0])) + ')'
+            conn.executemany('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), vals), newdata)
+            conn.commit()
             conn.close()
-
 
 
 def add_samples_info_to_db(database, project, pinery, table, donors_to_update, sample_info):
@@ -1740,17 +2085,19 @@ def add_samples_info_to_db(database, project, pinery, table, donors_to_update, s
     # remove rows for donors to update
     if donors_to_update:
         delete_records(donors_to_update, database, table)
+        print('deleted records in Samples')
 
         # collect information about samples
         samples = get_parent_sample_info(pinery, project, sample_info)
     
         if samples:
+            # make a list of row data
+            newdata = []
             # connect to db
             conn = sqlite3.connect(database)
-            cur = conn.cursor()
-   
+             
             # get column names
-            data = cur.execute("SELECT * FROM {0} WHERE project_id = '{1}';".format(table, project))
+            data = conn.execute("SELECT * FROM {0} WHERE project_id = '{1}';".format(table, project))
             column_names = [column[0] for column in data.description]
 
             # add data into table
@@ -1758,12 +2105,74 @@ def add_samples_info_to_db(database, project, pinery, table, donors_to_update, s
                 if i['case'] in donors_to_update and donors_to_update[i['case']] != 'delete':
                    L = [i['case'], i['donor_id'], i['species'], i['sex'], i['miso'],
                          i['created_date'], i['modified_date'], project, i['project']]          
+                   newdata.append(L)
             
-                   # insert project info
-                   cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
-                   conn.commit()
- 
+            vals = '(' + ','.join(['?'] * len(newdata[0])) + ')'
+            conn.executemany('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), vals), newdata)
+            conn.commit()
             conn.close()
+
+
+
+
+# def add_blocks_to_db(database, project, expected_workflows, table, pipeline, donors_to_update):
+#     '''
+#     (str, str, str, str) -> None
+    
+#     Inserts WGS blocks data into WGS_blocks table of database    
+    
+#     Parameters
+#     ----------
+#     - database (str): Path to the databae file
+#     - project (str): Name of project of interest
+#     - expected_workflows (list): List of expected workflow names to define a complete block
+#     - table (str): Name of table in database
+#     - pipeline (str): Indicate WT or WGS pipeline
+#     - donors_to_update (dict): Dictionary with donors for which records needs to be updated
+#     '''
+    
+#     # remove rows for donors to update
+#     if donors_to_update:
+#         delete_records(donors_to_update, database, table)
+    
+#         if pipeline == 'WGS':
+#             # get the WGS blocks for donors in project
+#             blocks = find_WGS_blocks(project, database, expected_workflows, donors_to_update)
+#         elif pipeline == 'WT':
+#             blocks = find_WT_blocks(project, database, expected_workflows, donors_to_update)
+
+#         if blocks:
+#             # connect to db
+#             conn = sqlite3.connect(database)
+#             cur = conn.cursor()
+   
+#             # get column names
+#             data = cur.execute("SELECT * FROM {0} WHERE project_id = '{1}';".format(table, project))
+#             column_names = [column[0] for column in data.description]
+
+#             # add data into table
+#             for d in blocks:
+#                 # loop over samples and blocks
+#                 for samples in d:
+#                     for block in d[samples]:
+#                         if d[samples][block]['case_id'] in donors_to_update and donors_to_update[d[samples][block]['case_id']] != 'delete':
+#                             L = [d[samples][block]['project_id'],
+#                                  d[samples][block]['case_id'],
+#                                  samples,
+#                                  block,
+#                                  ';'.join(d[samples][block]['workflows']),
+#                                  d[samples][block]['name'],
+#                                  d[samples][block]['date'],
+#                                  d[samples][block]['release'],
+#                                  d[samples][block]['complete'],
+#                                  d[samples][block]['clean'],
+#                                  d[samples][block]['network']]
+            
+#                             # insert project info
+#                             cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
+#                             conn.commit()
+ 
+#             conn.close()
 
 
 def add_blocks_to_db(database, project, expected_workflows, table, pipeline, donors_to_update):
@@ -1793,12 +2202,13 @@ def add_blocks_to_db(database, project, expected_workflows, table, pipeline, don
             blocks = find_WT_blocks(project, database, expected_workflows, donors_to_update)
 
         if blocks:
+            # make a list of row data
+            newdata = []
+            
             # connect to db
             conn = sqlite3.connect(database)
-            cur = conn.cursor()
-   
             # get column names
-            data = cur.execute("SELECT * FROM {0} WHERE project_id = '{1}';".format(table, project))
+            data = conn.execute("SELECT * FROM {0} WHERE project_id = '{1}';".format(table, project))
             column_names = [column[0] for column in data.description]
 
             # add data into table
@@ -1818,13 +2228,48 @@ def add_blocks_to_db(database, project, expected_workflows, table, pipeline, don
                                  d[samples][block]['complete'],
                                  d[samples][block]['clean'],
                                  d[samples][block]['network']]
-            
-                            # insert project info
-                            cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
-                            conn.commit()
- 
+                            newdata.append(L)
+            vals = '(' + ','.join(['?'] * len(newdata[0])) + ')'
+            conn.executemany('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), vals), newdata)
+            conn.commit()
             conn.close()
 
+
+
+
+# def add_checksums_info_to_db(database, project, donors_to_update, table = 'Checksums'):
+#     '''
+#     (str, str, dict, str) -> None
+    
+#     Update table Checksums with the checksum of the donor info 
+       
+#     Parameters
+#     ----------
+#     - database (str): Path to the database file
+#     - project (str): Name of project of interest
+#     - donors_to_update (dict): Dictionary with donors for which records needs to be updated
+#     - table (str): Name of Table in database. Default is Checksums
+#     '''
+    
+#     if donors_to_update:
+#         delete_records(donors_to_update, database, table)
+    
+#         # connect to db
+#         conn = sqlite3.connect(database, timeout=30)
+#         cur = conn.cursor()
+
+#         # get column names
+#         data = cur.execute("SELECT * FROM {0} WHERE project_id = '{1}';".format(table, project))
+#         column_names = [column[0] for column in data.description]
+
+#         # order values according to column names
+#         for i in donors_to_update:
+#             vals = [project, i, donors_to_update[i]]
+#             # insert project info
+#             cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(vals)))
+#             conn.commit()
+    
+#         conn.close()
 
 
 def add_checksums_info_to_db(database, project, donors_to_update, table = 'Checksums'):
@@ -1843,23 +2288,25 @@ def add_checksums_info_to_db(database, project, donors_to_update, table = 'Check
     
     if donors_to_update:
         delete_records(donors_to_update, database, table)
-    
+        
+        # make a list of data to insert
+        newdata = []
+        
         # connect to db
         conn = sqlite3.connect(database, timeout=30)
-        cur = conn.cursor()
-
         # get column names
-        data = cur.execute("SELECT * FROM {0} WHERE project_id = '{1}';".format(table, project))
+        data = conn.execute("SELECT * FROM {0} WHERE project_id = '{1}';".format(table, project))
         column_names = [column[0] for column in data.description]
 
         # order values according to column names
         for i in donors_to_update:
-            vals = [project, i, donors_to_update[i]]
-            # insert project info
-            cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(vals)))
-            conn.commit()
-    
+            L = [project, i, donors_to_update[i]]
+            newdata.append(L)
+        vals = '(' + ','.join(['?'] * len(newdata[0])) + ')'
+        conn.executemany('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), vals), newdata)
+        conn.commit()
         conn.close()
+
 
     
 def collect_lims_info(args):
@@ -2398,6 +2845,7 @@ def generate_database(args):
             print('added checksums')
         except:
             print('could not add data for {0}'.format(project))
+            print(print(traceback.format_exc()))
     
     
     
