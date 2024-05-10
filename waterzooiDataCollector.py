@@ -16,7 +16,7 @@ import traceback
 import os
 import subprocess
 import hashlib
-from utilities import connect_to_db, secret_key_generator
+from utilities import connect_to_db
 from whole_genome import get_workflow_limskeys, find_WGS_blocks
 from whole_transcriptome import find_WT_blocks
 
@@ -300,110 +300,7 @@ def donors_info_to_update(database, fpr_data, project, table = 'Checksums'):
 
 
 
-
-def collect_file_info_from_fpr(fpr, project_name):
-    '''
-    (str, str) -> dict
-
-    Returns a dictionary with file information for project_name extracted from File Provenance Report
-        
-    Parameters
-    ----------
-    - fpr (str): Path to File Provenance Report file
-    - project_name (str): Name of project of interest 
-    '''
-
-    infile = open_fpr(fpr)
-    # skip header
-    infile.readline()
-        
-    D = {}
-    
-    for line in infile:
-        line = line.rstrip()
-        if line:
-            line = line.split('\t')
-            # get stale status
-            stale = line[52]
-            # skip stale records
-            if stale.lower() != 'stale':
-                # get project and initiate dict
-                project = line[1]
-                # keep only file info for project_name
-                if project != project_name:
-                    continue             
-                if project not in D:
-                    D[project] = {}
-            
-                case_id = line[7]
-                   
-                # get creation date
-                creation_date = line[0]
-                # convert creation date into epoch time
-                # remove milliseconds
-                creation_date = creation_date.split('.')[0]
-                pattern = '%Y-%m-%d %H:%M:%S'
-                creation_date = int(time.mktime(time.strptime(creation_date, pattern)))
-                # get file path
-                file = line[46]
-                # get md5sums
-                md5sum = line[47]
-                # get file_swid
-                file_swid = line[44]
-            
-                # get the library type
-                library_type = line[17]
-                if library_type:
-                    d = collect_info({k.split('=')[0]:k.split('=')[1] for k in line[17].split(';')},
-                             ['geo_library_source_template_type'], ['library_type'])
-                    library_type = d['library_type']
-                else:
-                    library_type = ''
-                        
-                # get file attributes
-                attributes = line[45]
-                if attributes:
-                    attributes = attributes.split(';')
-                    attributes = json.dumps({k.split('=')[0]: k.split('=')[1] for k in attributes})
-                else:
-                    attributes = ''
-            
-                # get workflow
-                workflow = line[30]
-                # get workflow version
-                version = line[31]        
-                # get workflow run accession
-                workflow_run = line[36]
-                # get limskey
-                limskey = line[56]
-            
-                # get skip and stale status
-                skip = line[51]
-                if skip.lower() == 'true':
-                    skip = 1
-                else:
-                    skip = 0
-            
-                if case_id not in D[project]:
-                    D[project][case_id] = {}
-                
-                # collect file info
-                if file_swid not in D[project][case_id]:
-                    D[project][case_id][file_swid] = {'creation_date': creation_date, 'md5sum': md5sum,
-                                             'workflow': workflow, 'version': version,
-                                             'wfrun_id': workflow_run, 'file': file,
-                                             'library_type': library_type, 'attributes': attributes,
-                                             'limskey': [limskey], 'skip': skip, 'stale': stale,
-                                             'case_id': case_id}
-                else:
-                    D[project][case_id][file_swid]['limskey'].append(limskey)
-    infile.close()
-    return D
-
-
-
-
-def collect_all_file_info_from_fpr(fpr, projects):
+def collect_file_info_from_fpr(fpr, projects):
     '''
     (str, str) -> dict
 
@@ -503,15 +400,12 @@ def collect_all_file_info_from_fpr(fpr, projects):
                     else:
                         fpr_data[project][case_id][file_swid]['limskey'].append(limskey)
     
-                    #print(len(fpr_data), len(fpr_data[project]), len(fpr_data[project][case_id]))
-                    
-    
     infile.close()
     return fpr_data
 
 
 
-def extract_all_workflow_info(fpr, projects):
+def extract_workflow_info(fpr, projects):
     '''
     (str, str) -> dict
     
@@ -567,8 +461,6 @@ def extract_all_workflow_info(fpr, projects):
                         if d not in D[project][workflow_run][sample]['libraries']:
                             D[project][workflow_run][sample]['libraries'].append(d)
     
-                    #print(len(D), len(D[project]), len(D[project][workflow_run]), len(D[project][workflow_run][sample]), len(D[project][workflow_run][sample]['libraries']))
-                    
     return D            
 
 
@@ -708,15 +600,16 @@ def match_file_worklow_ids(fpr_data, project):
 
 
 
-def get_workflow_information(fpr_data, project, database, file_table='Files', workflow_input_table='Workflow_Inputs'):
+def get_workflow_information(fpr_data, donors_to_update, project, database, file_table='Files', workflow_input_table='Workflow_Inputs'):
     '''
-    (dict, str)    
+    (dict, dict, str, str, str, str) -> dict    
     
     Returns a dictinary with workflow information for the project of interest
         
     Parameters
     ----------
     - fpr_data (dict): Dictionary with file information parsed from FPR
+    - donors_to_update (dict): Dictionary with donors for which records needs to be updated
     - project (str): Name of the project of interest
     - database (str): Path to the sqlite database
     - file_table (str): Table in database storing file information
@@ -726,39 +619,37 @@ def get_workflow_information(fpr_data, project, database, file_table='Files', wo
     D = {}
     D[project] = {}
     
-    
-    for case_id in fpr_data[project]:
-        for file_swid in fpr_data[project][case_id]:
-            workflow = fpr_data[project][case_id][file_swid]['workflow']
-            version = fpr_data[project][case_id][file_swid]['version']
-            workflow_id = fpr_data[project][case_id][file_swid]['wfrun_id']
-            attributes = fpr_data[project][case_id][file_swid]['wf_attributes']
-            skip = fpr_data[project][case_id][file_swid]['skip']
-            stale = fpr_data[project][case_id][file_swid]['stale']
+    if donors_to_update:
+        for case_id in donors_to_update:
+            for file_swid in fpr_data[project][case_id]:
+                workflow = fpr_data[project][case_id][file_swid]['workflow']
+                version = fpr_data[project][case_id][file_swid]['version']
+                workflow_id = fpr_data[project][case_id][file_swid]['wfrun_id']
+                attributes = fpr_data[project][case_id][file_swid]['wf_attributes']
+                skip = fpr_data[project][case_id][file_swid]['skip']
+                stale = fpr_data[project][case_id][file_swid]['stale']
             
-            D[project][workflow_id] = {'wfrun_id': workflow_id,
-                                        'wf': workflow,
-                                        'wfv': version,
-                                        'attributes': attributes,
-                                        'project_id': project,
-                                        'case_id': case_id,
-                                         'skip': skip,
-                                         'stale': stale}
+                D[project][workflow_id] = {'wfrun_id': workflow_id,
+                                           'wf': workflow,
+                                           'wfv': version,
+                                           'attributes': attributes,
+                                           'project_id': project,
+                                           'case_id': case_id,
+                                           'skip': skip,
+                                           'stale': stale}
     
-    # get the file count for each workflow
-    counts = count_files(project, database, file_table)
-    # update workflow information with file count
-    update_workflow_information(project, D, counts, 'file_count')
-    # get the amount of data for each workflow
-    limskeys = get_workflow_limskeys(project, database, workflow_input_table)
-    for i in limskeys:
-        limskeys[i] = len(limskeys[i])
-    # update workflow information with lane count
-    update_workflow_information(project, D, limskeys, 'lane_count')
+        # get the file count for each workflow
+        counts = count_files(project, database, file_table)
+        # update workflow information with file count
+        update_workflow_information(project, D, counts, 'file_count')
+        # get the amount of data for each workflow
+        limskeys = get_workflow_limskeys(project, database, workflow_input_table)
+        for i in limskeys:
+            limskeys[i] = len(limskeys[i])
+        # update workflow information with lane count
+        update_workflow_information(project, D, limskeys, 'lane_count')
     
     return D
-
-
 
 
 def get_parent_file_ids(fpr, projects):
@@ -809,8 +700,6 @@ def get_parent_file_ids(fpr, projects):
     infile.close()
     
     return P         
-
-
 
 
 def identify_parent_children_workflows(P, F):
@@ -911,67 +800,6 @@ def get_parent_sample_info(pinery, project, samples):
         
     return L   
 
-
-def extract_workflow_info(fpr, project_name):
-    '''
-    (str, str) -> dict
-    
-    Returns a dictionary with library input information for all workflows for project_name
-    
-    Parameters
-    ----------
-    - fpr (str): Path to the File Provenance Report
-    - project_name (str): Name of project of interest
-    '''
-
-    # create a dict to store workflow input libraries
-    D = {}
-
-    infile = open_fpr(fpr)
-    # skip header
-    infile.readline()
-    
-    for line in infile:
-        line = line.rstrip()
-        if line:
-            line = line.split('\t')
-            # get project name
-            project = line[1]
-            # keep only info for project name
-            if project != project_name:
-                continue             
-    
-            # do not include stale records
-            stale = line[52]
-            if stale.lower() != 'stale':
-    
-                # get sample name
-                sample = line[7]
-                # get workflow name and workflow run accession
-                workflow, workflow_run = line[30], line[36]
-                                  
-                # get lane and run
-                run, lane = line[18], line[24]            
-                # get library and limskey
-                library, limskey  = line[13], line[56]
-            
-                # get barcode and platform
-                barcode, platform = line[27], line[22]
-            
-                d = {'run': run, 'lane': lane, 'library': library, 'limskey': limskey, 'barcode': barcode, 'platform': platform}
-            
-                if project not in D:
-                    D[project] = {}
-                if workflow_run not in D[project]:
-                    D[project][workflow_run] = {}
-                if sample not in D[project][workflow_run]:
-                    D[project][workflow_run][sample] = {'sample': sample, 'workflow': workflow, 'libraries': [d]}
-                else:
-                    assert sample == D[project][workflow_run][sample]['sample']
-                    assert workflow == D[project][workflow_run][sample]['workflow']
-                    if d not in D[project][workflow_run][sample]['libraries']:
-                        D[project][workflow_run][sample]['libraries'].append(d)
-    return D            
 
 
 def define_column_names():
@@ -1829,281 +1657,6 @@ def add_checksums_info_to_db(database, project, donors_to_update, table = 'Check
         conn.close()
 
 
- 
-def add_info(args):
-    '''
-    (list) -> None
-    
-    Adds infornation for a given project to the provenance reporter database
-    
-    Parameters
-    ----------
-    - fpr (str): Path to Path to the File Provenance Report
-    - nabu (str): URL of the Nabu API
-    - pinery (str): Pinery api
-    - database (str): Path to the database file
-    - lims_info (str): Path to the json file with lims information
-    - project (str): Name of the project
-    '''
-    
-    # create database if file doesn't exist
-    if os.path.isfile(args.database) == False:
-        initiate_db(args.database)
-    
-    # get the donors for which records need to be updated
-    donors_to_update = donors_info_to_update(args.database, args.fpr, args.project, 'Checksums')
-    print('donors to update', len(donors_to_update))
-    
-    # add project information    
-    add_project_info_to_db(args.database, args.pinery, args.project, args.lims_info, 'Projects')
-    print('added projects')
-    
-    # add file info
-    add_file_info_to_db(args.database, args.project, args.fpr, donors_to_update, 'Files')
-    print('added files')
-    
-    # add library information
-    add_library_info_to_db(args.database, args.project, args.pinery, args.lims_info, donors_to_update, 'Libraries')
-    print('added libraries')
-    
-    # add sample information
-    add_samples_info_to_db(args.database, args.project, args.pinery, 'Samples', donors_to_update, args.samples_info)
-    print('added samples') 
-    
-    # add workflow input
-    add_workflow_inputs_to_db(args.database, args.fpr, args.project, donors_to_update, 'Workflow_Inputs')
-    print('added workflow inputs')
-    
-    # add calculate contamination info
-    add_contamination_info(args.database, args.calcontaqc_db, donors_to_update, table = 'Calculate_Contamination')
-    print('added call-ready contamination')
-
-    # add file QC info
-    add_fileQC_info_to_db(args.database, args.project, args.nabu, args.fpr, donors_to_update, 'FilesQC')
-    print('added filesqc')
-    
-    # add workflow information
-    add_workflows_info_to_db(args.fpr, args.database, args.project, donors_to_update, 'Workflows', 'Parents', 'Children', 'Files', 'Workflow_Inputs')
-    print('added workflows')
-    
-    # add WGS blocks
-    expected_WGS_workflows = sorted(['mutect2', 'variantEffectPredictor', 'delly', 'varscan', 'sequenza', 'mavis']) 
-    add_blocks_to_db(args.database, args.project, expected_WGS_workflows, 'WGS_blocks', 'WGS', donors_to_update)
-    print('added wgs blocks')  
-    
-    # add WT blocks
-    expected_WT_workflows = sorted(['arriba', 'rsem', 'starfusion', 'mavis'])
-    add_blocks_to_db(args.database, args.project, expected_WT_workflows, 'WT_blocks', 'WT', donors_to_update)
-    print('added WT blocks')  
-    
-    # update the checksums for donors
-    add_checksums_info_to_db(args.database, args.project, donors_to_update, 'Checksums')
-    print('added checksums')
-
-
-    
-
-def launch_jobs(args):
-    '''
-    (list) -> None
-    
-    Launch qsub jobs to fill the provenance reporter database     
-    
-    Parameters
-    ----------
-    - fpr (str): Path to Path to the File Provenance Report
-    - nabu (str): URL of the Nabu API
-    - pinery (str): Pinery API
-    - database (str): Path to the database file
-    - workingdir (str): Name of the directory where qsubs scripts are written
-    - mem (int): Memory allocated to jobs
-    '''
-    
-    # populate database with project information
-    # extract project information from project provenance
-    projects = extract_project_info(args.pinery)
-    # filter out completed projects
-    projects = filter_completed_projects(projects)
-    # make a list of projects with data in Prinery and FPR
-    projects = get_valid_projects(projects, args.fpr)
-    
-    # make a directory to save the scripts
-    qsubdir = os.path.join(args.workingdir, 'qsubs')
-    os.makedirs(qsubdir, exist_ok=True)
-    # create a log dir
-    logdir = os.path.join(qsubdir, 'logs')
-    os.makedirs(logdir, exist_ok=True)
-    # make a directory to store the project databases
-    databasedir = os.path.join(args.workingdir, 'databases')
-    os.makedirs(databasedir, exist_ok=True)
-    
-    cmd1 = 'module load waterzooi-tools; waterzooiDataCollector collect_lims -p {0} -l {1}'
-        
-    bashScript = os.path.join(qsubdir, 'collect_lims.sh')
-    lims_info_file = os.path.join(args.workingdir, 'lims_info.json')
-    with open(bashScript, 'w') as newfile:
-        #newfile.write(cmd1.format(dbfiller, args.pinery, lims_info_file))
-        newfile.write(cmd1.format(args.pinery, lims_info_file))
-    
-    qsubCmd = "qsub -b y -P gsi -l h_vmem={0}g -N {1}  -e {2} -o {2} \"bash {3}\"".format(args.mem, 'waterzooidb.lims', logdir, bashScript)
-    subprocess.call(qsubCmd, shell=True)
-
-    cmd2 = 'module load waterzooi-tools; waterzooiDataCollector collect_samples -p {0} -s {1}'
-        
-    bashScript = os.path.join(qsubdir, 'collect_samples.sh')
-    samples_info_file = os.path.join(args.workingdir, 'samples_info.json')
-    with open(bashScript, 'w') as newfile:
-        newfile.write(cmd2.format(args.pinery, samples_info_file))
-    qsubCmd = "qsub -b y -P gsi -l h_vmem={0}g -N {1}  -e {2} -o {2} \"bash {3}\"".format(args.mem, 'waterzooidb.samples', logdir, bashScript)
-    subprocess.call(qsubCmd, shell=True)
-
-    cmd3 = 'module load waterzooi-tools; waterzooiDataCollector add_project -f {0} -n {1} -p {2} -d {3} -pr {4} -l {5} -s {6}'
-    
-    # record job names and job exit codes    
-    job_names = []
-
-    for project in projects:
-        database = os.path.join(databasedir, '{0}.db'.format(project))
-        # get name of output file
-        bashScript = os.path.join(qsubdir, '{0}_add_project_info.sh'.format(project))
-        with open(bashScript, 'w') as newfile:
-            newfile.write(cmd3.format(args.fpr, args.nabu, args.pinery, database, project, lims_info_file, samples_info_file))
-        # launch qsub directly, collect job names and exit codes
-        jobName = '{0}.{1}'.format(project, secret_key_generator(20))
-              
-        qsubCmd = 'qsub -b y -P gsi -l h_vmem={0}g,h_rt={1}:0:0 -N {2} -hold_jid "{3}" -e {4} -o {4} "bash {5}"'.format(args.mem, args.run_time, jobName, 'waterzooidb.lims,waterzooidb.samples', logdir, bashScript)
-        subprocess.call(qsubCmd, shell=True)
-        # store job names
-        job_names.append(jobName)
-    
-    # launch job to merge the project databases
-    cmd4 = 'module load waterzooi-tools; waterzooiDataCollector merge -md {0} -jn "{1}" -wd {2}'
-       
-    bashScript = os.path.join(qsubdir, 'merge_db.sh')
-    with open(bashScript, 'w') as newfile:
-        newfile.write(cmd4.format(args.merged_database, ','.join(job_names), args.workingdir))
-    qsubCmd = "qsub -b y -P gsi -l h_vmem={0}g,h_rt={1}:0:0 -N {2}  -hold_jid \"{3}\" -e {4} -o {4} \"bash {5}\"".format(args.mem, args.run_time, 'waterzooidb.merging', ','.join(job_names), logdir, bashScript)
-    subprocess.call(qsubCmd, shell=True)
-
-
-
-def collect_project_info(database, table):
-    '''
-    (str, str) -> list
-    
-    Returns a list of sqlite3.Row extracted from table in database
-        
-    Parameters
-    ----------
-    - database (str): Path to sqlite database
-    - table (str): Table of interest in database
-    '''
-    
-    # collect information from project database for table
-    conn = sqlite3.connect(database)
-    conn.row_factory = sqlite3.Row
-    data = conn.execute('SELECT * FROM {0}'.format(table)).fetchall()
-    conn.close()
-    
-    return data       
-    
-    
-def update_database(merged_database, table, data):
-    '''
-    (str, str, list) -> None
-    
-    Update table in merged_database with data for a given project
-    
-    Parameters
-    ----------
-    - merged_database (str): Path to the merged database
-    - table (str): Table of interest in database
-    - data (list): list of sqlite3.Row extracted from table in project database
-    '''
-    
-    # open merged database, add project data into table
-    conn = sqlite3.connect(merged_database,  timeout=30)
-    cur = conn.cursor()
-    # get the column names
-    c = list(zip(*list(dict(data[0]).items())))[0]
-    for i in data:
-        # get values in order of column names    
-        v = list(zip(*list(dict(i).items())))[1]
-        cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, c , v))
-        conn.commit()            
-    conn.close()
-
-
-
-def merge_two_databases(db1, db2):
-    '''
-    (str, str) -> None
-
-    Merge database db2 into database db1
-    Precondition: the two dababases have the same schema
-    
-    Parameters
-    ---------
-    - db1 (str): Path to database 1
-    - db2 (str): Path to database 2
-    '''
-
-    # connect to db1  
-    conn = sqlite3.connect(db1, timeout=30)
-    # attach database db2
-    conn.execute("ATTACH '" + db2 +  "' as dba")
-    conn.execute("BEGIN")
-    # loop over rows in selected info from db2
-    for row in conn.execute("SELECT * FROM dba.sqlite_master WHERE type='table'"):
-        # combine data into db1
-        combine = "INSERT OR IGNORE INTO "+ row[1] + " SELECT * FROM dba." + row[1]
-        conn.execute(combine)
-    conn.commit()
-    # detach from db2
-    conn.execute("detach database dba")
-    conn.close()
-       
-
-
-def merge_databases(merged_database, databases):
-    '''
-    (str, list) -> None    
-    
-    Merge all the project databases located into merged_database
-    
-    Parematers
-    ----------
-    - merged_database (str): Path to the merged database
-    - databases (list): List of paths to the project databases
-    '''
-    
-    start = time.time()
-    
-    # initiate merged database if file doesn't exist
-    if os.path.isfile(merged_database) == False:
-        initiate_db(merged_database)
-    
-    # remove tables
-    conn = sqlite3.connect(merged_database)
-    cur = conn.cursor()
-    cur.execute("SELECT name FROM sqlite_master WHERE type='table';")
-    tables = cur.fetchall()
-    tables = [i[0] for i in tables]
-    for table in tables:
-        # drop table and re-initiate table
-        remove_table(merged_database, table)
-        create_table(merged_database, table)
-              
-    for db in databases:
-        print(os.path.basename(db))
-        try:
-            merge_two_databases(merged_database, db)
-        except:
-            print('could not merge {0} database'.format(os.path.basename(db)))
-    
-    end = time.time()
-    print('merged databases', end - start)
-
 
 def get_job_exit_status(job):
     '''
@@ -2150,44 +1703,6 @@ def get_job_exit_status(job):
         exit_status = 1
     
     return exit_status
-
-
-def merge(args):
-    '''
-    (list) -> None
-    
-    Launch job to merge the project databases into a single database
-    
-    Parameters
-    ----------
-    - database (str): Path to the database file
-    - mem (str): Memory allocated to jobs
-    - job_names (str): Semi-colon separated list of job names 
-    '''
-    
-    # check that jobs completely successfully before merging the project databases
-    if args.job_names:
-        # check if jobs are still running
-        jobs = list(map(lambda x: x.strip(), args.job_names.split(',')))
-        jobs.sort()  
-        
-        # make a list of successfully updated project db
-        updated = []
-        databasedir = os.path.join(args.workingdir, 'databases')
-        for job in jobs:
-            # get exit status
-            exit_status = get_job_exit_status(job)
-            if exit_status == 0:
-                db =  os.path.join(databasedir, job.split('.')[0] + '.db')
-                updated.append(db)
-    else:
-        # make a list of any project databases 
-        databasedir = os.path.join(args.workingdir, 'databases')
-        updated = [os.path.join(databasedir, i) for i in os.listdir(databasedir) if '.db' in i]
-    
-    # merge all projects databases that were successfully updated
-    merge_databases(args.merged_database, updated)
-        
 
 
 def collect_lims_info(pinery):
@@ -2295,49 +1810,12 @@ def generate_database(args):
     - samples_info (str): Path to the json file with sample information
     '''
 
-
-    start0 = time.time()
-
-    # collect resources
-    
-    # # collect lims info
-    # start = time.time()
-    # lims_info = collect_lims_info(args.pinery)
-    # end = time.time()
-    # print('collected lims info', end - start)
-    
-    
-    infile = open('lims_info.json')
-    lims_info = json.load(infile)
-    infile.close()
-    
-    
-    
-    
-    # # collect samples info
-    # start = time.time()
-    # samples_info = collect_parent_sample_info(args.pinery)
-    # end = time.time()
-    # print('collected sample information', end -  start)
-    
-    infile = open('samples_info.json')
-    samples_info = json.load(infile)
-    infile.close()
-    
-    
-    
-    # # parse fpr
-    
-
-    # # check that fpr file exists
-    # assert os.path.isfile(args.fpr)
-    # # check that lims info file exists
-    # assert os.path.isfile(args.lims_info)
-    # # check that sample info file exists
-    # assert os.path.isfile(args.samples_info)
-    
-    start = time.time()
-    
+    # collect lims info
+    lims_info = collect_lims_info(args.pinery)
+    # collect sample info
+    samples_info = collect_parent_sample_info(args.pinery)
+           
+    # collect file info from FPR
     # get the list of valid projects
     # extract project information from project provenance
     projects = extract_project_info(args.pinery)
@@ -2346,43 +1824,18 @@ def generate_database(args):
     # make a list of projects with data in Prinery and FPR
     projects = get_valid_projects(projects, args.fpr)
     projects.sort()
-    
-    end = time.time()    
-    
-    print('listed valid projects', end - start)
+    fpr_data = collect_file_info_from_fpr(args.fpr, projects)
     
     # create database if file doesn't exist
     if os.path.isfile(args.database) == False:
         initiate_db(args.database)
     
-    start = time.time()
-    
-    # collect file info from FPR
-    fpr_data = collect_all_file_info_from_fpr(args.fpr, projects)
-    # newfile = open('FPR_file_info.json', 'w')
-    # json.dump(fpr_data, newfile)
-    # newfile.close()
-    
-    end = time.time()
-    print('collected file information', end - start)
-    
     # collect workflow inputlibraries
-    start = time.time()
-    wf_input = extract_all_workflow_info(args.fpr, projects)
-    end = time.time()
-    print('collected workflow input', end - start)
-    
-    
+    wf_input = extract_workflow_info(args.fpr, projects)
     # match file swids to donor ids
     matched_ids = match_donor_to_file_swid(fpr_data, projects)
-    
     # get the parent file ids of each workflow
     parents = get_parent_file_ids(args.fpr, projects)
-     
-    end0 = time.time()
-    
-    print('total time', end0 - start0)
-    
     
     # loop over projects
     for project in projects:
@@ -2391,136 +1844,69 @@ def generate_database(args):
             # get the donors for which records need to be updated
             start = time.time()
             donors_to_update = donors_info_to_update(args.database, fpr_data, project, 'Checksums')
-            end = time.time()
-            print('donors to update', len(donors_to_update), end - start)
-            # add project information    
-            start = time.time()
-            add_project_info_to_db(args.database, args.pinery, project, lims_info, 'Projects')
-            end = time.time()
-            print('added projects', end - start)
-            # add file info
-            start = time.time()
-            add_file_info_to_db(args.database, project, fpr_data, donors_to_update, 'Files')
-            end = time.time()
-            print('added files', end - start)
-            # add library information
-            start = time.time()
-            add_library_info_to_db(args.database, project, args.pinery, lims_info, donors_to_update, 'Libraries')
-            end = time.time()
-            print('added libraries', end - start)
-            # add sample information
-            start = time.time()
-            add_samples_info_to_db(args.database, project, args.pinery, 'Samples', donors_to_update, samples_info)
-            end = time.time()
-            print('added samples', end - start) 
-            # add workflow input
-            start = time.time()
-            add_workflow_inputs_to_db(args.database, wf_input, project, donors_to_update, 'Workflow_Inputs')
-            end = time.time()
-            print('added workflow inputs', end - start)
-            # add calculate contamination info
-            start = time.time()
-            add_contamination_info(args.database, args.calcontaqc_db, donors_to_update, table = 'Calculate_Contamination')
-            end = time.time()
-            print('added call-ready contamination', end - start)
-            # add file QC info
-            start = time.time()
-            add_fileQC_info_to_db(args.database, project, args.nabu, matched_ids, donors_to_update, 'FilesQC')
-            end = time.time()
-            print('added filesqc', end - start)
-            # add workflow information
-            # get workflow information for the current project
-            start = time.time()
-            workflows = get_workflow_information(fpr_data, project, args.database, 'Files', 'Workflow_Inputs')
-            add_workflows_to_db(fpr_data, workflows, args.database, project, donors_to_update, 'Workflows')
-            end = time.time()
-            print('added workflows', end - start)
-            # add workflow relationships
-            start = time.time()
-            add_workflows_relationships_to_db(fpr_data, workflows, parents, args.database, project, donors_to_update, 'Parents')
-            end = time.time()
-            print('added workflow relationships', end - start)
-            # add WGS blocks
-            start = time.time()
-            expected_WGS_workflows = sorted(['mutect2', 'variantEffectPredictor', 'delly', 'varscan', 'sequenza', 'mavis']) 
-            add_blocks_to_db(args.database, project, expected_WGS_workflows, 'WGS_blocks', 'WGS', donors_to_update)
-            end = time.time()
-            print('added wgs blocks', end - start)  
-            # add WT blocks
-            start = time.time()
-            expected_WT_workflows = sorted(['arriba', 'rsem', 'starfusion', 'mavis'])
-            add_blocks_to_db(args.database, project, expected_WT_workflows, 'WT_blocks', 'WT', donors_to_update)
-            end = time.time()
-            print('added WT blocks', end - start)  
-            # update the checksums for donors
-            start = time.time()
-            add_checksums_info_to_db(args.database, project, donors_to_update, 'Checksums')
-            end = time.time()
-            print('added checksums', end - start)
+            print('donors to update:', len(donors_to_update))
+            if donors_to_update:
+                # add project information    
+                add_project_info_to_db(args.database, args.pinery, project, lims_info, 'Projects')
+                print('added projects')
+                # add file info
+                add_file_info_to_db(args.database, project, fpr_data, donors_to_update, 'Files')
+                print('added files')
+                # add library information
+                add_library_info_to_db(args.database, project, args.pinery, lims_info, donors_to_update, 'Libraries')
+                print('added libraries')
+                # add sample information
+                add_samples_info_to_db(args.database, project, args.pinery, 'Samples', donors_to_update, samples_info)
+                print('added samples') 
+                # add workflow input
+                add_workflow_inputs_to_db(args.database, wf_input, project, donors_to_update, 'Workflow_Inputs')
+                print('added workflow inputs')
+                # add calculate contamination info
+                add_contamination_info(args.database, args.calcontaqc_db, donors_to_update, table = 'Calculate_Contamination')
+                print('added call-ready contamination')
+                # add file QC info
+                add_fileQC_info_to_db(args.database, project, args.nabu, matched_ids, donors_to_update, 'FilesQC')
+                print('added filesqc')
+                # add workflow information
+                # get workflow information for the current project
+                workflows = get_workflow_information(fpr_data, donors_to_update, project, args.database, 'Files', 'Workflow_Inputs')
+                add_workflows_to_db(fpr_data, workflows, args.database, project, donors_to_update, 'Workflows')
+                print('added workflows')
+                # add workflow relationships
+                add_workflows_relationships_to_db(fpr_data, workflows, parents, args.database, project, donors_to_update, 'Parents')
+                print('added workflow relationships')
+                # add WGS blocks
+                expected_WGS_workflows = sorted(['mutect2', 'variantEffectPredictor', 'delly', 'varscan', 'sequenza', 'mavis']) 
+                add_blocks_to_db(args.database, project, expected_WGS_workflows, 'WGS_blocks', 'WGS', donors_to_update)
+                print('added wgs blocks')  
+                # add WT blocks
+                expected_WT_workflows = sorted(['arriba', 'rsem', 'starfusion', 'mavis'])
+                add_blocks_to_db(args.database, project, expected_WT_workflows, 'WT_blocks', 'WT', donors_to_update)
+                print('added WT blocks')  
+                # update the checksums for donors
+                add_checksums_info_to_db(args.database, project, donors_to_update, 'Checksums')
+                print('added checksums')
+                end = time.time()
+                print('updated project {0} in {1} seconds'.format(project, end - start))
+                print('----')
         except:
             print('could not add data for {0}'.format(project))
             print(print(traceback.format_exc()))
+            print('----')
     
     
     
 if __name__ == '__main__':
-
-    
-    # create top-level parser
-    parent_parser = argparse.ArgumentParser(prog = 'prov_reporter_db_filler.py', description='Script to add data to the Provenance Reporter database', add_help=False)
-    parent_parser.add_argument('-f', '--fpr', dest='fpr', default = '/scratch2/groups/gsi/production/vidarr/vidarr_files_report_latest.tsv.gz', help='Path to the File Provenance Report. Default is /scratch2/groups/gsi/production/vidarr/vidarr_files_report_latest.tsv.gz')
-    parent_parser.add_argument('-n', '--nabu', dest='nabu', default='https://nabu-prod.gsi.oicr.on.ca', help='URL of the Nabu API. Default is https://nabu-prod.gsi.oicr.on.ca')
-    parent_parser.add_argument('-p', '--pinery', dest = 'pinery', default = 'http://pinery.gsi.oicr.on.ca', help = 'Pinery API. Default is http://pinery.gsi.oicr.on.ca')
-    parent_parser.add_argument('-cq', '--calcontaqc', dest = 'calcontaqc_db', default = '/scratch2/groups/gsi/production/qcetl_v1/calculatecontamination/latest', help = 'Path to the merged rnaseq calculateContamination database. Default is /scratch2/groups/gsi/production/qcetl_v1/calculatecontamination/latest')
-                               
-    main_parser = argparse.ArgumentParser(prog = 'prov_reporter_db_filler.py', description = 'Add data to the Provenance Reporter database')
-    subparsers = main_parser.add_subparsers(title='sub-commands', description='valid sub-commands', dest= 'subparser_name', help = 'sub-commands help')
-    
-    # add project info  
-    project_parser = subparsers.add_parser('add_project', help="Add project information to the Provenance Reporter database", parents = [parent_parser])
-    project_parser.add_argument('-pr', '--project', dest='project', help='Name of the project of interest', required = True)
-    project_parser.add_argument('-d', '--database', dest='database', help='Path to the database file', required=True)
-    project_parser.add_argument('-l', '--lims', dest='lims_info', help='Path to json file with lims info', required=True)
-    project_parser.add_argument('-s', '--samples', dest='samples_info', help='Path to json file with samples info', required=True)
-    project_parser.set_defaults(func=add_info)
- 
-    # launch jobs to fill db with all projects info
-    fill_parser = subparsers.add_parser('fill_db', help="Run jobs to fill database with information about all active projects.", parents = [parent_parser])
-    fill_parser.add_argument('-wd', '--workingdir', dest='workingdir', help='Name of the directory where qsubs scripts are written', required = True)
-    fill_parser.add_argument('-m', '--memory', dest='mem', default=20, help='Memory allocated to jobs')
-    fill_parser.add_argument('-md', '--merged_database', dest='merged_database', help='Path to the merged database', required = True)
-    fill_parser.add_argument('-rt', '--run_time', dest='run_time', default=5, help='Run time in hours')
-    fill_parser.set_defaults(func=launch_jobs)
-
-    # collect lims information from pinery
-    fill_parser = subparsers.add_parser('collect_lims', help="Collect lims information from Pinery.", parents = [parent_parser])
-    fill_parser.add_argument('-l', '--lims', dest='lims_info', help='Path to json file with lims info', required = True)
-    fill_parser.set_defaults(func=collect_lims_info)
-
-    # collect sample information from pinery
-    fill_parser = subparsers.add_parser('collect_samples', help="Collect sample information from Pinery.", parents = [parent_parser])
-    fill_parser.add_argument('-s', '--samples', dest='samples_info', help='Path to json file with sample info', required = True)
-    fill_parser.set_defaults(func=collect_parent_sample_info)
-
-    # launch job to merge the project dbs 
-    merge_parser = subparsers.add_parser('merge', help="Run job to merge the project databases", parents=[parent_parser])
-    merge_parser.add_argument('-m', '--memory', dest='mem', default=20, help='Memory allocated to jobs')
-    merge_parser.add_argument('-rt', '--run_time', dest='run_time', default=5, help='Run time in hours')
-    merge_parser.add_argument('-jn', '--job_names', dest='job_names', help='Names of the jobs launched to fill the database')
-    merge_parser.add_argument('-wd', '--workingdir', dest='workingdir', help='Name of the directory where qsubs scripts are written', required = True)
-    merge_parser.add_argument('-md', '--merged_database', dest='merged_database', help='Path to the merged database', required = True)
-    merge_parser.set_defaults(func=merge)
-
-    # generate the waterzooi database 
-    db_build_parser = subparsers.add_parser('build_db', help="Generate the waterzooi database without qsubing", parents=[parent_parser])
-    db_build_parser.add_argument('-db', '--database', dest='database', help='Path to the waterzooi database', required=True)    
-    #db_build_parser.add_argument('-l', '--lims_info', dest='lims_info', help='Path to json with lims information', required=True) 
-    #db_build_parser.add_argument('-s', '--samples_info', dest='samples_info', help='Path to json with samples information', required=True) 
-    db_build_parser.set_defaults(func=generate_database)
+    parser = argparse.ArgumentParser(prog = 'waterzooiDataCollector.py', description='Script to add data to the waterzooi database')
+    parser.add_argument('-f', '--fpr', dest='fpr', default = '/scratch2/groups/gsi/production/vidarr/vidarr_files_report_latest.tsv.gz', help='Path to the File Provenance Report. Default is /scratch2/groups/gsi/production/vidarr/vidarr_files_report_latest.tsv.gz')
+    parser.add_argument('-n', '--nabu', dest='nabu', default='https://nabu-prod.gsi.oicr.on.ca', help='URL of the Nabu API. Default is https://nabu-prod.gsi.oicr.on.ca')
+    parser.add_argument('-p', '--pinery', dest = 'pinery', default = 'http://pinery.gsi.oicr.on.ca', help = 'Pinery API. Default is http://pinery.gsi.oicr.on.ca')
+    parser.add_argument('-cq', '--calcontaqc', dest = 'calcontaqc_db', default = '/scratch2/groups/gsi/production/qcetl_v1/calculatecontamination/latest', help = 'Path to the merged rnaseq calculateContamination database. Default is /scratch2/groups/gsi/production/qcetl_v1/calculatecontamination/latest')
+    parser.add_argument('-db', '--database', dest='database', help='Path to the waterzooi database', required=True)    
+    parser.set_defaults(func=generate_database)
  
     # get arguments from the command line
-    args = main_parser.parse_args()
- 
+    args = parser.parse_args()
     args.func(args)
     
 
