@@ -744,7 +744,7 @@ def get_provenance_data(provenance):
     - provenance (str): URL of the pinery provenance API 
     '''
     
-    response = requests.get(provenance)
+    response = requests.get(provenance, timeout = (10,60))
     if response.ok:
         L = response.json()
     else:
@@ -887,17 +887,14 @@ def create_table(database, table):
     #if table  in ['Workflows', 'Parents', 'Files', 'FilesQC', 'Libraries', 'Workflow_Inputs', 'Samples', 'WGS_blocks', 'WT_blocks', 'Calculate_Contamination']:
     if table  in ['Workflows', 'Parents', 'Files', 'FilesQC', 'Libraries', 'Workflow_Inputs', 'Samples', 'WGS_blocks', 'WT_blocks', 'Checksums']:
         constraints = '''FOREIGN KEY (project_id)
-            REFERENCES Projects (project_id)
-            ON DELETE CASCADE ON UPDATE CASCADE'''
+            REFERENCES Projects (project_id)'''
         table_format = table_format + ', ' + constraints 
     
     if table == 'Parents':
         constraints = '''FOREIGN KEY (parents_id)
-          REFERENCES Workflows (wfrun_id)
-          ON DELETE CASCADE ON UPDATE CASCADE,
+          REFERENCES Workflows (wfrun_id),
           FOREIGN KEY (children_id)
-              REFERENCES Workflows (wfrun_id)
-              ON DELETE CASCADE ON UPDATE CASCADE''' 
+              REFERENCES Workflows (wfrun_id)''' 
         table_format = table_format + ', ' + constraints + ', PRIMARY KEY (parents_id, children_id, project_id)'
     
     if table == 'Worklows':
@@ -905,38 +902,31 @@ def create_table(database, table):
     
     if table in ['WGS_blocks', 'WT_blocks']:
         constraints = '''FOREIGN KEY (case_id)
-          REFERENCES Samples (case_id)
-          ON DELETE CASCADE ON UPDATE CASCADE'''
+          REFERENCES Samples (case_id)'''
         table_format = table_format + ', PRIMARY KEY (samples, anchor_wf)'
       
     if table == 'Files':
         constraints = '''FOREIGN KEY (wfrun_id)
-            REFERENCES Workflows (wfrun_id)
-            ON DELETE CASCADE ON UPDATE CASCADE,
+            REFERENCES Workflows (wfrun_id),
             FOREIGN KEY (file_swid)
-               REFERENCES FilesQC (file_swid)
-               ON DELETE CASCADE ON UPDATE CASCADE'''
+               REFERENCES FilesQC (file_swid)'''
         table_format = table_format + ', ' + constraints
     
     if table == 'Workflow_Inputs':
         constraints = '''FOREIGN KEY (wfrun_id)
-            REFERENCES Workflows (wfrun_id)
-            ON DELETE CASCADE ON UPDATE CASCADE,
+            REFERENCES Workflows (wfrun_id),
             FOREIGN KEY (library)
-              REFERENCES Libraries (library)
-              ON DELETE CASCADE ON UPDATE CASCADE'''
+              REFERENCES Libraries (library)'''
         table_format = table_format + ', ' + constraints
     
     if table == 'Samples':
         constraints = '''FOREIGN KEY (donor_id)
-            REFERENCES Libraries (ext_id)
-            ON DELETE CASCADE ON UPDATE CASCADE'''
+            REFERENCES Libraries (ext_id)'''
         table_format = table_format + ', ' + constraints
 
     if table == 'Libraries':
         constraints = '''FOREIGN KEY (case_id)
-            REFERENCES Samples (case_id)
-            ON DELETE CASCADE ON UPDATE CASCADE'''
+            REFERENCES Samples (case_id)'''
         table_format = table_format + ', ' + constraints
 
     # connect to database
@@ -947,6 +937,8 @@ def create_table(database, table):
     cur.execute(cmd)
     conn.commit()
     conn.close()
+
+
 
 
 
@@ -1812,8 +1804,10 @@ def generate_database(args):
 
     # collect lims info
     lims_info = collect_lims_info(args.pinery)
+    print('collected lins info')
     # collect sample info
     samples_info = collect_parent_sample_info(args.pinery)
+    print('samples info')
            
     # collect file info from FPR
     # get the list of valid projects
