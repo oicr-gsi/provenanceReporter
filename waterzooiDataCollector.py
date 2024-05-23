@@ -744,7 +744,7 @@ def get_provenance_data(provenance):
     - provenance (str): URL of the pinery provenance API 
     '''
     
-    response = requests.get(provenance, timeout = (10,60))
+    response = requests.get(provenance, timeout = (10,120))
     if response.ok:
         L = response.json()
     else:
@@ -1289,7 +1289,8 @@ def add_workflows_relationships_to_db(fpr_data, workflows, parents, database, pr
             column_names = define_column_names()[table]
             # connect to db
             conn = sqlite3.connect(database, timeout=30)
-            for workflow in parent_workflows[project]:
+            
+            for workflow in workflows[project]:
                 for parent in parent_workflows[project][workflow]:
                     if parent != 'NA':
                         assert workflows[project][workflow]['case_id'] == workflows[project][parent]['case_id']
@@ -1485,6 +1486,13 @@ def add_workflow_inputs_to_db(database, libraries, project, donors_to_update, ta
             for workflow_run in libraries[project]:
                 for sample in libraries[project][workflow_run]:
                     if sample in donors_to_update and donors_to_update[sample] != 'delete':
+                        
+                        
+                        print(workflow_run)
+                        print(sample)
+                        print('---')
+                        
+                        
                         for i in libraries[project][workflow_run][sample]['libraries']:
                             L = []
                             for j in column_names:
