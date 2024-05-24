@@ -1214,7 +1214,9 @@ def update_workflow_information(project, workflows, D, key):
     '''
     
     for workflow_id in D:
-        workflows[project][workflow_id][key] = D[workflow_id]
+        # workflow id may not be in workflows when updating 
+        if workflow_id in workflows[project]:
+            workflows[project][workflow_id][key] = D[workflow_id]
     
 
 def add_workflows_to_db(fpr_data, workflows, database, project, donors_to_update, table = 'Workflows'):
@@ -1486,13 +1488,6 @@ def add_workflow_inputs_to_db(database, libraries, project, donors_to_update, ta
             for workflow_run in libraries[project]:
                 for sample in libraries[project][workflow_run]:
                     if sample in donors_to_update and donors_to_update[sample] != 'delete':
-                        
-                        
-                        print(workflow_run)
-                        print(sample)
-                        print('---')
-                        
-                        
                         for i in libraries[project][workflow_run][sample]['libraries']:
                             L = []
                             for j in column_names:
