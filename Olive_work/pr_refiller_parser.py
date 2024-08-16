@@ -198,7 +198,7 @@ def define_column_names():
     column_names = {'Workflows': ['wfrun_id', 'wf', 'wfv', 'project_id', 'case_id', 'attributes', 'file_count', 'lane_count', 'skip', 'stale'],
                     'Parents': ['parents_id', 'children_id', 'project_id', 'case_id'],
                     'Projects': ['project_id', 'pipeline', 'last_updated', 'samples', 'library_types'],
-                    'Files': ['file_swid', 'project_id', 'md5sum', 'workflow', 'version', 'wfrun_id', 'file', 'library_type', 'attributes', 'creation_date', 'limskey', 'skip', 'stale', 'case_id'],
+                    'Files': ['file_swid', 'project_id', 'md5sum', 'workflow', 'version', 'wfrun_id', 'file', 'library_type', 'attributes', 'creation_date', 'limskey', 'stale', 'case_id'],
                     'FilesQC': ['file_swid', 'project_id', 'case_id', 'skip', 'user', 'date', 'status', 'reference', 'fresh', 'ticket'],
                     'Libraries': ['library', 'case_id', 'tissue_type', 'ext_id', 'tissue_origin',
                                   'library_type', 'prep', 'tissue_prep', 'sample_received_date', 'group_id', 'group_id_description', 'project_id'],
@@ -225,9 +225,9 @@ def define_column_types():
                     'Parents': ['VARCHAR(572)', 'VARCHAR(572)', 'VARCHAR(128)', 'VARCHAR(128)'],
                     'Projects': ['VARCHAR(128) PRIMARY KEY NOT NULL UNIQUE', 'VARCHAR(128)',
                                   'VARCHAR(256)', 'INT', 'INT'],
-                    'Files': ['VARCHAR(572) PRIMARY KEY NOT NULL UNIQUE', 'VARCHAR(128)',
+                    'Files': ['VARCHAR(572)', 'VARCHAR(128)',
                               'VARCHAR(256)', 'VARCHAR(128)', 'VARCHAR(128)',
-                              'VARCHAR(572)', 'TEXT', 'VARCHAR(128)', 'TEXT', 'INT', 'VARCHAR(256)', 'INT', 'VARCHAR(128)', 'VARCHAR(128)'],
+                              'VARCHAR(572)', 'TEXT', 'VARCHAR(128)', 'TEXT', 'INT', 'VARCHAR(256)', 'VARCHAR(128)', 'VARCHAR(128)'],
                     'FilesQC': ['VARCHAR(572) PRIMARY KEY NOT NULL UNIQUE', 'VARCHAR(128)', 'VARCHAR(128)',
                                 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)',
                                 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)'],
@@ -246,8 +246,6 @@ def define_column_types():
                     
     
     return column_types
-
-
 
 
 
@@ -461,6 +459,57 @@ def add_project_info_to_db(database, provenance_data, table = 'Projects'):
     conn.close()
 
 
+def add_file_info_to_db(database, provenance_data, donors_to_update, table = 'Files'):
+    '''
+    (str, str, dict, dict, str) -> None
+    
+    Inserts file information in database's Files table
+       
+    Parameters
+    ----------
+    - database (str): Path to the database file
+    - provenance_data (list): List of dictionaries, each representing the data of a single donor
+    - donors_to_update (dict): Dictionary with donors for which records needs to be updated
+    - table (str): Table in database storing file information. Default is Files
+    '''
+        
+    if donors_to_update:
+        # get the column names
+        column_names = define_column_names()[table]
+        # remove rows for donors to update
+        delete_records(donors_to_update, database, table)
+        print('deleted records in Files')
+    
+    
+        # make a list of data to insert in the database
+        newdata = []
+        
+        
+        files = []
+        
+    
+        for donor_data in provenance_data:
+            donor = donor_data['donor']
+            # check if donor needs to be updated
+            if donor in donors_to_update and donors_to_update[donor] != 'delete':
+                file_info = collect_donor_file_info(donor_data)
+                for file_swid in file_info:
+                    file_info[file_swid]['limskey'] = ';'.join(sorted(list(set(file_info[file_swid]['limskey']))))
+                    L = [file_info[file_swid][i] for i in column_names]
+                    newdata.append(L)             
+          
+        
+        # connect to db
+        conn = sqlite3.connect(database)
+        # add data
+        vals = '(' + ','.join(['?'] * len(newdata[0])) + ')'
+        conn.executemany('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), vals), newdata)
+        conn.commit()
+        conn.close()
+
+
+
+
 
 def is_project_active(donor_data):
     '''
@@ -473,13 +522,7 @@ def is_project_active(donor_data):
     - donor_data (dict): Dictionary with a single donor data    
     '''
     
-    active = []
-    for i in donor_data['pinery_project_data']:
-        if i['active'].lower() == 'true':
-            active.append(True)
-        else:
-            active.append(False)
-    
+    active = [convert_to_bool(i['active']) for i in donor_data['pinery_project_data']]
     return all(active)
 
 
@@ -700,31 +743,6 @@ def get_donor_library_types(donor_data):
     
     
     
-    # [{'accession': 'vidarr:research/file/012cf6554e9b51f0dcab3186a134f02b26b78953534e56dbd14ba3158428c380',
-    #   'barcode': 'TTCTGGAA-CGATTCCG',
-    #   'external_donor_id': 'BMT-PMH-125',
-    #   'group_id': 'BMT-PMH-125',
-    #   'input_files': '[]',
-    #   'instrument_model': 'Illumina MiSeq',
-    #   'lane': '1',
-    #   'library_design': 'TS',
-    #   'library_name': 'AHCT_0029_01_LB02-01',
-    #   'library_type': '',
-    #   'lims': '{"id":"5893_1_LDI84239","provider":"pinery-miso","time":1676401595000,"version":"882752c33378b9d66793a619fc4918241285391bf490f0525325f90fd58db05b"}',
-    #   'md5': 'c55a9d4efd25ff5d081b4c3301453561',
-    #   'path': '/oicr/data/archive/seqware/seqware_analysis_12/hsqwprod/seqware-results/bcl2fastq_3.1.2/25547692/AHCT_0029_01_LB02-01_220418_M06816_0282_000000000-DG2YB_1_TTCTGGAA-CGATTCCG_R2.fastq.gz',
-    #   'project': 'AHCT',
-    #   'run': '220418_M06816_0282_000000000-DG2YB',
-    #   'stale': 'False',
-    #   'timestamp': '2022-04-19T13:43:09.757Z',
-    #   'tissue_origin': 'Pb',
-    #   'tissue_type': 'P',
-    #   'workflow': 'bcl2fastq',
-    #   'workflow_run_accession': 'vidarr:research/run/89fb17aed45e61d0caa9b23277fc973eb87309ec50de7469709daddfeb517a0e',
-    #   'workflow_run_attributes': '{}',
-    #   'workflow_run_labels': '{}',
-    #   'workflow_version': '[3,1,2]'}]
-    
     
     
     
@@ -754,23 +772,102 @@ def get_donor_samples_and_library_types(donor_data):
                            
     return D
             
+
+
+
+def convert_to_bool(S):
+    '''
+    (str) -> bool
+    
+    Returns the boolean value of the string representation of a boolean
+    
+    Parameters
+    ----------
+    - S (str): String indicating True or False
+    '''
+    
+    if S.lower() == 'true':
+        B = True
+    elif S.lower() == 'false':
+        B = False
+    return B
     
     
+   
+def get_file_timestamp(d):
+    '''
+    (dict) - > int
+    
+    Returns the time stamp of a file from the dictionary of the file from cerberus data
+    for a donor
+    
+    Parameters
+    ----------
+    - d (dict): Dictionary representing a file information from cerberus
+    '''    
+    
+    creation_date = d['timestamp']
+    creation_date = ' '.join(creation_date.split('T')).replace('Z', '')
+    creation_date = creation_date.split('.')
+    if len(creation_date) > 1:
+        creation_date = ' '.join(creation_date[:-1])
+    else:
+        creation_date = creation_date[0]
+    pattern = '%Y-%m-%d %H:%M:%S'
+    creation_date = int(time.mktime(time.strptime(creation_date, pattern)))
+    
+    return creation_date
     
     
+def collect_donor_file_info(donor_data):
+    '''
+    (dict) -> dict
     
+    Returns a dictionary with all the file information for a given donor
     
+    Parameters
+    ----------
+    - donor_data (dict): Dictionary with a single donor data   
+    '''    
+        
+    D = {}
     
+    for i in range(len(donor_data['cerberus_data'])):
+        file_swid = donor_data['cerberus_data'][i]['accession']
+        project_id = donor_data['cerberus_data'][i]['project']
+        md5sum = donor_data['cerberus_data'][i]['md5']
+        workflow = donor_data['cerberus_data'][i]['workflow']
+        case_id = donor_data['donor']
+        file = donor_data['cerberus_data'][i]['path']
+        library_type = donor_data['cerberus_data'][i]['library_design']
+        stale = convert_to_bool(donor_data['cerberus_data'][i]['stale'])
+        wfrun_id = os.path.basename(donor_data['cerberus_data'][i]['workflow_run_accession'])
+        version = '.'.join(donor_data['cerberus_data'][i]['workflow_version'])
+        limskey = json.loads(donor_data['cerberus_data'][i]['lims'])['id']
+        creation_date = get_file_timestamp(donor_data['cerberus_data'][i])
+        
+        if 'attributes' in donor_data['cerberus_data'][i]:
+            attributes = donor_data['cerberus_data'][i]['attributes']
+            attributes = attributes.split(';')
+            attributes = json.dumps({k.split('=')[0]: k.split('=')[1] for k in attributes})
+        else:
+            attributes = ''
+        
+        # collect file info if not stale             
+        if stale == False:
+            if file_swid not in D:
+                D[file_swid] = {'file_swid': file_swid, 'project_id': project_id,
+                                'md5sum': md5sum, 'workflow': workflow, 'case_id': case_id,
+                                'file': file, 'library_type': library_type,
+                                'stale': stale, 'wfrun_id': wfrun_id, 'version': version,
+                                'limskey': [limskey], 'creation_date': creation_date,
+                                'attributes': attributes}
+            else:
+                D[file_swid]['limskey'].append(limskey)
+                
+    return D
     
-    
-    
-    
-    
-    
-    
-    
-    
-    
+
     
 
 
@@ -806,12 +903,6 @@ def collect_project_info(provenance_data):
         
         
         
-
-
-
-#      'Projects': ['project_id', 'pipeline', 'description', 'active', 'contact_name', 'contact_email', 'last_updated', 'expected_samples', 'sequenced_samples', 'library_types'],
-
-
 
 
 
@@ -852,7 +943,9 @@ def generate_database(database, provenance_data_file):
     add_project_info_to_db(database, provenance_data, 'Projects')
     print('added project info to database')
     
-    
+    # add file information to database
+    add_file_info_to_db(database, provenance_data, donors_to_update, 'Files')
+    print('added file info to database')
     
     
     
@@ -1698,26 +1791,7 @@ generate_database('test.db', 'provenance_reporter.json')
 #     conn.close()
 
 
-# def delete_records(donors, database, table):
-#     '''
-#     (dict, str, str) -> None
-    
-#     Remove all the rows from table with case_id in donors
-    
-#     Parameters
-#     ----------
-#     - donors (dict): Dictionary with donors to remove from table
-#     - database (str): Path to the sqlite database
-#     - table (str): Table in database
-#     '''
-    
-#     conn = sqlite3.connect(database)
-#     cur = conn.cursor()
-#     id_list = list(donors.keys())
-#     query = "DELETE FROM {0} WHERE case_id IN ({1})".format(table, ", ".join("?" * len(id_list)))
-#     cur.execute(query, id_list)
-#     conn.commit()
-#     conn.close()
+
 
 
 # def add_project_info_to_db(database, pinery, project, lims, table = 'Projects'):
@@ -2612,10 +2686,10 @@ generate_database('test.db', 'provenance_reporter.json')
 #             donors_to_update = donors_info_to_update(args.database, fpr_data, project, 'Checksums')
 #             print('donors to update:', len(donors_to_update))
 #             if donors_to_update:
-#                 # add project information    
-#                 add_project_info_to_db(args.database, args.pinery, project, lims_info, 'Projects')
-#                 print('added projects')
-#                 # add file info
+#                 
+
+
+                  
 #                 add_file_info_to_db(args.database, project, fpr_data, donors_to_update, 'Files')
 #                 print('added files')
 #                 # add library information
