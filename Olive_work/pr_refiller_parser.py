@@ -201,7 +201,7 @@ def define_column_names():
                     'Files': ['file_swid', 'project_id', 'md5sum', 'workflow', 'version', 'wfrun_id', 'file', 'library_type', 'attributes', 'creation_date', 'limskey', 'stale', 'case_id'],
                     'FilesQC': ['file_swid', 'project_id', 'case_id', 'skip', 'user', 'date', 'status', 'reference', 'fresh', 'ticket'],
                     'Libraries': ['library', 'case_id', 'tissue_type', 'ext_id', 'tissue_origin',
-                                  'library_type', 'prep', 'tissue_prep', 'sample_received_date', 'group_id', 'group_id_description', 'project_id'],
+                                  'library_type', 'group_id', 'group_id_description', 'project_id'],
                     'Workflow_Inputs': ['library', 'run', 'lane', 'wfrun_id', 'limskey', 'barcode', 'platform', 'project_id', 'case_id'],
                     'Samples': ['case_id', 'donor_id', 'species', 'sex', 'miso', 'created_date', 'modified_date', 'project_id', 'parent_project'],
                     'WGS_blocks': ['project_id', 'case_id', 'samples', 'anchor_wf', 'workflows', 'name', 'date', 'release_status', 'complete', 'clean', 'network'],
@@ -231,10 +231,9 @@ def define_column_types():
                     'FilesQC': ['VARCHAR(572) PRIMARY KEY NOT NULL UNIQUE', 'VARCHAR(128)', 'VARCHAR(128)',
                                 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)',
                                 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)'],
-                    'Libraries': ['VARCHAR(256) PRIMARY KEY NOT NULL', 'VARCHAR(128)',
+                    'Libraries': ['VARCHAR(256)', 'VARCHAR(128)',
                                   'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)',
-                                  'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 
-                                  'VARCHAR(256)', 'VARCHAR(128)', 'VARCHAR(256)', 'VARCHAR(128)'],
+                                  'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(256)', 'VARCHAR(128)'],
                     'Workflow_Inputs': ['VARCHAR(128)', 'VARCHAR(256)', 'INTEGER', 'VARCHAR(572)', 
                                         'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)'],
                     'Samples': ['VARCHAR(128) PRIMARY KEY NOT NULL', 'VARCHAR(256)', 'VARCHAR(256)', 'VARCHAR(128)', 'VARCHAR(572)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)'],
@@ -480,14 +479,9 @@ def add_file_info_to_db(database, provenance_data, donors_to_update, table = 'Fi
         delete_records(donors_to_update, database, table)
         print('deleted records in Files')
     
-    
         # make a list of data to insert in the database
         newdata = []
-        
-        
-        files = []
-        
-    
+            
         for donor_data in provenance_data:
             donor = donor_data['donor']
             # check if donor needs to be updated
@@ -498,7 +492,6 @@ def add_file_info_to_db(database, provenance_data, donors_to_update, table = 'Fi
                     L = [file_info[file_swid][i] for i in column_names]
                     newdata.append(L)             
           
-        
         # connect to db
         conn = sqlite3.connect(database)
         # add data
@@ -508,6 +501,48 @@ def add_file_info_to_db(database, provenance_data, donors_to_update, table = 'Fi
         conn.close()
 
 
+
+
+
+
+
+
+
+
+def add_library_info_to_db(database, provenance_data, donors_to_update, table = 'Libraries'):
+    '''
+
+
+    '''                 
+
+    if donors_to_update:
+        # get the column names
+        column_names = define_column_names()[table]
+        # remove rows for donors to update
+        delete_records(donors_to_update, database, table)
+        print('deleted records in Files')
+
+        # make a list of data to insert in the database
+        newdata = []
+    
+        for donor_data in provenance_data:
+            donor = donor_data['donor']
+            # check if donor needs to be updated
+            if donor in donors_to_update and donors_to_update[donor] != 'delete':
+                library_info = collect_donor_library_info(donor_data)
+                
+                for library in library_info:
+                    for d in library_info[library]:
+                        L = [d[i] for i in column_names]
+                        newdata.append(L)             
+  
+        # connect to db
+        conn = sqlite3.connect(database)
+        # add data
+        vals = '(' + ','.join(['?'] * len(newdata[0])) + ')'
+        conn.executemany('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), vals), newdata)
+        conn.commit()
+        conn.close()
 
 
 
@@ -868,7 +903,49 @@ def collect_donor_file_info(donor_data):
     return D
     
 
+
+def collect_donor_library_info(donor_data):
+    '''
+    (dict) -> dict
     
+    Returns a dictionary with all the library information for a given donor
+    
+    Parameters
+    ----------
+    - donor_data (dict): Dictionary with a single donor data   
+    '''    
+
+    D = {}
+    
+    for i in range(len(donor_data['pinery_data'])):
+        library = donor_data['pinery_data'][i]['library_name']
+        case_id = donor_data['donor']
+        ext_id = donor_data['cerberus_data'][0]['external_donor_id']
+        project_id = donor_data['pinery_data'][i]['project']
+        group_id = donor_data['pinery_data'][i]['group_id']
+        group_id_description = donor_data['pinery_data'][i]['group_desc']
+        library_type = donor_data['pinery_data'][i]['library_design']
+        tissue_type = donor_data['pinery_data'][i]['tissue_type']
+        tissue_origin = donor_data['pinery_data'][i]['tissue_origin']
+        
+        d = {'library': library, 'case_id': case_id, 'ext_id': ext_id,
+                      'project_id': project_id, 'group_id': group_id,
+                      'group_id_description': group_id_description,
+                      'library_type': library_type, 'tissue_type': tissue_type,
+                      'tissue_origin': tissue_origin}
+        
+        if library not in D:
+            D[library] = [d] 
+        else:
+            if d not in D[library]:
+                D[library].append(d)
+                   
+    return D       
+        
+
+        
+
+
 
 
 
@@ -947,7 +1024,9 @@ def generate_database(database, provenance_data_file):
     add_file_info_to_db(database, provenance_data, donors_to_update, 'Files')
     print('added file info to database')
     
-    
+    add_library_info_to_db(database, provenance_data, donors_to_update, 'Libraries')
+    print('added library info to database')
+         
     
     
     # update the checksums for donors
@@ -2690,8 +2769,6 @@ generate_database('test.db', 'provenance_reporter.json')
 
 
                   
-#                 add_file_info_to_db(args.database, project, fpr_data, donors_to_update, 'Files')
-#                 print('added files')
 #                 # add library information
 #                 add_library_info_to_db(args.database, project, args.pinery, lims_info, donors_to_update, 'Libraries')
 #                 print('added libraries')
