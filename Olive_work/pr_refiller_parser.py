@@ -1153,7 +1153,7 @@ def collect_donor_file_info(donor_data):
         library_type = donor_data['cerberus_data'][i]['library_design']
         stale = convert_to_bool(donor_data['cerberus_data'][i]['stale'])
         wfrun_id = os.path.basename(donor_data['cerberus_data'][i]['workflow_run_accession'])
-        version = '.'.join(donor_data['cerberus_data'][i]['workflow_version'])
+        version = '.'.join(map(lambda x: str(x), json.loads(donor_data['cerberus_data'][i]['workflow_version'])))
         limskey = json.loads(donor_data['cerberus_data'][i]['lims'])['id']
         creation_date = get_file_timestamp(donor_data['cerberus_data'][i])
         
@@ -1436,7 +1436,7 @@ def collect_donor_workflow_info(donor_data):
         project_id = donor_data['cerberus_data'][i]['project']
         wfrun_id = os.path.basename(donor_data['cerberus_data'][i]['workflow_run_accession'])
         wf = donor_data['cerberus_data'][i]['workflow']
-        wfv = '.'.join(donor_data['cerberus_data'][i]['workflow_version'])
+        wfv = '.'.join(map(lambda x: str(x), json.loads(donor_data['cerberus_data'][i]['workflow_version'])))
         case_id = donor_data['donor']
         stale = convert_to_bool(donor_data['cerberus_data'][i]['stale'])
         file_swid = donor_data['cerberus_data'][i]['accession']     
