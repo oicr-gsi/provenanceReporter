@@ -401,7 +401,7 @@ def add_checksums_info_to_db(database, donors_to_update, table = 'Checksums'):
 
         # order values according to column names
         for i in donors_to_update:
-            L = [donors_to_update[i]['project'], i, donors_to_update[i]['md5']]
+            L = [donors_to_update[i]['project_id'], i, donors_to_update[i]['md5']]
             newdata.append(L)
         vals = '(' + ','.join(['?'] * len(newdata[0])) + ')'
         conn.executemany('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), vals), newdata)
@@ -696,67 +696,46 @@ def add_workflows_to_db(database, provenance_data, donors_to_update, table = 'Wo
         conn.close()
 
 
-
-
-# def add_workflow_inputs_to_db(database, provenance_data, donors_to_update, table = 'Workflow_Inputs'):
-#     '''
-#     (str, dict, str, dict, str) -> None
+def add_workflow_inputs_to_db(database, provenance_data, donors_to_update, table = 'Workflow_Inputs'):
+    '''
+    (str, list, dict, str) -> None
     
-#     Inserts or updates workflow input library information in table Workflow_Inputs of database    
-    
-#     Parameters
-#     ----------
-#     - database (str): Path to the databae file
-#     - libraries (dict): Dictionary with workflow inputs extracted from FPR
-#     - project (str): Name of project of interest
-#     - donors_to_update (dict): Dictionary with donors for which records needs to be updated
-#     - table (str): Table storing library in database. Default is Libraries
-#     '''
+    Inserts or updates workflow input information 
+ 
+    Parameters
+    ----------    
+    - database (str): Path to the database file
+    - provenance_data (list): List of dictionaries, each representing the data of a single donor
+    - donors_to_update (dict): Dictionary with donors for which records needs to be updated
+    - table (str): Table in database storing file information. Default is Workflow_Inputs
+    '''
 
+    if donors_to_update:
+        # get the column names
+        column_names = define_column_names()[table]
+        # remove rows for donors to update
+        delete_records(donors_to_update, database, table)
+        print('deleted records in Files')
 
-#     # remove rows for donors to update
-#     if donors_to_update:
-#         delete_records(donors_to_update, database, table)
-#         print('deleted records in Workflow_Inputs')
+        # make a list of data to insert in the database
+        newdata = []
+     
+        for donor_data in provenance_data:
+            donor = donor_data['donor']
+            # check if donor needs to be updated
+            if donor in donors_to_update and donors_to_update[donor] != 'delete':
+                workflow_input_info = collect_donor_workflow_inputs(donor_data)
+                for d in workflow_input_info:
+                    L = [d[i] for i in column_names]
+                    newdata.append(L)             
 
-#         # check that data is recorded in FPR for project
-#         if libraries:
-#             # make a list of data to insert
-#             newdata = []
-#             # connect to db
-#             conn = sqlite3.connect(database)
-#             # get column names
-#             data = conn.execute("SELECT * FROM {0} WHERE project_id = '{1}';".format(table, project))
-#             column_names = [column[0] for column in data.description]
-    
-#             # add or update data
-#             for workflow_run in libraries[project]:
-#                 for sample in libraries[project][workflow_run]:
-#                     if sample in donors_to_update and donors_to_update[sample] != 'delete':
-#                         for i in libraries[project][workflow_run][sample]['libraries']:
-#                             L = []
-#                             for j in column_names:
-#                                 if j in i:
-#                                     if j != 'lane':
-#                                         L.append(i[j])
-#                                     else:
-#                                         L.append(int(i[j]))
-#                             L.append(project)
-#                             L.insert(3, workflow_run)
-#                             L.append(sample)
-#                             newdata.append(L)                      
-#             vals = '(' + ','.join(['?'] * len(newdata[0])) + ')'
-#             conn.executemany('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), vals), newdata)
-#             conn.commit()
-#             conn.close()
-
-
-
-
-
-
-
-
+        # connect to db
+        conn = sqlite3.connect(database)
+        # add data
+        vals = '(' + ','.join(['?'] * len(newdata[0])) + ')'
+        conn.executemany('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), vals), newdata)
+        conn.commit()
+        conn.close()
 
 
 def is_project_active(donor_data):
@@ -842,13 +821,9 @@ def compute_donor_md5sum(provenance_data):
     for d in provenance_data:
         md5 = compute_md5(d)
         donor = d['donor']
-        try:
-            project = d['cerberus_data'][0]['project']
-        except:
-            print(donor, 'cerberus', len(d['cerberus_data']))
-            project = ''
+        project = d['cerberus_data'][0]['project']
         assert donor not in D
-        D[donor] = {'md5':md5, 'project':project}
+        D[donor] = {'md5':md5, 'project_id':project}
     return D
     
 
@@ -872,7 +847,7 @@ def get_donors_md5sum(database, table = 'Checksums'):
     if table in tables:
         data = conn.execute('SELECT case_id, md5, project_id FROM {0}'.format(table)).fetchall()  
         for i in data:
-            records[i['case_id']] = {'md5': i['md5'], 'project': i['project']}
+            records[i['case_id']] = {'md5': i['md5'], 'project_id': i['project_id']}
     conn.close()
     
     return records
@@ -896,12 +871,12 @@ def donors_info_to_update(md5sums, recorded_md5sums):
     for donor in md5sums:
         # update if not already recorded
         if donor not in recorded_md5sums:
-            donors[donor] = {'md5': md5sums[donor]['md5'], 'project': md5sums[donor]['project']}
+            donors[donor] = {'md5': md5sums[donor]['md5'], 'project_id': md5sums[donor]['project_id']}
         # update if md5sums are different
         else:
             if recorded_md5sums[donor]['md5'] != md5sums[donor]['md5']:
                 donors[donor]['md5'] = md5sums[donor]['md5']
-                assert donors[donor]['project'] == md5sums[donor]['project']
+                assert donors[donor]['project_id'] == md5sums[donor]['project_id']
         
     # delete donors that are no longer recorded
     for donor in recorded_md5sums:
@@ -1462,6 +1437,49 @@ def collect_donor_workflow_info(donor_data):
 
 
 
+
+def collect_donor_workflow_inputs(donor_data):
+    '''
+    (dict) -> list
+    
+    Returns a list of dictionaries with the workflow input information for a given donor
+    
+    Parameters
+    ----------
+    - donor_data (dict): Dictionary with a single donor data   
+    '''
+        
+    L = []
+    
+    for i in range(len(donor_data['cerberus_data'])):
+        case_id = donor_data['donor']
+        library = donor_data['cerberus_data'][i]['library_name']
+        project_id = donor_data['cerberus_data'][i]['project']
+        barcode = donor_data['cerberus_data'][i]['barcode']
+        platform = '_'.join(donor_data['cerberus_data'][i]['instrument_model'].split())
+        lane = donor_data['cerberus_data'][i]['lane']
+        wfrun_id = os.path.basename(donor_data['cerberus_data'][i]['workflow_run_accession'])
+        run = donor_data['cerberus_data'][i]['run']
+        limskey = json.loads(donor_data['cerberus_data'][i]['lims'])['id']
+        
+        d = {'case_id': case_id, 'library': library, 'project_id': project_id,
+             'barcode': barcode, 'platform': platform, 'lane': lane, 'wfrun_id': wfrun_id,
+             'run': run, 'limskey': limskey}
+        
+        if d not in L:
+            L.append(d)
+    
+    return L
+
+
+
+
+
+
+
+
+
+
 def collect_project_info(provenance_data):
     '''
     (list) -> dict
@@ -1544,6 +1562,10 @@ def generate_database(database, provenance_data_file):
     add_workflows_to_db(database, provenance_data, donors_to_update, 'Workflows')
     print('added workflow info to database')
          
+    
+    
+    add_workflow_inputs_to_db(database, provenance_data, donors_to_update, 'Workflow_Inputs')
+
     
     
     # update the checksums for donors
@@ -3205,58 +3227,6 @@ generate_database('test.db', 'provenance_reporter.json')
 #     projects.sort()
     
     
-#     # projects =     ['AHCT', 'AIX3', 'AMLWES', 'ARCH1', 'AWAON',
-#     #                 'BDAC', 'BDRUO', 'BDWGTS', 'BEAVER', 'BIOCAN',
-#     #                 'BIODIVA', 'BIOMTEST', 'BTC', 'BTCMOH', 'BTCWGTS',
-#     #                 'CAPPT', 'CHANCE', 'CHARM', 'CHARMHBOC', 'CHARMQ',
-#     #                 'CHIPBC', 'CLINVAL', 'CMLB4', 'COLO829', 'COMBAT',
-#     #                 'COMPCAP', 'COMPDOWN', 'CSEQTEST', 'CSFWGS',
-#     #                 'CSTAMP', 'DBSSMMIP', 'DELISH', 'DNAMCI', 'DTP',
-#     #                 'EAC2', 'EACOM', 'EBUSO', 'ECTDNA', 'EMGK', 'EMJY',
-#     #                 'EVOLVE', 'EVRS', 'FCR', 'FETHB2', 'FINHCC',
-#     #                 'FLOMICS', 'GENCOV', 'GLCS', 'GLDS', 'GNTC',
-#     #                 'GOLDEN', 'GSITEST', 'HBOCX', 'HBSEQ', 'HCCCFD',
-#     #                 'HCCMOH', 'HIPERMM', 'ILCTTEST', 'ILCWGTS', 'IMPACT', 'INSIGHTG',
-#     #                 'INSIGHTM', 'IRIS', 'JYCF', 'KLCS', 'LGOCWG', 'LLHC', 'LPWGS2',
-#     #                 'LSEM', 'LWESH', 'LYMEM', 'M4CHIP', 'MATMET', 'MESO', 'MESO2', 'MOCHA',
-#     #                 'MOHCCNO', 'MONS', 'MPHC', 'MYC', 'MYP', 'MYR', 'N2KCLINVAL', 'NASHB2',
-#     #                 'NEP2', 'NOVAXVAL', 'OCHM', 'OCT', 'OCTCAP', 'OCTMOH2', 'OCTMOH3', 'OCTMOH4',
-#     #                 'OHR', 'OZM075', 'PALMS', 'PANX', 'PANXTAR', 'PANXWGTS', 'PASS01', 'PATMA', 'PBCM1',
-#     #                 'PCFEM', 'PDACWTA', 'PHLCX', 'PLEMS', 'PMGEC', 'PMLB', 'POSTBMTMOH', 'POSTBMTRUO',
-#     #                 'PRSPR', 'PRSPRPLAS', 'PSCPBC', 'PTEST', 'PTRS', 'PWGVAL', 'RATBCA', 'READILY',
-#     #                 'REFLECT', 'REVOLVE', 'REVRS', 'REVTAR', 'REVV2VAL', 'REVWGTS', 'RHDV', 'RLGS',
-#     #                 'SAMBA', 'SARH', 'SCKRAS', 'SCTSF', 'SHEBAXEN', 'SOTCH', 'SOTRCS', 'SPAR', 'SPORE', 
-#     #                 'STSMOH', 'SWAPWG', 'TALL', 'TCML', 'TFRIM4', 'TGL01MOH', 'TGL07CAP', 'TGL20',
-#     #                 'TGL26', 'TGL32', 'TGL38', 'TGL39', 'TGL42', 'TGL43', 'TGL44', 'TGL46', 'TGL48',
-#     #                 'TGL49', 'TGL50', 'TGL53', 'TGL54', 'TGL55', 'TGL59', 'TGL61', 'TGL62', 'TGL63',
-#     #                 'TGL63EMS', 'TGL65', 'TGLX25', 'TRACER', 'TXME', 'UHTC', 'VENHPV', 'VNRUO', 'VNWGTS',
-#     #                 'WESTMB', 'WTCC', 'WTEC', 'WTTEST', 'YOCRC']
-
-#     # projects = ['PWGVAL', 'RATBCA', 'READILY', 'REFLECT', 'REVOLVE', 'REVRS',
-#     #             'REVTAR', 'REVV2VAL', 'REVWGTS', 'RHDV', 'RLGS', 'SAMBA', 'SARH',
-#     #             'SCKRAS', 'SCTSF', 'SHEBAXEN', 'SOTCH', 'SOTRCS', 'SPAR', 'SPORE',
-#     #             'STSMOH', 'SWAPWG', 'TALL', 'TCML', 'TFRIM4', 'TGL01MOH', 'TGL07CAP',
-#     #             'TGL20', 'TGL26', 'TGL32', 'TGL38', 'TGL39', 'TGL42', 'TGL43',
-#     #             'TGL44', 'TGL46', 'TGL48', 'TGL49', 'TGL50', 'TGL53', 'TGL54',
-#     #             'TGL55', 'TGL59', 'TGL61', 'TGL62', 'TGL63', 'TGL63EMS',
-#     #             'TGL65', 'TGLX25', 'TRACER', 'TXME', 'UHTC', 'VENHPV', 'VNRUO',
-#     #             'VNWGTS', 'WESTMB', 'WTCC', 'WTEC', 'WTTEST', 'YOCRC']
-    
-#     projects = ['RATBCA', 'READILY', 'REFLECT', 'REVOLVE', 'REVRS',
-#                 'REVTAR', 'REVV2VAL', 'REVWGTS', 'RHDV', 'RLGS', 'SAMBA', 'SARH',
-#                 'SCKRAS', 'SCTSF', 'SHEBAXEN', 'SOTCH', 'SOTRCS', 'SPAR', 'SPORE',
-#                 'STSMOH', 'SWAPWG', 'TALL', 'TCML', 'TFRIM4', 'TGL01MOH', 'TGL07CAP',
-#                 'TGL20', 'TGL26', 'TGL32', 'TGL38', 'TGL39', 'TGL42', 'TGL43',
-#                 'TGL44', 'TGL46', 'TGL48', 'TGL49', 'TGL50', 'TGL53', 'TGL54',
-#                 'TGL55', 'TGL59', 'TGL61', 'TGL62', 'TGL63', 'TGL63EMS',
-#                 'TGL65', 'TGLX25', 'TRACER', 'TXME', 'UHTC', 'VENHPV', 'VNRUO',
-#                 'VNWGTS', 'WESTMB', 'WTCC', 'WTEC', 'WTTEST', 'YOCRC']
-    
-    
-    
-    
-    
-    
     
     
     
@@ -3304,11 +3274,8 @@ generate_database('test.db', 'provenance_reporter.json')
 #                 # add file QC info
 #                 add_fileQC_info_to_db(args.database, project, args.nabu, matched_ids, donors_to_update, 'FilesQC')
 #                 print('added filesqc')
-#                 # add workflow information
-#                 # get workflow information for the current project
-#                 workflows = get_workflow_information(fpr_data, donors_to_update, project, args.database, 'Files', 'Workflow_Inputs')
-#                 add_workflows_to_db(fpr_data, workflows, args.database, project, donors_to_update, 'Workflows')
-#                 print('added workflows')
+#                 
+                  #workflows = get_workflow_information(fpr_data, donors_to_update, project, args.database, 'Files', 'Workflow_Inputs')
 #                 # add workflow relationships
 #                 add_workflows_relationships_to_db(fpr_data, workflows, parents, args.database, project, donors_to_update, 'Parents')
 #                 print('added workflow relationships')
