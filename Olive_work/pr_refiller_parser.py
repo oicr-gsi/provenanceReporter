@@ -1131,14 +1131,17 @@ def collect_donor_file_info(donor_data):
         version = '.'.join(map(lambda x: str(x), json.loads(donor_data['cerberus_data'][i]['workflow_version'])))
         limskey = json.loads(donor_data['cerberus_data'][i]['lims'])['id']
         creation_date = get_file_timestamp(donor_data['cerberus_data'][i])
-        
-        if 'attributes' in donor_data['cerberus_data'][i]:
-            attributes = donor_data['cerberus_data'][i]['attributes']
-            attributes = attributes.split(';')
-            attributes = json.dumps({k.split('=')[0]: k.split('=')[1] for k in attributes})
+        if 'file_attributes' in donor_data['cerberus_data'][i]:
+            attributes = json.loads(donor_data['cerberus_data'][i]['file_attributes'])
+            for k in attributes:
+                attributes[k] = attributes[k][0]
+            if len(attributes) == 0:
+                attributes = ''
+            else:
+                attributes = json.dumps(attributes)
         else:
             attributes = ''
-        
+    
         # collect file info if not stale             
         if stale == False:
             if file_swid not in D:
@@ -2759,156 +2762,6 @@ generate_database('test.db', 'provenance_reporter.json')
 #             conn.close()
             
 
-# def add_file_info_to_db(database, project, fpr_data, donors_to_update, table = 'Files'):
-#     '''
-#     (str, str, dict, dict, str) -> None
-    
-#     Inserts file information in database's Files table
-       
-#     Parameters
-#     ----------
-#     - database (str): Path to the database file
-#     - project (str): Name of project of interest
-#     - fpr_data (dict): Dictionary with file information parsed from FPR
-#     - file_table (str): Table in database storing file information. Default is Files 
-#     - donors_to_update (dict): Dictionary with donors for which records needs to be updated
-#     - table (str): Table in database storing file information. Default is Files
-#     '''
-        
-#     # remove rows for donors to update
-#     if donors_to_update:
-#         delete_records(donors_to_update, database, table)
-#         print('deleted records in Files')
-    
-#         # get column names
-#         column_names = define_column_names()[table]
-
-#         # check that data is recorded in FPR for project
-#         if project in fpr_data:
-#             # make a list of row data
-#             newdata = []
-#             # add data
-#             for case in fpr_data[project]:
-#                 if case in donors_to_update and donors_to_update[case] != 'delete':
-#                     for file_swid in fpr_data[project][case]:
-#                         fpr_data[project][case][file_swid]['limskey'] = ';'.join(list(set(fpr_data[project][case][file_swid]['limskey'])))
-#                         L = [fpr_data[project][case][file_swid][i] for i in column_names if i in fpr_data[project][case][file_swid]]
-#                         L.insert(0, project)
-#                         L.insert(0, file_swid)
-#                         newdata.append(L)
-#             print('organized data')
-            
-#             # connect to db
-#             conn = sqlite3.connect(database)
-#             print('connected to db')
-#             #cur = conn.cursor()
-#             # add data
-#             vals = '(' + ','.join(['?'] * len(newdata[0])) + ')'
-#             conn.executemany('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), vals), newdata)
-#             print('inserted data')
-#             conn.commit()
-#             print('commit changes')
-#             conn.close()
-
-
-# def add_library_info_to_db(database, project, pinery, lims, donors_to_update, table = 'Libraries'):
-#     '''
-#     (str, str, str, dict, dict, str) -> None
-    
-#     Inserts or updates library information in Libraries table of database    
-    
-#     Parameters
-#     ----------
-#     - database (str): Path to the databae file
-#     - project (str): Name of project of interest
-#     - pinery (str): URL of the sample provenance API: 
-#     - lims_info (dict): Dictionary with lims information extracted from Pinery
-#     - donors_to_update (dict): Dictionary with donors for which records needs to be updated
-#     - table (str): Table storing library in database. Default is Libraries
-#     '''
-
-#     # remove rows for donors to update
-#     if donors_to_update:
-#         delete_records(donors_to_update, database, table)
-#         print('deleted records in Libraries')
-
-#         # check that data is recorded for that project
-#         if project in lims and lims[project]:
-#             # make a list of row data
-#             newdata = []
-#             # get column names
-#             column_names = define_column_names()[table]
-            
-#             # connect to db
-#             conn = sqlite3.connect(database)
-#             # add data
-#             for sample in lims[project]:
-#                 if sample in donors_to_update and donors_to_update[sample] != 'delete':
-#                     for library in lims[project][sample]:
-#                         L = [lims[project][sample][library][i] for i in column_names if i in lims[project][sample][library]]
-#                         L.insert(0, sample)
-#                         L.insert(0, library)
-#                         L.append(project)
-#                         newdata.append(L)
-#             vals = '(' + ','.join(['?'] * len(newdata[0])) + ')'
-#             conn.executemany('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), vals), newdata)
-#             conn.commit()
-#             conn.close()
-
-
-
-# def add_workflow_inputs_to_db(database, libraries, project, donors_to_update, table = 'Workflow_Inputs'):
-#     '''
-#     (str, dict, str, dict, str) -> None
-    
-#     Inserts or updates workflow input library information in table Workflow_Inputs of database    
-    
-#     Parameters
-#     ----------
-#     - database (str): Path to the databae file
-#     - libraries (dict): Dictionary with workflow inputs extracted from FPR
-#     - project (str): Name of project of interest
-#     - donors_to_update (dict): Dictionary with donors for which records needs to be updated
-#     - table (str): Table storing library in database. Default is Libraries
-#     '''
-
-
-#     # remove rows for donors to update
-#     if donors_to_update:
-#         delete_records(donors_to_update, database, table)
-#         print('deleted records in Workflow_Inputs')
-
-#         # check that data is recorded in FPR for project
-#         if libraries:
-#             # make a list of data to insert
-#             newdata = []
-#             # connect to db
-#             conn = sqlite3.connect(database)
-#             # get column names
-#             data = conn.execute("SELECT * FROM {0} WHERE project_id = '{1}';".format(table, project))
-#             column_names = [column[0] for column in data.description]
-    
-#             # add or update data
-#             for workflow_run in libraries[project]:
-#                 for sample in libraries[project][workflow_run]:
-#                     if sample in donors_to_update and donors_to_update[sample] != 'delete':
-#                         for i in libraries[project][workflow_run][sample]['libraries']:
-#                             L = []
-#                             for j in column_names:
-#                                 if j in i:
-#                                     if j != 'lane':
-#                                         L.append(i[j])
-#                                     else:
-#                                         L.append(int(i[j]))
-#                             L.append(project)
-#                             L.insert(3, workflow_run)
-#                             L.append(sample)
-#                             newdata.append(L)                      
-#             vals = '(' + ','.join(['?'] * len(newdata[0])) + ')'
-#             conn.executemany('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), vals), newdata)
-#             conn.commit()
-#             conn.close()
-
 
 
 # def add_samples_info_to_db(database, project, pinery, table, donors_to_update, sample_info):
@@ -3019,41 +2872,6 @@ generate_database('test.db', 'provenance_reporter.json')
 #             conn.close()
 
 
-
-# def add_checksums_info_to_db(database, project, donors_to_update, table = 'Checksums'):
-#     '''
-#     (str, str, dict, str) -> None
-    
-#     Update table Checksums with the checksum of the donor info 
-       
-#     Parameters
-#     ----------
-#     - database (str): Path to the database file
-#     - project (str): Name of project of interest
-#     - donors_to_update (dict): Dictionary with donors for which records needs to be updated
-#     - table (str): Name of Table in database. Default is Checksums
-#     '''
-    
-#     if donors_to_update:
-#         delete_records(donors_to_update, database, table)
-        
-#         # make a list of data to insert
-#         newdata = []
-        
-#         # connect to db
-#         conn = sqlite3.connect(database, timeout=30)
-#         # get column names
-#         data = conn.execute("SELECT * FROM {0} WHERE project_id = '{1}';".format(table, project))
-#         column_names = [column[0] for column in data.description]
-
-#         # order values according to column names
-#         for i in donors_to_update:
-#             L = [project, i, donors_to_update[i]]
-#             newdata.append(L)
-#         vals = '(' + ','.join(['?'] * len(newdata[0])) + ')'
-#         conn.executemany('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), vals), newdata)
-#         conn.commit()
-#         conn.close()
 
 
 
@@ -3262,11 +3080,7 @@ generate_database('test.db', 'provenance_reporter.json')
 #                 print('added samples') 
 #                 
 
-                  # add workflow input
-#                 add_workflow_inputs_to_db(args.database, wf_input, project, donors_to_update, 'Workflow_Inputs')
-#                 print('added workflow inputs')
-
-
+                  
 
 #                 # add calculate contamination info
 #                 add_contamination_info(args.database, args.calcontaqc_db, donors_to_update, table = 'Calculate_Contamination')
@@ -3287,12 +3101,8 @@ generate_database('test.db', 'provenance_reporter.json')
 #                 expected_WT_workflows = sorted(['arriba', 'rsem', 'starfusion', 'mavis'])
 #                 add_blocks_to_db(args.database, project, expected_WT_workflows, 'WT_blocks', 'WT', donors_to_update)
 #                 print('added WT blocks')  
-#                 # update the checksums for donors
-#                 add_checksums_info_to_db(args.database, project, donors_to_update, 'Checksums')
-#                 print('added checksums')
-#                 end = time.time()
-#                 print('updated project {0} in {1} seconds'.format(project, end - start))
-#                 print('----')
+#                 
+                  
 #         except:
 #             print('could not add data for {0}'.format(project))
 #             print(print(traceback.format_exc()))
