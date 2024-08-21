@@ -351,6 +351,31 @@ def initiate_db(database):
 
 
 
+def insert_data(database, table, data, column_names):
+    '''
+    (str, str, list, list) -> None
+    
+    Inserts data into the database table with column names 
+    
+    Parameters
+    ----------
+    - database (str): Path to the database file
+    - table (str): Table in database
+    - data (list): List of data to be inserted
+    - column_names (list): List of table column names
+    '''
+       
+
+    # connect to db
+    conn = sqlite3.connect(database)
+    # add data
+    vals = '(' + ','.join(['?'] * len(data[0])) + ')'
+    conn.executemany('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), vals), data)
+    conn.commit()
+    conn.close()
+
+
+
 def delete_records(donors, database, table):
     '''
     (dict, str, str) -> None
@@ -491,15 +516,10 @@ def add_file_info_to_db(database, provenance_data, donors_to_update, table = 'Fi
                     file_info[file_swid]['limskey'] = ';'.join(sorted(list(set(file_info[file_swid]['limskey']))))
                     L = [file_info[file_swid][i] for i in column_names]
                     newdata.append(L)             
-          
-        # connect to db
-        conn = sqlite3.connect(database)
+        
         # add data
-        vals = '(' + ','.join(['?'] * len(newdata[0])) + ')'
-        conn.executemany('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), vals), newdata)
-        conn.commit()
-        conn.close()
-
+        insert_data(database, table, newdata, column_names)
+        
 
 def add_library_info_to_db(database, provenance_data, donors_to_update, table = 'Libraries'):
     '''
@@ -536,17 +556,9 @@ def add_library_info_to_db(database, provenance_data, donors_to_update, table = 
                         L = [d[i] for i in column_names]
                         newdata.append(L)             
   
-        # connect to db
-        conn = sqlite3.connect(database)
         # add data
-        vals = '(' + ','.join(['?'] * len(newdata[0])) + ')'
-        conn.executemany('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), vals), newdata)
-        conn.commit()
-        conn.close()
-
-
-
-
+        insert_data(database, table, newdata, column_names)
+        
 
 
 # def add_fileQC_info_to_db(database, project, nabu_api, matched_ids, donors_to_update, table='FilesQC'):
@@ -687,14 +699,10 @@ def add_workflows_to_db(database, provenance_data, donors_to_update, table = 'Wo
                     L = [workflow_info[workflow][i] for i in column_names]
                     newdata.append(L)             
       
-        # connect to db
-        conn = sqlite3.connect(database)
         # add data
-        vals = '(' + ','.join(['?'] * len(newdata[0])) + ')'
-        conn.executemany('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), vals), newdata)
-        conn.commit()
-        conn.close()
-
+        insert_data(database, table, newdata, column_names)
+               
+        
 
 def add_workflow_inputs_to_db(database, provenance_data, donors_to_update, table = 'Workflow_Inputs'):
     '''
@@ -729,18 +737,9 @@ def add_workflow_inputs_to_db(database, provenance_data, donors_to_update, table
                     L = [d[i] for i in column_names]
                     newdata.append(L)             
 
-        # connect to db
-        conn = sqlite3.connect(database)
         # add data
-        vals = '(' + ','.join(['?'] * len(newdata[0])) + ')'
-        conn.executemany('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), vals), newdata)
-        conn.commit()
-        conn.close()
-
-
-
-
-
+        insert_data(database, table, newdata, column_names)
+        
 
 
 def add_workflows_relationships_to_db(database, provenance_data, donors_to_update, table = 'Parents'):
@@ -784,14 +783,9 @@ def add_workflows_relationships_to_db(database, provenance_data, donors_to_updat
                         if L not in newdata:
                             newdata.append(L)
         
-        # connect to db
-        conn = sqlite3.connect(database)
         # add data
-        vals = '(' + ','.join(['?'] * len(newdata[0])) + ')'
-        conn.executemany('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), vals), newdata)
-        conn.commit()
-        conn.close()
-
+        insert_data(database, table, newdata, column_names)
+        
 
 
 def is_project_active(donor_data):
