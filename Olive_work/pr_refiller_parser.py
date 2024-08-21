@@ -477,7 +477,7 @@ def add_file_info_to_db(database, provenance_data, donors_to_update, table = 'Fi
         column_names = define_column_names()[table]
         # remove rows for donors to update
         delete_records(donors_to_update, database, table)
-        print('deleted records in Files')
+        print('deleted records in {0}'.format(table))
     
         # make a list of data to insert in the database
         newdata = []
@@ -520,7 +520,7 @@ def add_library_info_to_db(database, provenance_data, donors_to_update, table = 
         column_names = define_column_names()[table]
         # remove rows for donors to update
         delete_records(donors_to_update, database, table)
-        print('deleted records in Files')
+        print('deleted records in {0}'.format(table))
 
         # make a list of data to insert in the database
         newdata = []
@@ -673,7 +673,7 @@ def add_workflows_to_db(database, provenance_data, donors_to_update, table = 'Wo
         column_names = define_column_names()[table]
         # remove rows for donors to update
         delete_records(donors_to_update, database, table)
-        print('deleted records in Files')
+        print('deleted records in {0}'.format(table))
 
         # make a list of data to insert in the database
         newdata = []
@@ -715,7 +715,7 @@ def add_workflow_inputs_to_db(database, provenance_data, donors_to_update, table
         column_names = define_column_names()[table]
         # remove rows for donors to update
         delete_records(donors_to_update, database, table)
-        print('deleted records in Files')
+        print('deleted records in {0}'.format(table))
 
         # make a list of data to insert in the database
         newdata = []
@@ -736,6 +736,62 @@ def add_workflow_inputs_to_db(database, provenance_data, donors_to_update, table
         conn.executemany('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), vals), newdata)
         conn.commit()
         conn.close()
+
+
+
+
+
+
+
+def add_workflows_relationships_to_db(database, provenance_data, donors_to_update, table = 'Parents'):
+    '''
+    (str, str, str, dict, str, str, str, str) -> None
+    
+    Inserts or updates workflow information and parent-children workflow relationships
+ 
+    Parameters
+    ----------   
+    - database (str): Path to the database file
+    - provenance_data (list): List of dictionaries, each representing the data of a single donor
+    - donors_to_update (dict): Dictionary with donors for which records needs to be updated
+    - table (str): Table in database storing file information. Default is Parents
+    '''
+
+    if donors_to_update:
+        # get the column names
+        column_names = define_column_names()[table]
+        # remove rows for donors to update
+        delete_records(donors_to_update, database, table)
+        print('deleted records in {0}'.format(table))
+        
+        # make a list of data to insert in the database
+        newdata = []
+        
+        for donor_data in provenance_data:
+            donor = donor_data['donor']
+            project = get_project_name(donor_data)
+            # check if donor needs to be updated
+            if donor in donors_to_update and donors_to_update[donor] != 'delete':
+                files = map_file_to_worklow(donor_data)
+                workflow_inputs = get_workflow_inputs(donor_data)
+                parents = identify_parent_children_workflows(workflow_inputs, files)
+        
+                # make a list of all workflows for the donor
+                donor_workflows = list(set(list(files.values())))
+                for workflow in donor_workflows:
+                    for parent in parents[workflow]:
+                        L = (os.path.basename(parent), os.path.basename(workflow), project, donor)
+                        if L not in newdata:
+                            newdata.append(L)
+        
+        # connect to db
+        conn = sqlite3.connect(database)
+        # add data
+        vals = '(' + ','.join(['?'] * len(newdata[0])) + ')'
+        conn.executemany('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), vals), newdata)
+        conn.commit()
+        conn.close()
+
 
 
 def is_project_active(donor_data):
@@ -1514,6 +1570,84 @@ def collect_project_info(provenance_data):
         
         
         
+        
+        
+        
+def map_file_to_worklow(donor_data):
+    '''
+    (dict) -> dict
+
+    Returns a dictionary of file swids matched to their workflow run id for a donor    
+    
+    Parameters
+    ----------
+    - donor_data (dict): Dictionary with a single donor data   
+    '''
+    
+    D = {}
+       
+    for i in range(len(donor_data['cerberus_data'])):
+        wfrun_id = donor_data['cerberus_data'][i]['workflow_run_accession']
+        file_swid = donor_data['cerberus_data'][i]['accession'] 
+        if file_swid in D:
+            assert D[file_swid] == wfrun_id
+        else:
+            D[file_swid] = wfrun_id
+    
+    return D
+    
+            
+def get_workflow_inputs(donor_data):
+    '''
+    (dict) -> dict
+
+    Returns a dictionary of workflows and their input files for a donor    
+    
+    Parameters
+    ----------
+    - donor_data (dict): Dictionary with a single donor data   
+    '''
+    
+    D = {}
+       
+    for i in range(len(donor_data['cerberus_data'])):
+        wfrun_id = donor_data['cerberus_data'][i]['workflow_run_accession']
+        input_files = json.loads(donor_data['cerberus_data'][i]['input_files']) 
+        if wfrun_id in D:
+            assert D[wfrun_id] == input_files
+        else:
+            D[wfrun_id] = input_files
+    
+    return D
+        
+        
+def identify_parent_children_workflows(workflow_inputs, files):
+    '''
+    (dict, dict) -> dict     
+    
+    Returns a dictionary of children: parents workflows relationsips for a donor
+        
+    Parameters
+    ----------
+    - workflow_inouts (dict): Dictionary of workflows and their input files for a donor
+    - files (dict): Dictionary of file swids matched to their workflow run id for a donor    
+    '''
+    
+    # parents record child-parent workflow relationships
+    D = {}
+    
+    for workflow in workflow_inputs:
+        if workflow_inputs[workflow]:
+            parent_workflows = sorted(list(set([files[i] for i in workflow_inputs[workflow] if i in files])))
+        else:
+            parent_workflows = ['NA']
+        if workflow not in D:
+            D[workflow] = parent_workflows
+        else:
+            assert D[workflow] == parent_workflows
+    
+    return D
+        
 
 
 
@@ -1568,8 +1702,15 @@ def generate_database(database, provenance_data_file):
     
     
     add_workflow_inputs_to_db(database, provenance_data, donors_to_update, 'Workflow_Inputs')
-
+    print('added workflow inputs to database')
     
+    
+    add_workflows_relationships_to_db(database, provenance_data, donors_to_update, 'Parents')
+    print('added workflow relationships to database')
+    
+
+
+
     
     # update the checksums for donors
     add_checksums_info_to_db(database, donors_to_update, 'Checksums')
@@ -1579,7 +1720,7 @@ def generate_database(database, provenance_data_file):
 
 
 
-generate_database('test.db', 'provenance_reporter.json')    
+generate_database('test2.db', 'provenance_reporter.json')    
 
 
 
@@ -2114,44 +2255,6 @@ generate_database('test.db', 'provenance_reporter.json')
 #     return projects
 
 
-# def is_gzipped(file):
-#     '''
-#     (str) -> bool
-
-#     Return True if file is gzipped
-
-#     Parameters
-#     ----------
-#     - file (str): Path to file
-#     '''
-    
-#     # open file in rb mode
-#     infile = open(file, 'rb')
-#     header = infile.readline()
-#     infile.close()
-#     if header.startswith(b'\x1f\x8b\x08'):
-#         return True
-#     else:
-#         return False
-
-
-# def open_fpr(fpr):
-#     '''
-#     (str) -> _io.TextIOWrapper
-    
-#     Returns a file open for reading
-    
-#     Parameters
-#     ----------
-#     - fpr (str): Path to File Provenance Report file
-#     '''
-
-#     # open provenance for reading. allow gzipped file or not
-#     if is_gzipped(fpr):
-#         infile = gzip.open(fpr, 'rt', errors='ignore')
-#     else:
-#         infile = open(fpr, encoding='utf-8')
-#     return infile
 
 
 
@@ -2282,36 +2385,6 @@ generate_database('test.db', 'provenance_reporter.json')
     
 #     return P         
 
-
-# def identify_parent_children_workflows(P, F):
-#     '''
-#     (dict, dict, dict) -> dict     
-    
-#     Returns a dictionary of children: parents workflows relationsips for a given project
-        
-#     Parameters
-#     ----------
-#     - P (dict): Input file ids for each workflow run id
-#     - F (dict): Map of file id and workflow id
-#     '''
-    
-#     # parents record child-parent workflow relationships
-#     parents = {}
-    
-#     for project in P:
-#         for workflow in P[project]:
-#             if P[project][workflow]:
-#                 parent_workflows = sorted(list(set([F[project][i] for i in P[project][workflow] if i in F[project]])))
-#             else:
-#                 parent_workflows = ['NA']
-#             if project not in parents:
-#                 parents[project] = {}
-#             if workflow not in parents[project]:
-#                 parents[project][workflow] = parent_workflows
-#             else:
-#                 assert parents[project][workflow] == parent_workflows
-    
-#     return parents
 
     
 # def get_provenance_data(provenance):
@@ -2626,92 +2699,6 @@ generate_database('test.db', 'provenance_reporter.json')
 #             workflows[project][workflow_id][key] = D[workflow_id]
     
 
-# def add_workflows_to_db(fpr_data, workflows, database, project, donors_to_update, table = 'Workflows'):
-#     '''
-#     (dict, dict, str, str, dict, str) -> None
-    
-#     Inserts or updates workflow information 
- 
-#     Parameters
-#     ----------    
-#     - fpr_data (dict): Dictionary with file information extracted from the File Provenance Report
-#     - workflows (dict): Dictionary with workflow information of the project of interest
-#     - database (str): Path to the database file
-#     - project (str): Name of project of interest
-#     - donors_to_update (dict): Dictionary with donors for which records needs to be updated
-#     - table (str): Name of the table storing workflow information. Default is Workflows
-#     '''
-    
-#     if donors_to_update:
-#         # make a list of data to insert
-#         newdata = []
-#         delete_records(donors_to_update, database, table)
-        
-#         # get column names
-#         column_names = define_column_names()[table]
-#         # connect to db
-#         conn = sqlite3.connect(database, timeout=30)
-            
-#         for workflow_run in workflows[project]:
-#             case_id = workflows[project][workflow_run]['case_id'] 
-#             if case_id in donors_to_update and donors_to_update[case_id] != 'delete':
-#                 # insert data into table
-#                 L = [workflows[project][workflow_run][i] for i in column_names if i in workflows[project][workflow_run]]
-#                 newdata.append(L)
-#         vals = '(' + ','.join(['?'] * len(newdata[0])) + ')'
-#         conn.executemany('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), vals), newdata)
-#         conn.commit()
-#         conn.close()
-
-    
-# def add_workflows_relationships_to_db(fpr_data, workflows, parents, database, project, donors_to_update, table = 'Parents'):
-#     '''
-#     (str, str, str, dict, str, str, str, str) -> None
-    
-#     Inserts or updates workflow information and parent-children workflow relationships
- 
-#     Parameters
-#     ----------    
-#     - fpr_data (dict): Dictionary with file information extracted from the File Provenance Report
-#     - workflows (dict): Dictionary with workflows information of the current project
-#     - parents (dict): Dictionary with file ids input of the workflows
-#     - database (str): Path to the database file
-#     - project_name (str): Name of project of interest
-#     - donors_to_update (dict): Dictionary with donors for which records needs to be updated
-#     - workflow_table (str): Name of the table storing workflow information. Default is Workflows
-#     - table (str): Name of the table storing parents-children workflow relationships. Default is Parents
-#     '''
-
-#     if donors_to_update:
-#         # match file swids to workflow runs
-#         files = match_file_worklow_ids(fpr_data, project)
-#         # identify the parent-child workflow relationships
-#         # check that project is defined in FPR (ie, may be defined in Pinery but no data recorded in FPR)
-#         if parents[project] and files:
-#             # create a dict {workflow: [parent workflows]}
-#             parent_workflows = identify_parent_children_workflows({project: parents[project]}, files)
-#             # remove rows for donors to update
-#             # make a list of data to insert
-#             newdata = []
-#             delete_records(donors_to_update, database, table)
-#             # get column names
-#             column_names = define_column_names()[table]
-#             # connect to db
-#             conn = sqlite3.connect(database, timeout=30)
-            
-#             for workflow in workflows[project]:
-#                 for parent in parent_workflows[project][workflow]:
-#                     if parent != 'NA':
-#                         assert workflows[project][workflow]['case_id'] == workflows[project][parent]['case_id']
-#                     case_id = workflows[project][workflow]['case_id']
-#                     if case_id in donors_to_update and donors_to_update[case_id] != 'delete':
-#                         L = (parent, workflow, project, case_id)
-#                         newdata.append(L)
-#             vals = '(' + ','.join(['?'] * len(newdata[0])) + ')'
-#             conn.executemany('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), vals), newdata)
-#             conn.commit()
-#             conn.close()
-
             
 # def add_fileQC_info_to_db(database, project, nabu_api, matched_ids, donors_to_update, table='FilesQC'):
 #     '''
@@ -2873,53 +2860,6 @@ generate_database('test.db', 'provenance_reporter.json')
 
 
 
-
-
-# def get_job_exit_status(job):
-#     '''
-#     (str) -> int
-    
-#     Returns the most recent exit status of job
-
-#     Parameters
-#     ----------
-#     - job (str): Job name     
-#     '''    
-
-#     try:
-#         output = subprocess.check_output('qacct -j {0}'.format(job), shell=True).decode('utf-8').rstrip().split('\n')
-#     except:
-#         output = ''
-    
-#     if output:
-#         # record all exit status, the same job may have run multiple times
-#         d = {}
-#         for i in output:
-#             if 'jobname' in i:
-#                 jobname = i.split()[1]
-#                 assert job == jobname
-#             elif 'end_time' in i:
-#                 j = i.split()[1:]
-#                 if len(j) != 0:
-#                     # convert to epoch time
-#                     if '.' in j[1]:
-#                         j[1] = j[1][:j[1].index('.')]
-#                     date = '.'.join([j[0].split('/')[1], j[0].split('/')[0], j[0].split('/')[-1]]) + ' ' + j[1]
-#                     p = '%d.%m.%Y %H:%M:%S'
-#                     date = int(time.mktime(time.strptime(date, p)))
-#                 else:
-#                     date = 0
-#             elif 'exit_status' in i:
-#                 d[date] = i.split()[1]
-        
-#         # get the most recent exit status        
-#         end_jobs = list(d.keys())
-#         end_jobs.sort()
-#         exit_status = int(d[end_jobs[-1]])
-#     else:
-#         exit_status = 1
-    
-#     return exit_status
 
 
 # def collect_lims_info(pinery):
@@ -3089,9 +3029,7 @@ generate_database('test.db', 'provenance_reporter.json')
 #                 add_fileQC_info_to_db(args.database, project, args.nabu, matched_ids, donors_to_update, 'FilesQC')
 #                 print('added filesqc')
 #                 
-                  #workflows = get_workflow_information(fpr_data, donors_to_update, project, args.database, 'Files', 'Workflow_Inputs')
-#                 # add workflow relationships
-#                 add_workflows_relationships_to_db(fpr_data, workflows, parents, args.database, project, donors_to_update, 'Parents')
+                  
 #                 print('added workflow relationships')
 #                 # add WGS blocks
 #                 expected_WGS_workflows = sorted(['mutect2', 'variantEffectPredictor', 'delly', 'varscan', 'sequenza', 'mavis']) 
