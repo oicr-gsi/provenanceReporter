@@ -1705,27 +1705,28 @@ def generate_database(database, provenance_data_file, calcontaqc_db):
     add_project_info_to_db(database, provenance_data, 'Projects')
     print('added project info to database')
     
-    # # add file information
-    # add_file_info_to_db(database, provenance_data, donors_to_update, 'Files')
-    # print('added file info to database')
-    # # add library information
-    # add_library_info_to_db(database, provenance_data, donors_to_update, 'Libraries')
-    # print('added library info to database')
-    # # add workflow information
-    # add_workflows_to_db(database, provenance_data, donors_to_update, 'Workflows')
-    # print('added workflow info to database')
-    # # add workflow inputs
-    # add_workflow_inputs_to_db(database, provenance_data, donors_to_update, 'Workflow_Inputs')
-    # print('added workflow inputs to database')
-    # # add workflow relationships
-    # add_workflows_relationships_to_db(database, provenance_data, donors_to_update, 'Parents')
-    # print('added workflow relationships to database')
-    # # add contamination
-    # add_contamination_info(database, calcontaqc_db, provenance_data, donors_to_update, 'Calculate_Contamination')
-    # print('added contamination to database')
-
-
+    # add file information
+    add_file_info_to_db(database, provenance_data, donors_to_update, 'Files')
+    print('added file info to database')
+    # add library information
+    add_library_info_to_db(database, provenance_data, donors_to_update, 'Libraries')
+    print('added library info to database')
+    # add workflow information
+    add_workflows_to_db(database, provenance_data, donors_to_update, 'Workflows')
+    print('added workflow info to database')
+    # add workflow inputs
+    add_workflow_inputs_to_db(database, provenance_data, donors_to_update, 'Workflow_Inputs')
+    print('added workflow inputs to database')
+    # add workflow relationships
+    add_workflows_relationships_to_db(database, provenance_data, donors_to_update, 'Parents')
+    print('added workflow relationships to database')
+    # add contamination
+    add_contamination_info(database, calcontaqc_db, provenance_data, donors_to_update, 'Calculate_Contamination')
+    print('added contamination to database')
     add_samples_info_to_db(database, provenance_data, donors_to_update, 'Samples')
+    print('added sample information to database')
+    
+    
     
     # update the checksums for donors
     add_checksums_info_to_db(database, donors_to_update, 'Checksums')
@@ -1735,7 +1736,7 @@ def generate_database(database, provenance_data_file, calcontaqc_db):
 
 
 
-#generate_database('test2.db', 'provenance_reporter.json', '57163009F163C387D7636FFFAFE10FFAFCDFC643.sqlite')    
+generate_database('test2.db', 'provenance_reporter.json', '57163009F163C387D7636FFFAFE10FFAFCDFC643.sqlite')    
 
 
 
@@ -2663,53 +2664,6 @@ def generate_database(database, provenance_data_file, calcontaqc_db):
 
 
 
-# def add_samples_info_to_db(database, project, pinery, table, donors_to_update, sample_info):
-#     '''
-#     (str, str, str, dict, dict, dict) -> None
-    
-#     Inserts samples data into Samples table of database    
-    
-#     Parameters
-#     ----------
-#     - database (str): Path to the databae file
-#     - project (str): Name of project of interest
-#     - pinery (str): Pinery API
-#     - table (str): Name of table in database
-#     - donors_to_update (dict): Dictionary with donors for which records needs to be updated
-#     - sample_info (dict): Dictionary with sample information extracted from Pinery
-#     '''
-    
-    
-#     # remove rows for donors to update
-#     if donors_to_update:
-#         delete_records(donors_to_update, database, table)
-#         print('deleted records in Samples')
-
-#         # collect information about samples
-#         samples = get_parent_sample_info(pinery, project, sample_info)
-    
-#         if samples:
-#             # make a list of row data
-#             newdata = []
-#             # connect to db
-#             conn = sqlite3.connect(database)
-             
-#             # get column names
-#             data = conn.execute("SELECT * FROM {0} WHERE project_id = '{1}';".format(table, project))
-#             column_names = [column[0] for column in data.description]
-
-#             # add data into table
-#             for i in samples:
-#                 if i['case'] in donors_to_update and donors_to_update[i['case']] != 'delete':
-#                    L = [i['case'], i['donor_id'], i['species'], i['sex'], i['miso'],
-#                          i['created_date'], i['modified_date'], project, i['project']]          
-#                    newdata.append(L)
-            
-#             vals = '(' + ','.join(['?'] * len(newdata[0])) + ')'
-#             conn.executemany('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), vals), newdata)
-#             conn.commit()
-#             conn.close()
-
 
 # def add_blocks_to_db(database, project, expected_workflows, table, pipeline, donors_to_update):
 #     '''
@@ -2924,15 +2878,6 @@ def generate_database(database, provenance_data_file, calcontaqc_db):
 #             if donors_to_update:
 #                 
 
-
-                  
-#                 
-#                 # add sample information
-#                 add_samples_info_to_db(args.database, project, args.pinery, 'Samples', donors_to_update, samples_info)
-#                 print('added samples') 
-#                 
-
-                  
 
                  
 #                 # add file QC info
