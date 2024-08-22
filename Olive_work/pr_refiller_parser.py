@@ -788,6 +788,50 @@ def add_workflows_relationships_to_db(database, provenance_data, donors_to_updat
         
 
 
+
+def add_contamination_info(database, calcontaqc_db, provenance_data, donors_to_update, table = 'Calculate_Contamination'):
+    '''
+    (str, str, dict, str) -> None
+    
+    Parse the calcontaqc_db, reformat data and add information to the Calculate_Contamination
+    table of the database
+    
+    Parameters
+    ----------
+    - database (str): Path to the database file
+    - calcontaqc_db (str): Path to the calculate contamination database
+    - provenance_data (list): List of dictionaries, each representing the data of a single donor
+    - donors_to_update (dict): Dictionary with donors for which records needs to be updated
+    - table (str): Table in database storing file information. Default is Parents
+    '''
+
+    if donors_to_update:
+        # get the column names
+        column_names = define_column_names()[table]
+        # remove rows for donors to update
+        delete_records(donors_to_update, database, table)
+        print('deleted records in {0}'.format(table))
+        
+        # make a list of data to insert in the database
+        newdata = []
+        
+        for donor_data in provenance_data:
+            donor = donor_data['donor']
+            # check if donor needs to be updated
+            if donor in donors_to_update and donors_to_update[donor] != 'delete':
+                contamination = collect_donor_calculate_contamination_db(calcontaqc_db, donor)
+                if contamination:
+                    for sample in contamination[donor]:
+                        for i in contamination[donor][sample]:
+                            L = [i[j] for j in column_names]
+                            newdata.append(L)
+                   
+        # add data
+        insert_data(database, table, newdata, column_names)
+        
+
+
+
 def is_project_active(donor_data):
     '''
     (dict) -> bool
@@ -1645,7 +1689,73 @@ def identify_parent_children_workflows(workflow_inputs, files):
 
 
 
-def generate_database(database, provenance_data_file):
+
+
+def collect_donor_calculate_contamination_db(calcontaqc_db, donor):
+    '''
+    (str) -> dict
+    
+    Returns a dictionary with information collected from the calculate contamination
+    QC-etl sqlite cache for a donor of interest
+    
+    Parameters
+    ----------
+    - calcontaqc_db (str): Path to the calculate contamination database
+    - donor (str): Donor of interest
+    '''
+
+    # get tables in db
+    conn = sqlite3.connect(calcontaqc_db)
+    cur = conn.cursor()
+    cur.execute("SELECT name FROM sqlite_master WHERE type='table';")
+    tables = cur.fetchall()
+    tables = [i[0] for i in tables]    
+    conn.close()
+    # connect to db and retrieve all data
+    conn = connect_to_db(calcontaqc_db)
+    data = conn.execute('SELECT * FROM {0} where Donor == \"{1}\"'.format(tables[0], donor)).fetchall()
+    conn.close()
+
+    D = {}
+    
+    for i in data:
+        case_id = i['Donor']
+        group_id = i['Group ID']
+        library_type = i['Library Design']
+        tissue_origin = i['Tissue Origin']
+        tissue_type = i['Tissue Type']
+        contamination = i['contamination']
+        merged_limskey = i['Merged Pinery Lims ID']
+        merged_limskey = list(map(lambda x: x.strip(), merged_limskey.replace('[', '').replace(']', '').replace('\"', '').split(',')))
+        merged_limskey = ';'.join(sorted(merged_limskey))
+        sample_id = '_'.join([i['Donor'], i['Tissue Type'], i['Tissue Origin'],
+                              i['Library Design'], i['Group ID']])
+        
+        if case_id not in D:
+            D[case_id] = {}
+        if sample_id not in D[case_id]:
+            D[case_id][sample_id] = []
+        d = {'case_id': case_id,
+              'group_id': group_id,
+              'library_type': library_type, 
+              'tissue_origin': tissue_origin,
+              'tissue_type': tissue_type,
+              'contamination': contamination,
+              'merged_limskey': merged_limskey,
+              'sample_id': sample_id
+              }
+        D[case_id][sample_id].append(d)
+           
+    return D                         
+
+
+
+
+
+
+
+
+def generate_database(database, provenance_data_file, calcontaqc_db):
     '''
     
     
@@ -1682,26 +1792,24 @@ def generate_database(database, provenance_data_file):
     add_project_info_to_db(database, provenance_data, 'Projects')
     print('added project info to database')
     
-    # add file information to database
+    # add file information
     add_file_info_to_db(database, provenance_data, donors_to_update, 'Files')
     print('added file info to database')
-    
+    # add library information
     add_library_info_to_db(database, provenance_data, donors_to_update, 'Libraries')
     print('added library info to database')
-    
-    
+    # add workflow information
     add_workflows_to_db(database, provenance_data, donors_to_update, 'Workflows')
     print('added workflow info to database')
-         
-    
-    
+    # add workflow inputs
     add_workflow_inputs_to_db(database, provenance_data, donors_to_update, 'Workflow_Inputs')
     print('added workflow inputs to database')
-    
-    
+    # add workflow relationships
     add_workflows_relationships_to_db(database, provenance_data, donors_to_update, 'Parents')
     print('added workflow relationships to database')
-    
+    # add contamination
+    add_contamination_info(database, calcontaqc_db, provenance_data, donors_to_update, 'Calculate_Contamination')
+    print('added contamination to database')
 
 
 
@@ -1714,7 +1822,7 @@ def generate_database(database, provenance_data_file):
 
 
 
-generate_database('test2.db', 'provenance_reporter.json')    
+generate_database('test2.db', 'provenance_reporter.json', '57163009F163C387D7636FFFAFE10FFAFCDFC643.sqlite')    
 
 
 
@@ -2544,109 +2652,6 @@ generate_database('test2.db', 'provenance_reporter.json')
 #     conn.close()
 
 
-# def parse_calculate_contamination_db(calcontaqc_db):
-#     '''
-#     (str) -> dict
-    
-#     Returns a dictionary with information collected from the calculate contamination
-#     QC-etl sqlite cache
-    
-#     Parameters
-#     ----------
-#     - calcontaqc_db (str): Path to the calculate contamination database
-#     '''
-
-#     # get tables in db
-#     conn = sqlite3.connect(calcontaqc_db)
-#     cur = conn.cursor()
-#     cur.execute("SELECT name FROM sqlite_master WHERE type='table';")
-#     tables = cur.fetchall()
-#     tables = [i[0] for i in tables]    
-#     conn.close()
-#     # connect to db and retrieve all data
-#     conn = connect_to_db(calcontaqc_db)
-#     data = conn.execute('SELECT * FROM {0}'.format(tables[0])).fetchall()  
-#     conn.close()
-
-#     D = {}
-    
-#     for i in data:
-#         case_id = i['Donor']
-#         group_id = i['Group ID']
-#         library_type = i['Library Design']
-#         tissue_origin = i['Tissue Origin']
-#         tissue_type = i['Tissue Type']
-#         contamination = i['contamination']
-#         merged_limskey = i['Merged Pinery Lims ID']
-#         merged_limskey = list(map(lambda x: x.strip(), merged_limskey.replace('[', '').replace(']', '').replace('\"', '').split(',')))
-#         merged_limskey = ';'.join(sorted(merged_limskey))
-#         sample_id = '_'.join([i['Donor'], i['Tissue Type'], i['Tissue Origin'],
-#                               i['Library Design'], i['Group ID']])
-        
-#         if case_id not in D:
-#             D[case_id] = {}
-#         if sample_id not in D[case_id]:
-#             D[case_id][sample_id] = []
-#         d = {'case_id': case_id,
-#              'group_id': group_id,
-#              'library_type': library_type, 
-#              'tissue_origin': tissue_origin,
-#              'tissue_type': tissue_type,
-#              'contamination': contamination,
-#              'merged_limskey': merged_limskey,
-#              'sample_id': sample_id
-#              }
-#         D[case_id][sample_id].append(d)
-           
-#     return D                         
-                         
-
-# def add_contamination_info(database, calcontaqc_db, donors_to_update, table = 'Calculate_Contamination'):
-#     '''
-#     (str, str, dict, str) -> None
-    
-#     Parse the calcontaqc_db, reformat data and add information to the Calculate_Contamination
-#     table of the database
-    
-#     Parameters
-#     ----------
-#     - database (str): Path to the sqlite database
-#     - calcontaqc_db (db): Path to the calculate contamination database
-#     - donors_to_update (dict): Dictionary with donors for which records needs to be updated
-#     - table (str): name of the table in the database. Default is Calculate_Contamination 
-#     '''
-
-#     # remove rows for donors to update
-#     if donors_to_update:
-#         delete_records(donors_to_update, database, table)
-#         print('deleted records in Calculate_Contamination')
-
-#         # collect ata from the calculate contamination cache
-#         D = parse_calculate_contamination_db(calcontaqc_db)
-        
-#         if D:
-#             # make a list of data to insert
-#             newdata = []
-#             # connect to db
-#             conn = sqlite3.connect(database)
-#             # get column names
-#             column_names = define_column_names()[table]
-
-#             # add data
-#             for case_id in D:
-#                 if case_id in donors_to_update and donors_to_update[case_id] != 'delete':
-#                     for sample_id in D[case_id]:
-#                         for i in D[case_id][sample_id]:
-#                            L = [i[j] for j in  column_names]
-#                            newdata.append(L)
-        
-#         if newdata:
-#             vals = '(' + ','.join(['?'] * len(newdata[0])) + ')'
-#             conn.executemany('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), vals), newdata)
-#             conn.commit()
-#             conn.close()
-        
-
 
 # def count_files(project_name, database, file_table = 'Files'):
 #     '''
@@ -3016,9 +3021,7 @@ generate_database('test2.db', 'provenance_reporter.json')
 
                   
 
-#                 # add calculate contamination info
-#                 add_contamination_info(args.database, args.calcontaqc_db, donors_to_update, table = 'Calculate_Contamination')
-#                 print('added call-ready contamination')
+                 
 #                 # add file QC info
 #                 add_fileQC_info_to_db(args.database, project, args.nabu, matched_ids, donors_to_update, 'FilesQC')
 #                 print('added filesqc')
