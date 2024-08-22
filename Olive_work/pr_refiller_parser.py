@@ -280,7 +280,7 @@ def create_table(database, table):
           REFERENCES Workflows (wfrun_id),
           FOREIGN KEY (children_id)
               REFERENCES Workflows (wfrun_id)''' 
-        table_format = table_format + ', ' + constraints + ', PRIMARY KEY (parents_id, children_id, project_id)'
+        table_format = table_format + ', ' + constraints + ', PRIMARY KEY (parents_id, children_id, project_id, case_id)'
     
     if table == 'Worklows':
         table_format = table_format + ', PRIMARY KEY (wfrun_id, project_id)'
