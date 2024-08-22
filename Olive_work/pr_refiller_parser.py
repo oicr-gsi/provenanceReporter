@@ -203,7 +203,7 @@ def define_column_names():
                     'Libraries': ['library', 'case_id', 'tissue_type', 'ext_id', 'tissue_origin',
                                   'library_type', 'group_id', 'group_id_description', 'project_id'],
                     'Workflow_Inputs': ['library', 'run', 'lane', 'wfrun_id', 'limskey', 'barcode', 'platform', 'project_id', 'case_id'],
-                    'Samples': ['case_id', 'donor_id', 'species', 'sex', 'miso', 'created_date', 'modified_date', 'project_id', 'parent_project'],
+                    'Samples': ['case_id', 'donor_id', 'species', 'sex', 'miso', 'project_id'],
                     'WGS_blocks': ['project_id', 'case_id', 'samples', 'anchor_wf', 'workflows', 'name', 'date', 'release_status', 'complete', 'clean', 'network'],
                     'WT_blocks': ['project_id', 'case_id', 'samples', 'anchor_wf', 'workflows', 'name', 'date', 'release_status', 'complete', 'clean', 'network'],
                     'Calculate_Contamination': ['sample_id', 'group_id', 'case_id', 'library_type', 'tissue_origin', 'tissue_type', 'contamination', 'merged_limskey'],
@@ -236,7 +236,7 @@ def define_column_types():
                                   'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(256)', 'VARCHAR(128)'],
                     'Workflow_Inputs': ['VARCHAR(128)', 'VARCHAR(256)', 'INTEGER', 'VARCHAR(572)', 
                                         'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)'],
-                    'Samples': ['VARCHAR(128) PRIMARY KEY NOT NULL', 'VARCHAR(256)', 'VARCHAR(256)', 'VARCHAR(128)', 'VARCHAR(572)', 'VARCHAR(128)', 'VARCHAR(128)'],
+                    'Samples': ['VARCHAR(128) PRIMARY KEY NOT NULL', 'VARCHAR(256)', 'VARCHAR(256)', 'VARCHAR(128)', 'VARCHAR(572)', 'VARCHAR(128)'],
                     'WGS_blocks': ['VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(572)', 'VARCHAR(572)', 'TEXT', 'VARCHAR(256)', 'VARCHAR(128)', 'INT', 'INT', 'INT', 'TEXT'],
                     'WT_blocks': ['VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(572)', 'VARCHAR(572)', 'TEXT', 'VARCHAR(256)', 'VARCHAR(128)', 'INT', 'INT', 'INT', 'TEXT'],
                     'Calculate_Contamination': ['VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'FLOAT', 'VARCHAR(572)'],
@@ -612,55 +612,42 @@ def add_library_info_to_db(database, provenance_data, donors_to_update, table = 
 
 
 
-# def add_samples_info_to_db(database, project, pinery, table, donors_to_update, sample_info):
-#     '''
-#     (str, str, str, dict, dict, dict) -> None
+def add_samples_info_to_db(database, provenance_data, donors_to_update, table = 'Samples'):
+    '''
+    (str, str, str, dict, dict, dict) -> None
     
-#     Inserts samples data into Samples table of database    
+    Inserts samples data into Samples table of database    
     
-#     Parameters
-#     ----------
-#     - database (str): Path to the databae file
-#     - project (str): Name of project of interest
-#     - pinery (str): Pinery API
-#     - table (str): Name of table in database
-#     - donors_to_update (dict): Dictionary with donors for which records needs to be updated
-#     - sample_info (dict): Dictionary with sample information extracted from Pinery
-#     '''
+    Parameters
+    ----------
+    - database (str): Path to the databae file
+    - project (str): Name of project of interest
+    - pinery (str): Pinery API
+    - table (str): Name of table in database
+    - donors_to_update (dict): Dictionary with donors for which records needs to be updated
+    - sample_info (dict): Dictionary with sample information extracted from Pinery
+    '''
     
-    
-#     # remove rows for donors to update
-#     if donors_to_update:
-#         delete_records(donors_to_update, database, table)
-#         print('deleted records in Samples')
+    if donors_to_update:
+        # get the column names
+        column_names = define_column_names()[table]
+        # remove rows for donors to update
+        delete_records(donors_to_update, database, table)
+        print('deleted records in {0}'.format(table))
 
-#         # collect information about samples
-#         samples = get_parent_sample_info(pinery, project, sample_info)
-    
-#         if samples:
-#             # make a list of row data
-#             newdata = []
-#             # connect to db
-#             conn = sqlite3.connect(database)
-             
-#             # get column names
-#             data = conn.execute("SELECT * FROM {0} WHERE project_id = '{1}';".format(table, project))
-#             column_names = [column[0] for column in data.description]
-
-#             # add data into table
-#             for i in samples:
-#                 if i['case'] in donors_to_update and donors_to_update[i['case']] != 'delete':
-#                    L = [i['case'], i['donor_id'], i['species'], i['sex'], i['miso'],
-#                          i['created_date'], i['modified_date'], project, i['project']]          
-#                    newdata.append(L)
-            
-#             vals = '(' + ','.join(['?'] * len(newdata[0])) + ')'
-#             conn.executemany('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), vals), newdata)
-#             conn.commit()
-#             conn.close()
-
-
-
+        # make a list of data to insert in the database
+        newdata = []
+        
+        for donor_data in provenance_data:
+            donor = donor_data['donor']
+            # check if donor needs to be updated
+            if donor in donors_to_update and donors_to_update[donor] != 'delete':
+                sample_info = collect_donor_sample_info(donor_data)
+                L = [sample_info[donor][i] for i in column_names]
+                newdata.append(L)
+                
+        # add data
+        insert_data(database, table, newdata, column_names) 
 
 
 
@@ -1074,10 +1061,21 @@ def get_donor_sex(donor_data):
     sex = []
     for i in range(len(donor_data['pinery_data'])):
         sex.append(donor_data['pinery_data'][i]['sex'])       
-    sex = list(set(sex))
-    assert len(sex) == 1
+    sex = map(lambda x: x.lower(), list(set(sex)))
     
-    return sex[0]
+    
+    # sex may not be defined for all samples.
+    # assign donor sex to a known sample sex
+    if 'female' in sex:
+        assert 'male' not in sex
+        sex = 'Female'
+    elif 'male' in sex:
+        assert 'female' not in sex
+        sex = 'Male'
+    else:
+        sex = 'Unknown'
+        
+    return sex
 
 
 
@@ -1095,7 +1093,7 @@ def get_donor_species(donor_data):
     
     species = []
     for i in range(len(donor_data['pinery_data'])):
-        species.append(donor_data['pinery_data'][i]['species'])       
+        species.append(donor_data['pinery_data'][i]['organism'])       
     species = list(set(species))
     assert len(species) == 1
         
@@ -1376,118 +1374,35 @@ def collect_donor_file_qc_info(donor_data):
 
 def collect_donor_sample_info(donor_data):
     '''
+    (dict) -> dict
     
+    Returns a dictionary with the sample information for a given donor
     
+    Parameters
+    ----------
+    - donor_data (dict): Dictionary with a single donor data   
     '''
-    
-    
+        
     D = {}
         
-    for i in range(len(donor_data['nabu_data'])):
+    for i in range(len(donor_data['pinery_data'])):
         case_id = donor_data['donor']       
         donor_id = get_donor_external_id(donor_data)
         sex = get_donor_sex(donor_data)
         species = get_donor_species(donor_data)
         project_id = get_project_name(donor_data)
-    
-         
-    
-    # 'miso',
-    # 'parent_project'
-    
-
-
-
-
-
-
-
-
-# i['cerberus_data'] -> list of lists
-
-# [{'accession': 'vidarr:research/file/012cf6554e9b51f0dcab3186a134f02b26b78953534e56dbd14ba3158428c380',
-#   'barcode': 'TTCTGGAA-CGATTCCG',
-#   'external_donor_id': 'BMT-PMH-125',
-#   'group_id': 'BMT-PMH-125',
-#   'input_files': '[]',
-#   'instrument_model': 'Illumina MiSeq',
-#   'lane': '1',
-#   'library_design': 'TS',
-#   'library_name': 'AHCT_0029_01_LB02-01',
-#   'library_type': '',
-#   'lims': '{"id":"5893_1_LDI84239","provider":"pinery-miso","time":1676401595000,"version":"882752c33378b9d66793a619fc4918241285391bf490f0525325f90fd58db05b"}',
-#   'md5': 'c55a9d4efd25ff5d081b4c3301453561',
-#   'path': '/oicr/data/archive/seqware/seqware_analysis_12/hsqwprod/seqware-results/bcl2fastq_3.1.2/25547692/AHCT_0029_01_LB02-01_220418_M06816_0282_000000000-DG2YB_1_TTCTGGAA-CGATTCCG_R2.fastq.gz',
-#   'project': 'AHCT',
-#   'run': '220418_M06816_0282_000000000-DG2YB',
-#   'stale': 'False',
-#   'timestamp': '2022-04-19T13:43:09.757Z',
-#   'tissue_origin': 'Pb',
-#   'tissue_type': 'P',
-#   'workflow': 'bcl2fastq',
-#   'workflow_run_accession': 'vidarr:research/run/89fb17aed45e61d0caa9b23277fc973eb87309ec50de7469709daddfeb517a0e',
-#   'workflow_run_attributes': '{}',
-#   'workflow_run_labels': '{}',
-#   'workflow_version': '[3,1,2]'}]
-
-
-
-# =======
-
-# i['pinery_data'] -> list of lists
-
-
-# [{'barcode': 'TTCTGGAA-CGATTCCG',
-#   'group_desc': '60',
-#   'group_id': 'BMT-PMH-125',
-#   'lane': '1',
-#   'library_design': 'TS',
-#   'library_name': 'AHCT_0029_01_LB02-01',
-#   'library_type': '',
-#   'lims': '{"id":"5884_1_LDI84239","provider":"pinery-miso-2.2","time":1676401595000,"version":"478c561cfe6b90bb6275692186e4cf9a87ea0c96de42f9954bcc77319ab67715"}',
-#   'organism': 'Homo sapiens',
-#   'path': '/oicr/data/archive/M06816/220412_M06816_0279_000000000-DG3HV',
-#   'project': 'AHCT',
-#   'run': '220412_M06816_0279_000000000-DG3HV',
-#   'start_date': '2022-04-12T00:00:00Z',
-#   'tissue_origin': 'Pb',
-#   'tissue_type': 'P'}]
-
-
-# =====
-
-# i['pinery_project_data']
-
-
-# [[{'active': 'True',
-#    'name': 'YOCRC',
-#    'pipeline': 'Accredited',
-#    'provider': 'pinery-miso-2.2',
-#    'sample_count': '416'}],
-#  [{'active': 'True',
-#    'name': 'YOCRC',
-#    'pipeline': 'Accredited',
-#    'provider': 'pinery-miso-stage-v8',
-#    'sample_count': '367'}],
-#  [{'active': 'True',
-#    'name': 'YOCRC',
-#    'pipeline': 'Accredited',
-#    'provider': 'pinery-miso-v2',
-#    'sample_count': '416'}],
-#  [{'active': 'True',
-#    'name': 'YOCRC',
-#    'pipeline': 'Accredited',
-#    'provider': 'pinery-miso-v7',
-#    'sample_count': '416'}],
-#  [{'active': 'True',
-#    'name': 'YOCRC',
-#    'pipeline': 'Accredited',
-#    'provider': 'pinery-miso-v8',
-#    'sample_count': '416'}]]
-
-
-  
-    
+        miso = 'NA'
+        
+        d = {'case_id': case_id, 'donor_id': donor_id, 'sex': sex,
+             'species': species, 'project_id': project_id, 'miso': miso}
+        
+        if case_id not in D:
+            D[case_id] = d
+        else:
+            assert D[case_id] == d
+            
+    return D
+            
 
 def collect_donor_workflow_info(donor_data):
     '''
@@ -1790,27 +1705,27 @@ def generate_database(database, provenance_data_file, calcontaqc_db):
     add_project_info_to_db(database, provenance_data, 'Projects')
     print('added project info to database')
     
-    # add file information
-    add_file_info_to_db(database, provenance_data, donors_to_update, 'Files')
-    print('added file info to database')
-    # add library information
-    add_library_info_to_db(database, provenance_data, donors_to_update, 'Libraries')
-    print('added library info to database')
-    # add workflow information
-    add_workflows_to_db(database, provenance_data, donors_to_update, 'Workflows')
-    print('added workflow info to database')
-    # add workflow inputs
-    add_workflow_inputs_to_db(database, provenance_data, donors_to_update, 'Workflow_Inputs')
-    print('added workflow inputs to database')
-    # add workflow relationships
-    add_workflows_relationships_to_db(database, provenance_data, donors_to_update, 'Parents')
-    print('added workflow relationships to database')
-    # add contamination
-    add_contamination_info(database, calcontaqc_db, provenance_data, donors_to_update, 'Calculate_Contamination')
-    print('added contamination to database')
+    # # add file information
+    # add_file_info_to_db(database, provenance_data, donors_to_update, 'Files')
+    # print('added file info to database')
+    # # add library information
+    # add_library_info_to_db(database, provenance_data, donors_to_update, 'Libraries')
+    # print('added library info to database')
+    # # add workflow information
+    # add_workflows_to_db(database, provenance_data, donors_to_update, 'Workflows')
+    # print('added workflow info to database')
+    # # add workflow inputs
+    # add_workflow_inputs_to_db(database, provenance_data, donors_to_update, 'Workflow_Inputs')
+    # print('added workflow inputs to database')
+    # # add workflow relationships
+    # add_workflows_relationships_to_db(database, provenance_data, donors_to_update, 'Parents')
+    # print('added workflow relationships to database')
+    # # add contamination
+    # add_contamination_info(database, calcontaqc_db, provenance_data, donors_to_update, 'Calculate_Contamination')
+    # print('added contamination to database')
 
 
-
+    add_samples_info_to_db(database, provenance_data, donors_to_update, 'Samples')
     
     # update the checksums for donors
     add_checksums_info_to_db(database, donors_to_update, 'Checksums')
@@ -1820,7 +1735,7 @@ def generate_database(database, provenance_data_file, calcontaqc_db):
 
 
 
-generate_database('test2.db', 'provenance_reporter.json', '57163009F163C387D7636FFFAFE10FFAFCDFC643.sqlite')    
+#generate_database('test2.db', 'provenance_reporter.json', '57163009F163C387D7636FFFAFE10FFAFCDFC643.sqlite')    
 
 
 
