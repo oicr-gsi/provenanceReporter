@@ -208,7 +208,6 @@ def define_column_names():
                     'Parents': ['parents_id', 'children_id', 'project_id', 'case_id'],
                     'Projects': ['project_id', 'pipeline', 'last_updated', 'samples', 'library_types'],
                     'Files': ['file_swid', 'project_id', 'md5sum', 'workflow', 'version', 'wfrun_id', 'file', 'library_type', 'attributes', 'creation_date', 'limskey', 'stale', 'case_id'],
-                    'FilesQC': ['file_swid', 'project_id', 'case_id', 'skip', 'user', 'date', 'status', 'reference', 'fresh', 'ticket'],
                     'Libraries': ['library', 'case_id', 'tissue_type', 'ext_id', 'tissue_origin',
                                   'library_type', 'group_id', 'group_id_description', 'project_id'],
                     'Workflow_Inputs': ['library', 'run', 'lane', 'wfrun_id', 'limskey', 'barcode', 'platform', 'project_id', 'case_id'],
@@ -237,9 +236,6 @@ def define_column_types():
                     'Files': ['VARCHAR(572)', 'VARCHAR(128)',
                               'VARCHAR(256)', 'VARCHAR(128)', 'VARCHAR(128)',
                               'VARCHAR(572)', 'TEXT', 'VARCHAR(128)', 'TEXT', 'INT', 'VARCHAR(256)', 'VARCHAR(128)', 'VARCHAR(128)'],
-                    'FilesQC': ['VARCHAR(572) PRIMARY KEY NOT NULL UNIQUE', 'VARCHAR(128)', 'VARCHAR(128)',
-                                'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)',
-                                'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)'],
                     'Libraries': ['VARCHAR(256)', 'VARCHAR(128)',
                                   'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)',
                                   'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(256)', 'VARCHAR(128)'],
@@ -279,7 +275,7 @@ def create_table(database, table):
 
 
     #if table  in ['Workflows', 'Parents', 'Files', 'FilesQC', 'Libraries', 'Workflow_Inputs', 'Samples', 'WGS_blocks', 'WT_blocks', 'Calculate_Contamination']:
-    if table  in ['Workflows', 'Parents', 'Files', 'FilesQC', 'Libraries', 'Workflow_Inputs', 'Samples', 'WGS_blocks', 'WT_blocks', 'Checksums']:
+    if table  in ['Workflows', 'Parents', 'Files', 'Libraries', 'Workflow_Inputs', 'Samples', 'WGS_blocks', 'WT_blocks', 'Checksums']:
         constraints = '''FOREIGN KEY (project_id)
             REFERENCES Projects (project_id)'''
         table_format = table_format + ', ' + constraints 
@@ -301,9 +297,7 @@ def create_table(database, table):
       
     if table == 'Files':
         constraints = '''FOREIGN KEY (wfrun_id)
-            REFERENCES Workflows (wfrun_id),
-            FOREIGN KEY (file_swid)
-               REFERENCES FilesQC (file_swid)'''
+            REFERENCES Workflows (wfrun_id)'''
         table_format = table_format + ', ' + constraints
     
     if table == 'Workflow_Inputs':
@@ -351,7 +345,7 @@ def initiate_db(database):
     tables = cur.fetchall()
     tables = [i[0] for i in tables]    
     conn.close()
-    for i in ['Projects', 'Workflows', 'Parents', 'Files', 'FilesQC', 'Libraries',
+    for i in ['Projects', 'Workflows', 'Parents', 'Files', 'Libraries',
               'Workflow_Inputs', 'Samples', 'WGS_blocks', 'WT_blocks', 
               'Calculate_Contamination', 'Checksums']:
         if i not in tables:
@@ -568,57 +562,6 @@ def add_library_info_to_db(database, provenance_data, donors_to_update, table = 
         # add data
         insert_data(database, table, newdata, column_names)
         
-
-
-# def add_fileQC_info_to_db(database, project, nabu_api, matched_ids, donors_to_update, table='FilesQC'):
-#     '''
-#     (str, str, str, dict, str, str) -> None
-    
-#     Inserts file QC information in database's FilesQC table
-       
-#     Parameters
-#     ----------
-#     - database (str): Path to the database file
-#     - project (str): Name of project of interest
-#     - nabu_api (str): URL of the nabu API
-#     - matched_ids (dict): Dictionary of matched file swids and donor ids for each project in FPR
-#     - donors_to_update (dict): Dictionary with donors for which records needs to be updated
-#     - table (str): Table in database storing the file QC. Default is FilesQC
-#     '''
-
-#     # remove rows for donors to update
-#     if donors_to_update:
-#         delete_records(donors_to_update, database, table)
-#         print('deleted records in FilesQC')
-
-#         # collect QC info from nabu
-#         D = collect_qc_info(project, database, nabu_api)
-    
-#         # check that data is recorded in nabu for project
-#         if D:
-#             # make a list of data to insert
-#             newdata = []
-#             # connect to db
-#             conn = sqlite3.connect(database)
-#             # get column names
-#             column_names = define_column_names()[table]
-
-#             # add data
-#             for file_swid in D[project]:
-#                 # check that file swid is recorded in FPR for the same project
-#                 if file_swid in matched_ids[project]:
-#                     if matched_ids[project][file_swid] in donors_to_update and donors_to_update[matched_ids[project][file_swid]] != 'delete':
-#                         L = [D[project][file_swid][i] for i in column_names if i in D[project][file_swid]]
-#                         L.insert(0, matched_ids[project][file_swid])
-#                         L.insert(0, project)
-#                         L.insert(0, file_swid)
-#                         newdata.append(L)
-#             vals = '(' + ','.join(['?'] * len(newdata[0])) + ')'
-#             conn.executemany('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), vals), newdata)
-#             conn.commit()
-#             conn.close()
-
-
 
 
 def add_samples_info_to_db(database, provenance_data, donors_to_update, table = 'Samples'):
@@ -2760,38 +2703,6 @@ def generate_database(database, provenance_data_file, calcontaqc_db):
 
 
 
-# def get_QC_status_from_nabu(project, workflow, api):
-#     '''
-#     (str, str, str) -> dict
-    
-#     Returns a dictionary with qc information extracted from nabu for files generated by workflow in project
-        
-#     Parameters
-#     ----------
-#     - project (str): Project of interest
-#     - workflow (str): Workflow of interest
-#     - api (str): URL of the Nabu api
-#     '''
-
-#     # get end-point
-#     api += 'get-fileqcs' if api[-1] == '/' else '/get-fileqcs'
-    
-#     D = {project: {}}
-    
-#     # check each fastq-generating workflow
-#     headers = {'accept': 'application/json','Content-Type': 'application/json'}
-#     json_data = {"project": "{0}".format(project), "workflow": workflow}
-#     response = requests.post(api, headers=headers, json=json_data)
-#     # check response code
-#     if response.status_code == 200:
-#         L = response.json()['fileqcs']
-#         if L:
-#             for i in L:
-#                 qc = collect_info(i, ['skip', 'username', 'date', 'qcstatus', 'ref', 'stalestatus', 'comment'], ['skip', 'user', 'date', 'status', 'reference', 'fresh', 'ticket']) 
-#                 file_swid = i['fileid']    
-#                 D[project][file_swid] = qc
-#     return D    
-    
 
 
 # def get_project_workflows(project, database, workflow_table = 'Workflows'):
@@ -3531,56 +3442,6 @@ def generate_database(database, provenance_data_file, calcontaqc_db):
 #             workflows[project][workflow_id][key] = D[workflow_id]
     
 
-            
-# def add_fileQC_info_to_db(database, project, nabu_api, matched_ids, donors_to_update, table='FilesQC'):
-#     '''
-#     (str, str, str, dict, str, str) -> None
-    
-#     Inserts file QC information in database's FilesQC table
-       
-#     Parameters
-#     ----------
-#     - database (str): Path to the database file
-#     - project (str): Name of project of interest
-#     - nabu_api (str): URL of the nabu API
-#     - matched_ids (dict): Dictionary of matched file swids and donor ids for each project in FPR
-#     - donors_to_update (dict): Dictionary with donors for which records needs to be updated
-#     - table (str): Table in database storing the file QC. Default is FilesQC
-#     '''
-
-#     # remove rows for donors to update
-#     if donors_to_update:
-#         delete_records(donors_to_update, database, table)
-#         print('deleted records in FilesQC')
-
-#         # collect QC info from nabu
-#         D = collect_qc_info(project, database, nabu_api)
-    
-#         # check that data is recorded in nabu for project
-#         if D:
-#             # make a list of data to insert
-#             newdata = []
-#             # connect to db
-#             conn = sqlite3.connect(database)
-#             # get column names
-#             column_names = define_column_names()[table]
-
-#             # add data
-#             for file_swid in D[project]:
-#                 # check that file swid is recorded in FPR for the same project
-#                 if file_swid in matched_ids[project]:
-#                     if matched_ids[project][file_swid] in donors_to_update and donors_to_update[matched_ids[project][file_swid]] != 'delete':
-#                         L = [D[project][file_swid][i] for i in column_names if i in D[project][file_swid]]
-#                         L.insert(0, matched_ids[project][file_swid])
-#                         L.insert(0, project)
-#                         L.insert(0, file_swid)
-#                         newdata.append(L)
-#             vals = '(' + ','.join(['?'] * len(newdata[0])) + ')'
-#             conn.executemany('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), vals), newdata)
-#             conn.commit()
-#             conn.close()
-            
-
 
 
 
@@ -3799,16 +3660,9 @@ def generate_database(database, provenance_data_file, calcontaqc_db):
 
 
                  
-#                 # add file QC info
-#                 add_fileQC_info_to_db(args.database, project, args.nabu, matched_ids, donors_to_update, 'FilesQC')
-#                 print('added filesqc')
-#                 
+#                
                   
-#                 print('added workflow relationships')
-#                 # add WGS blocks
-#                 expected_WGS_workflows = sorted(['mutect2', 'variantEffectPredictor', 'delly', 'varscan', 'sequenza', 'mavis']) 
-#                 add_blocks_to_db(args.database, project, expected_WGS_workflows, 'WGS_blocks', 'WGS', donors_to_update)
-#                 print('added wgs blocks')  
+#                   
 #                 # add WT blocks
 #                 expected_WT_workflows = sorted(['arriba', 'rsem', 'starfusion', 'mavis'])
 #                 add_blocks_to_db(args.database, project, expected_WT_workflows, 'WT_blocks', 'WT', donors_to_update)
