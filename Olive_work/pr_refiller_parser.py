@@ -22,6 +22,15 @@ import hashlib
 # from whole_transcriptome import find_WT_blocks
 
 
+import matplotlib
+matplotlib.use('agg')
+import matplotlib.pyplot as plt
+import networkx as nx
+import numpy as np
+import base64
+import io
+
+
 
 # data -> list of donor data
 # dict_keys(['cerberus_data',
@@ -204,7 +213,7 @@ def define_column_names():
                                   'library_type', 'group_id', 'group_id_description', 'project_id'],
                     'Workflow_Inputs': ['library', 'run', 'lane', 'wfrun_id', 'limskey', 'barcode', 'platform', 'project_id', 'case_id'],
                     'Samples': ['case_id', 'donor_id', 'species', 'sex', 'miso', 'project_id'],
-                    'WGS_blocks': ['project_id', 'case_id', 'samples', 'anchor_wf', 'workflows', 'name', 'date', 'release_status', 'complete', 'clean', 'network'],
+                    'WGS_blocks': ['project_id', 'case_id', 'samples', 'anchor_wf', 'workflows', 'name', 'date', 'complete', 'clean', 'network'],
                     'WT_blocks': ['project_id', 'case_id', 'samples', 'anchor_wf', 'workflows', 'name', 'date', 'release_status', 'complete', 'clean', 'network'],
                     'Calculate_Contamination': ['sample_id', 'group_id', 'case_id', 'library_type', 'tissue_origin', 'tissue_type', 'contamination', 'merged_limskey'],
                     'Checksums': ['project_id', 'case_id', 'md5']
@@ -237,7 +246,7 @@ def define_column_types():
                     'Workflow_Inputs': ['VARCHAR(128)', 'VARCHAR(256)', 'INTEGER', 'VARCHAR(572)', 
                                         'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)'],
                     'Samples': ['VARCHAR(128) PRIMARY KEY NOT NULL', 'VARCHAR(256)', 'VARCHAR(256)', 'VARCHAR(128)', 'VARCHAR(572)', 'VARCHAR(128)'],
-                    'WGS_blocks': ['VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(572)', 'VARCHAR(572)', 'TEXT', 'VARCHAR(256)', 'VARCHAR(128)', 'INT', 'INT', 'INT', 'TEXT'],
+                    'WGS_blocks': ['VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(572)', 'VARCHAR(572)', 'TEXT', 'VARCHAR(256)', 'VARCHAR(128)', 'INT', 'INT', 'TEXT'],
                     'WT_blocks': ['VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(572)', 'VARCHAR(572)', 'TEXT', 'VARCHAR(256)', 'VARCHAR(128)', 'INT', 'INT', 'INT', 'TEXT'],
                     'Calculate_Contamination': ['VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'FLOAT', 'VARCHAR(572)'],
                     'Checksums': ['VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(572)']
@@ -817,6 +826,58 @@ def add_contamination_info(database, calcontaqc_db, provenance_data, donors_to_u
         insert_data(database, table, newdata, column_names)
         
 
+
+def add_WGS_blocks_to_db(database, provenance_data, donors_to_update, table,
+                         expected_workflows, qc_workflows, library_type = 'WG', platform = 'novaseq'):
+    '''
+    (str, list, dict, str, list, list, str, str) -> None
+    
+    Inserts WGS blocks data into WGS_blocks table of database    
+    
+    Parameters
+    ----------
+    - database (str): Path to the databae file
+    - provenance_data (list): List of dictionaries, each representing the data of a single donor
+    - donors_to_update (dict): Dictionary with donors for which records needs to be updated
+    - table (str): Name of table in database
+    - expected_workflows (list): List of expected workflow names to define a complete block
+    - qc_workflows (tuple): List of QC workflows to exclude from analysis blocks
+    - library_type (str): Library design of the data forming the blocks. Default is WG
+    - platform (str): Sequencing platform. Default is novaseq
+    '''
+    
+    if donors_to_update:
+        # get the column names
+        column_names = define_column_names()[table]
+        # remove rows for donors to update
+        delete_records(donors_to_update, database, table)
+        print('deleted records in {0}'.format(table))
+        
+        # make a list of data to insert in the database
+        newdata = []
+    
+        for donor_data in provenance_data:
+            donor = donor_data['donor']
+            # check if donor needs to be updated
+            if donor in donors_to_update and donors_to_update[donor] != 'delete':
+                blocks = find_donor_WGS_blocks(donor_data, library_type, platform, expected_workflows, qc_workflows)
+                for samples in blocks:
+                    for block in blocks[samples]:
+                        L = [blocks[samples][block]['project_id'],
+                             blocks[samples][block]['case_id'],
+                             samples,
+                             block,
+                             ';'.join(blocks[samples][block]['workflows']),
+                              blocks[samples][block]['name'],
+                              blocks[samples][block]['date'],
+                              blocks[samples][block]['complete'],
+                              blocks[samples][block]['clean'],
+                              blocks[samples][block]['network']]
+                        newdata.append(L)
+        
+        # add data
+        insert_data(database, table, newdata, column_names)
+        
 
 
 def is_project_active(donor_data):
@@ -1663,6 +1724,850 @@ def collect_donor_calculate_contamination_db(calcontaqc_db, donor):
 
 
 
+def get_donor_bmpp(donor_data, platform, library_type):
+    '''
+    (dict, str, str) -> list
+    
+    Returns a list of bmpp workflow Ids corresponding to the specific case from project 
+    with input sequences from platform and library_type
+    
+    Parameters
+    ----------
+    - donor_data (dict): Dictionary with a single donor data   
+    - platform (str): Sequencing platform. Values are novaseq, miseq, nextseq and hiseq
+    - library_type (str): 2-letters code describing the type of the library (eg, WG, WT,..)
+    '''
+    
+    L = []
+        
+    for i in range(len(donor_data['cerberus_data'])):
+        library_design = donor_data['cerberus_data'][i]['library_design']
+        workflow = donor_data['cerberus_data'][i]['workflow']
+        instrument = donor_data['cerberus_data'][i]['instrument_model']
+        wfrun_id = donor_data['cerberus_data'][i]['workflow_run_accession']
+        if 'bammergepreprocessing' in workflow.lower() and platform in instrument.lower() and library_type == library_design:
+            L.append(wfrun_id)
+    L = list(set(L))        
+            
+    return L
+    
+
+def map_samples_to_bmpp_runs(samples_workflows, bmpp_ids):
+    '''
+    (dict, list) -> dict
+    
+    Returns a dictionary with normal, tumor samples for each bmpp run id
+      
+    Parameters
+    ----------
+    - samples_workflows (dict): Dictionary with workflow information for all samples of a given donor
+    - bmpp_ids (list): List of BamMergePreprocessing workflow run identifiers for a single case
+    '''
+
+    D = {}
+    
+    
+    for bmpp_run_id in bmpp_ids:
+        samples = {'normal': [], 'tumour': []}
+        for sample in samples_workflows:
+            for d in samples_workflows[sample]['workflows']:
+                if d['wfrun_id'] == bmpp_run_id:
+                    if samples_workflows[sample]['tissue_type'] == 'R':
+                        tissue = 'normal'
+                    else:
+                        tissue = 'tumour'
+                    if sample not in samples[tissue]:
+                        samples[tissue].append(sample)
+        D[bmpp_run_id] = samples
+        
+    return D
+    
+
+def get_case_call_ready_samples(bmpp_samples):
+    '''
+    (dict) -> dict
+    
+    Returns a dictionary with all normal and tumor samples processed for all
+    bamMergePreprocessing workflow run ids for a specific donor
+    
+    Parameters
+    ----------
+    - bmpp_samples (dict): Dictionary with normal, tumor samples for each bmpp run id
+    '''
+        
+    D = {'normal': [], 'tumour': []} 
+    
+    for i in bmpp_samples:
+        D['normal'].extend(bmpp_samples[i]['normal'])
+        D['tumour'].extend(bmpp_samples[i]['tumour'])
+    return D
+
+
+def group_normal_tumor_pairs(samples):
+    '''
+    (dict) -> list
+    
+    Returns a list with all possible normal, tumor pairs from the dictionary
+    of normal and tumor samples for a given donor
+    
+    Parameters
+    ----------
+    - samples (dict): Dictionary with normal and tumour samples for a given donor
+    '''
+    
+    pairs = []
+    if samples['normal'] and samples['tumour']:
+        for i in samples['normal']:
+            for j in samples['tumour']:
+                pairs.append(sorted([i, j]))
+    elif samples['normal']:
+        for i in samples['normal']:
+            pairs.append([i])
+    elif samples['tumour']:
+        for i in samples['tumour']:
+            pairs.append([i])
+       
+    return pairs
+
+
+def exclude_qc_workflows(samples_workflows, qc_workflows):
+    '''
+    (dict, list) -> dict
+    
+    Returns a dictionary of workflow information for each sample in samples excluding
+    QC worflows from the qc_workflows list
+       
+    Parameters
+    ----------
+    - samples (dict): Dictionary with workflow information for all samples of a given donor
+    - sample (str): Specific sample of donor
+    '''
+        
+    D = {}
+    
+    for sample in samples_workflows:
+        assert sample not in D
+        D[sample] = {'tissue_type': samples_workflows[sample]['tissue_type'], 'workflows': []}
+        for i in samples_workflows[sample]['workflows']:
+            if i['workflow'] not in qc_workflows:
+                D[sample]['workflows'].append(i)
+        
+    return D                  
+            
+
+non_analysis_workflows = ('wgsmetrics', 'insertsizemetrics', 'bamqc', 'calculatecontamination',
+                          'callability', 'fastqc', 'crosscheckfingerprintscollector',
+                          'fingerprintcollector', 'bwamem', 'bammergepreprocessing',
+                          'ichorcna', 'tmbanalysis', 'casava', 'bcl2fastq',
+                          'fileimportforanalysis', 'fileimport', 'import_fastq',
+                          'dnaseqqc', 'hotspotfingerprintcollector', 'rnaseqqc')
+
+
+
+def collect_sample_workflows(donor_data, platform):
+    '''
+    (dict, str) -> dict
+    
+    Returns a dictionary with all workflows for all samples of a given donor
+        
+    Parameters
+    ----------
+    - donor_data (dict): Dictionary with a single donor data   
+    - platform (str): Sequencing platform. Values are: novaseq, nextseq, highseq and miseq
+    '''
+    
+    D = {}
+        
+    for i in range(len(donor_data['cerberus_data'])):
+        donor = donor_data['donor']
+        tissue_type = donor_data['cerberus_data'][i]['tissue_type']
+        tissue_origin = donor_data['cerberus_data'][i]['tissue_origin']
+        library_type = donor_data['cerberus_data'][i]['library_design']
+        group_id = donor_data['cerberus_data'][i]['group_id']
+        sample = '_'.join([donor, tissue_type, tissue_origin, library_type, group_id])
+        wfrun_id = donor_data['cerberus_data'][i]['workflow_run_accession']
+        workflow = donor_data['cerberus_data'][i]['workflow']
+        instrument = donor_data['cerberus_data'][i]['instrument_model']
+        
+        if platform in instrument.lower():
+            if sample not in D:
+                D[sample] = {'tissue_type': tissue_type, 'workflows': [{'workflow': workflow, 'wfrun_id': wfrun_id}]}
+            else:
+                if {'workflow': workflow, 'wfrun_id': wfrun_id} not in D[sample]['workflows']:
+                    D[sample]['workflows'].append({'workflow': workflow, 'wfrun_id': wfrun_id})            
+        
+    return D
+
+
+def find_sample_pairs_with_common_workflows(samples_workflows, pairs):
+    '''
+    (dict, list) -> dict
+    
+    Returns a dictionary of sample pairs and common workflows
+    for pairs that have been processed together
+    
+    Parameters
+    ----------    
+    - samples_workflows (dict): Dictionary of workflow information for each sample of a given donor
+    - pairs (list): List of normal/tumor samples
+    '''
+
+    D = {} 
+
+    for i in pairs:
+        j = ' | '.join(sorted(i))
+        # get the common worflows to each normal/tumor pair
+        L = [k for k in samples_workflows[i[0]]['workflows'] if k in samples_workflows[i[1]]['workflows']]
+        if L:
+            D[j] = L
+
+    return D
+
+
+
+def identify_WGTS_blocks(D, parent_workflows, bmpp):
+    '''
+    (dict, dict, list) -> list
+    
+    Returns a dictionary with analysis workflows grouped by sample pairs and blocks 
+    (ie, originating from common call-ready workflows)
+    
+    Parameters
+    ----------
+    - D (dict): Dictionary with workflows of each normal, tumour sample pair
+    - parent_worfklows (dict): Dictionary with parent workflows of each workflow for the normal, tumour sample pairs
+    - bmpp (list): List of bmpp workflow run id for a given donor                           
+    '''
+    
+    # track blocks
+    blocks = {}
+
+    # record all parent workflows
+    L = []
+
+    # get the bmpp sort bmpp-dowsntream workflows by block and sample     
+    for samples in D:
+        for d in D[samples]:
+            # get the workflow id
+            wfrun_id = d['wfrun_id']
+            # get the parent workflows
+            parent = parent_workflows[wfrun_id]
+            # check that parent workflows are in bmpp list
+            if all([i in bmpp for i in parent]):
+                # get the anchor workflow
+                parent_workflow = '.'.join(sorted(parent))
+                if samples not in blocks:
+                    blocks[samples] = {}
+                if parent_workflow not in blocks[samples]:
+                    blocks[samples][parent_workflow] = []
+                blocks[samples][parent_workflow].append({wfrun_id: {'parent': d, 'children': []}})
+                L.append(wfrun_id)
+    
+    # sort workflows downstream of callers by block and sample, 
+    # keeping track of workflow parent-child relationshsips    
+    for samples in blocks:
+        for parent_workflow in blocks[samples]:
+            for j in D[samples]:
+                if j['wfrun_id'] not in L:
+                    upstream = parent_workflows[j['wfrun_id']]
+                    for k in blocks[samples][parent_workflow]:
+                        for m in upstream:
+                            if m in k:
+                                k[m]['children'].append(j)
+    return blocks                
+
+
+
+def get_block_analysis_date(donor_data, block_workflows):
+    '''
+    (dict) -> dict, dict
+    
+    Returns a dictionary with the most recent analysis date of any workflow downstream
+    of bmpp parent workflows for each sample pair
+    
+    Parameters
+    ----------
+    - block_workflows (dict): Dictionary of workflow run ids organized by sample pair and bmpp parent workflows
+    - creation_dates (dict): Dictionary with creation date of each worklow in project
+    '''
+
+    D = {}
+    
+    for i in range(len(donor_data['cerberus_data'])):
+        wfrun_id = donor_data['cerberus_data'][i]['workflow_run_accession']
+        creation_date = get_file_timestamp(donor_data['cerberus_data'][i])
+        if wfrun_id not in D:
+            D[wfrun_id] = creation_date
+        else:
+            D[wfrun_id] = max(creation_date, D[wfrun_id])
+
+
+    block_date = {}
+    for block in block_workflows:
+        block_date[block] = {}
+        for bmpp in block_workflows[block]:
+            # get the analysis date for each workflow
+            L = [D[wf] for wf in block_workflows[block][bmpp] if wf in D]
+            if L:
+                block_date[block][bmpp] = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(int(max(L))))
+            else:
+                block_date[block][bmpp] = 'NA'
+    return block_date
+
+
+
+def list_block_workflows(blocks):
+    '''
+    (dict) -> dict
+    
+    Returns a dictionary with list of workflow ids grouped by sample pair and analysis block
+    
+    Parameters
+    ----------
+    - blocks (dict): Dictionary with analysis workflows grouped by sample pairs and blocks 
+    (ie, originating from common call-ready workflows)
+    '''
+        
+    # list all workflows downstream of each bmpp anchors
+    W = {}
+    for block in blocks:
+        W[block] = {}
+        for bmpp in blocks[block]:
+            L = []
+            for d in blocks[block][bmpp]:
+                for workflow in d:
+                    L.append(d[workflow]['parent']['wfrun_id'])
+                    for k in d[workflow]['children']:
+                        L.append(k['wfrun_id'])
+            L.extend(bmpp.split('.'))
+            L = sorted(list(set(L)))            
+            W[block][bmpp] = L
+    
+    return W
+
+
+
+def map_workflow_ids_to_names(samples_workflows):
+    '''
+    (str, str) -> dict
+    
+    Returns a dictionary with workflow_id and workflow name key, value pairs
+    
+    Parameters
+    ----------
+    - samples_workflows (dict): Dictionary with workflow information for each sample of a donor
+    '''
+
+    D = {}
+
+    for sample in samples_workflows:
+        for d in samples_workflows[sample]['workflows']:
+            wfrun_id = d['wfrun_id']
+            wf = d['workflow']
+            D[wfrun_id] = wf
+
+    return D
+
+
+def get_node_labels(block_workflows, workflow_names):
+    '''
+    (dict, dict) -> dict
+    
+    Returns a dictionary with node labels (workflows) for each block (sample pair)
+    and bmpp parent workflows
+    
+    Parameters
+    ----------
+    - block_workflows (dict): Dictionary of workflow run ids organized by sample pair and bmpp parent workflows
+    - workflow_names (dict): Dictionary with workflow name for each workflow run id in project
+    '''
+    
+    labels = {}
+    for block in block_workflows:
+        labels[block] = {}
+        for bmpp in block_workflows[block]:
+            labels[block][bmpp] = []
+            for workflow in block_workflows[block][bmpp]:
+                workflow_name = workflow_names[workflow]
+                workflow_name = workflow_name.split('_')[0]
+                if workflow_name.lower() == 'varianteffectpredictor':
+                    workflow_name = 'VEP'
+                elif workflow_name.lower() == 'bammergepreprocessing':
+                    workflow_name = 'bmpp'
+                labels[block][bmpp].append(workflow_name)
+       
+    return labels
+
+
+
+
+def make_adjacency_matrix(block_workflows, parent_workflows):
+    '''
+    (dict, dict) -> dict    
+    
+    Returns a dictionary of matrices showing relationships among workflows for each
+    sample and bmpp parent workflows
+    
+    Parameters
+    ----------
+    - block_workflows (dict): Dictionary of workflow run ids organized by sample pair and bmpp parent workflows
+    - parent_workflows (dict): Dictionary with parent-children workflow relationships
+    '''
+          
+    matrix = {}
+    
+    for block in block_workflows:
+        matrix[block] = {}
+        for bmpp in block_workflows[block]:
+            M = []
+            for i in block_workflows[block][bmpp]:
+                m = []
+                for j in block_workflows[block][bmpp]:
+                    if i not in parent_workflows and j not in parent_workflows:
+                        m.append(0)
+                    elif i == j:
+                        m.append(0)
+                    elif i in parent_workflows:
+                        if j in parent_workflows[i]:
+                            m.append(1)
+                        else:
+                            m.append(0)
+                    elif i not in parent_workflows:
+                        if i in parent_workflows[j]:
+                            m.append(1)
+                        else:
+                            m.append(0)
+                M.append(m)
+            matrix[block][bmpp] = M
+
+    return matrix
+
+
+
+def convert_figure_to_base64(figure):
+    '''
+    (matplotlib.figure.Figure) -> str
+    
+    Returns a base64 string representation of figure
+    
+    Parameters
+    ----------
+    - figure (matplotlib.figure.Figure): Figure showing workflow relationships
+    '''
+    
+    my_stringIObytes = io.BytesIO()
+    figure.savefig(my_stringIObytes, format='png')
+    
+    my_stringIObytes.seek(0)
+    my_base64_jpgData = base64.b64encode(my_stringIObytes.read()).decode('utf-8')
+      
+    return my_base64_jpgData
+
+
+
+
+def show_graph(adjacency_matrix, mylabels):
+    '''
+    (dict, dict) -> matplotlib.figure.Figure
+    
+    Returns a matplotlib figure of workflow relationships
+        
+    Parameters
+    ----------
+    - matrix (dict): Dictionary of matrices of workflow relationships for each
+                     sample pair (block) and bmpp parent workflows
+    - labels (dict): Dictionary with node labels (workflows) for each block (sample pair)
+                     and bmpp parent workflows
+    '''
+    
+
+
+
+    figure = plt.figure()
+    #figure.set_size_inches(2.5, 2)
+
+    # add a plot to figure (N row, N column, plot N)
+    ax = figure.add_subplot(1, 1, 1)
+
+
+
+    
+    rows, cols = np.where(adjacency_matrix == 1)
+    edges = zip(rows.tolist(), cols.tolist())
+    gr = nx.Graph()
+    
+    gr.add_edges_from(edges)
+    
+    #nx.draw(gr, node_size=500, labels=mylabels, with_labels=True)
+    
+    nodes = list(gr)
+    N = {}
+    for i in nodes:
+        N[i] = mylabels[i]
+    
+    nx.draw(gr, node_size=1200, node_color='#ffe066', font_size = 14, with_labels=True, labels=N, linewidths=2)
+    
+
+    # write title
+    #ax.set_title(title, size = 14)
+        
+    # # add space between axis and tick labels
+    # ax.yaxis.labelpad = 18
+    # ax.xaxis.labelpad = 18
+    
+    # # do not show lines around figure  
+    # ax.spines["top"].set_visible(False)    
+    # ax.spines["bottom"].set_visible(False)    
+    # ax.spines["right"].set_visible(False)    
+    # ax.spines["left"].set_visible(False)  
+    
+    # # do not show ticks
+    # plt.tick_params(axis='both', which='both', bottom=False, top=False,
+    #                 right=False, left=False, labelleft=False, labelbottom=False,
+    #                 labelright=False, colors = 'black', labelsize = 12, direction = 'out')  
+    
+    # # set up same network layout for all drawings
+    # Pos = nx.spring_layout(G)
+    # # draw edges    
+    # nx.draw_networkx_edges(gr, pos=1, width=0.7, edge_color='grey', style='solid',
+    #                         alpha=0.4, ax=ax, arrows=False, node_size=5,
+    #                         nodelist=AllNodes, node_shape='o')
+    
+    #nx.draw_networkx_edges(gr, pos=nx.spring_layout(gr), width=0.7, edge_color='grey', style='solid',
+    #                        alpha=0.4, ax=ax, arrows=False, node_size=5,
+    #                        node_shape='o')
+    
+    # draw all nodes, color according to degree
+    # nodelist = sorted(degree.keys())
+    # node_color = [degree[i] for i in nodelist]
+    
+   
+    # nodes = nx.draw_networkx_nodes(G, pos=Pos, with_labels=False, node_size=5,
+    #                                node_color=node_color, node_shape='o', alpha=0.3,
+    #                                linewidths=0, edgecolors='grey', ax=None,
+    #                                nodelist=nodelist, cmap=cmap)
+    # nodes.set_clim(min(node_color), max(node_color)+1) 
+
+    # # add discrete color bar for node degree
+    # divider = make_axes_locatable(ax)
+    # cax = divider.append_axes("bottom", size="5%", pad=0.05)
+    
+
+    # save figure    
+    plt.tight_layout()
+    #figure.savefig(Outputfile, bbox_inches = 'tight')
+    plt.close()
+
+    return figure
+
+
+
+
+def plot_workflow_network(matrix, labels):
+    '''
+    (dict, dict) -> dict
+    
+    Returns a dictionary with plots of workflow relationships for each sample pair and 
+    bmpp parent workflows
+    
+    Parameters
+    ----------
+    - matrix (dict): Dictionary of matrices of workflow relationships for each
+                     sample pair (block) and bmpp parent workflows
+    - labels (dict): Dictionary with node labels (workflows) for each block (sample pair)
+                     and bmpp parent workflows
+    '''
+        
+        
+    F = {}
+    # convert to numpy 2-D array
+    for block in matrix:
+        F[block] = {}
+        for bmpp in matrix[block]:
+            matrix[block][bmpp] = np.array(matrix[block][bmpp])
+            figure = show_graph(matrix[block][bmpp], mylabels=labels[block][bmpp])   
+            # convert to base64
+            F[block][bmpp] = convert_figure_to_base64(figure)
+   
+    return F
+
+
+
+
+
+def is_block_complete(block_workflows, expected_workflows, workflow_names):
+    '''
+    (dict, list) -> dict
+    
+    Returns a dictionary indicating if the downstream workflows of each parent bmpp workflows
+    are complete (ie, contains all the expected workflows) for each block (ie,sample pair)
+    
+    Parameters
+    ----------
+    - block_workflows (dict): Dictionary wirh list of workflows for each sample pair and parent bmpp
+    - expected_workflows (list): List of expected generic workflows names
+    '''
+    
+    D = {}
+    
+    for block in block_workflows:
+        D[block] = {}
+        for bmpp in block_workflows[block]:
+            if len(block_workflows[block][bmpp]) == 0:
+                complete = False
+            else:
+                # make a list of caller workflows (ie, remove bmpp)
+                call_ready = list(map(lambda x: x.strip(), bmpp.split('.')))
+                callers = set(block_workflows[block][bmpp]).difference(set(call_ready))
+                workflows = [workflow_names[i] for i in callers]
+                # homogeneize workflow names by removing the matched suffix
+                for i in range(len(workflows)):
+                    workflows[i] = workflows[i].split('_')[0]
+                # check that all workflows are present
+                complete = set(expected_workflows).issubset(set(workflows))
+            # record boolean as 0 or 1
+            D[block][bmpp] = int(complete)
+            
+    return D
+
+
+
+def is_block_clean(block_workflows, expected_workflows):
+    '''
+    (dict, list) -> dict
+    
+    Returns a dictionary indicating if each parent bmpp workflow has onlly expected 
+    or extra (more than expected) downstream workflows for each block (ie,sample pair)
+    
+    Parameters
+    ----------
+    - block_workflows (dict): Dictionary wirh list of workflows for each sample pair and parent bmpp
+    - expected_workflows (list): List of expected generic workflows names
+    '''
+    
+    D = {}
+    
+    for block in block_workflows:
+        D[block] = {}
+        for bmpp in block_workflows[block]:
+            L = block_workflows[block][bmpp]
+            if len(L) == 0:
+                clean = False
+            else:
+                # remove call ready workflows
+                call_ready = list(map(lambda x: x.strip(), bmpp.split('.')))
+                callers = set(L).difference(set(call_ready))
+                if len(callers) == len(expected_workflows):
+                    clean = True
+                else:
+                    clean = False
+            # record boolean as 0 or 1
+            D[block][bmpp] = int(clean)
+             
+    return D
+
+
+
+
+def score_blocks(blocks, amount_data, complete, clean):
+    '''
+    (dict, dict, dict, dict) -> dict
+    
+    Returns a dictionary with scores (based on amount of data, and block status)
+    for each sub-block (bmpp anchor) for each sample pair (block)
+       
+    Parameters
+    ----------
+    - blocks (dict): Dictionary of workflow information organized by sample pair and parent bmpp workflows
+    - amount_data (dict): Dictionary of amount of data for each workflow
+    - complete (dict): Dictionary with block completeness (ie presence of all expected workflows) for each sub-block
+    - clean (dict): Dictionary with block cleaness (ie presence of only expected workflows) for each sub-block 
+    '''
+    
+    # rank blocks according to lane count
+    ranks = {}
+    for block in blocks:
+        d = {}
+        for bmpp in blocks[block]:
+            # sum all lanes for all call-ready workflows within each block
+            total = 0
+            workflows = list(map(lambda x: x.strip(), bmpp.split('.')))
+            for workflow_id in workflows:
+                total += amount_data[os.path.basename(workflow_id)]
+            d[bmpp] = total
+        L = sorted(list(set(d.values())))
+        # get the indices (ranks) for each bmpp anchor
+        # weighted by the number of values
+        ranks[block] = {}
+        for bmpp in d:
+            for i in range(len(L)):
+                if L[i] == d[bmpp]:
+                    ranks[block][bmpp] = (i + 1) / len(L)
+    
+    # score sub-blocks within each block
+    D = {}
+    for block in blocks:
+        for bmpp in blocks[block]:
+            score = 0
+            score += complete[block][bmpp]
+            score += clean[block][bmpp]
+            score += ranks[block][bmpp]
+            if block not in D:
+                D[block] = {}
+            D[block][bmpp] = score
+    
+    return D
+
+
+
+
+
+
+def order_blocks(blocks, amount_data, complete, clean):
+    '''
+    (dict, dict, dict, dict) -> dict
+    
+    Returns a dictionary with bmpp parent workflows ordered by amount of lane data
+    and block status for each sample pair
+    
+    Parameters
+    ----------
+    - blocks (dict): Dictionary of workflow information organized by sample pair and parent bmpp workflows
+    - amount_data (dict): Dictionary of amount of data for each workflow
+    - complete (dict): Dictionary with block completeness (ie presence of all expected workflows) for each sub-block
+    - clean (dict): Dictionary with block cleaness (ie presence of only expected workflows) for each sub-block 
+    '''
+    
+    # score the blocks
+    scores = score_blocks(blocks, amount_data, complete, clean)
+    
+    D = {}
+    for block in blocks:
+        L = []
+        for bmpp in blocks[block]:
+            L.append([scores[block][bmpp], bmpp])
+        # sort sub-blocks according to score    
+        L.sort(key=lambda x: x[0])
+        D[block] = [i[1] for i in L]
+    return D
+
+
+
+def name_WGS_blocks(ordered_blocks):
+    '''
+    (dict) -> dict  
+    
+    Returns a dictionary with sub-blocks names for each sample pair (ie, block)
+    
+    Parameters
+    ----------
+    - ordered_blocks (dict): Dictionary with bmpp parent worflows ordered by amount of data for each sample pair
+    '''
+        
+    names = {}
+    for block in ordered_blocks:
+        counter = 1
+        names[block] = {}
+        # loop in reverse order, list is sorted according to ascending scores
+        for i in ordered_blocks[block][::-1]:
+            k = 'WGS Analysis Block {0}'.format(counter)
+            names[block][i] = k
+            counter += 1
+    return names
+
+
+
+def find_donor_WGS_blocks(donor_data, library_type, platform, expected_workflows, qc_workflows):
+    '''
+    (str, str, str, list) -> dict
+    
+    Returns a dictionary with the WGS blocks for case in project
+    
+    Parameters
+    ----------
+    - donor_data (dict): Dictionary with a single donor data   
+    - library_type (str): 2-letters code describing the type of the library (eg, WG, WT,..)
+    - platform (str): Sequencing platform. Values are novaseq, miseq, nextseq and hiseq
+    - expected_workflows (list): List of expected workflow names to define a complete block
+    - qc_workflows (list): List of QC workflows to exclude
+    '''
+    
+    # organize the WGS blocks as a dictionary
+    WGS_blocks = {}
+    
+    # get all the bmpp runs for WG library type and Novaseq platform
+    bmpp = get_donor_bmpp(donor_data, platform, library_type)
+
+    # proceed only in bmpp ids exist
+    if bmpp:
+        # get workflows of all samples for the donor
+        samples_workflows = collect_sample_workflows(donor_data, platform)
+        bmpp_samples = map_samples_to_bmpp_runs(samples_workflows, bmpp)
+        # identify all the samples processed
+        samples = get_case_call_ready_samples(bmpp_samples)
+        # proceed only if tumor/normal samples exist
+        if samples['normal'] and samples['tumour']:
+            # get all pairs N/T samples
+            pairs = group_normal_tumor_pairs(samples)
+            # exclude QC workflows
+            samples_workflows = exclude_qc_workflows(samples_workflows, qc_workflows)
+            # find common workflows to each normal/tumor pair    
+            D = find_sample_pairs_with_common_workflows(samples_workflows, pairs)
+            
+            if D:
+                # find the parents of each workflow
+                files = map_file_to_worklow(donor_data)
+                workflow_inputs = get_workflow_inputs(donor_data)
+                parent_workflows = identify_parent_children_workflows(workflow_inputs, files)
+                # find the blocks for that donor           
+                blocks = identify_WGTS_blocks(D, parent_workflows, bmpp)
+                # list all workflows for each block
+                block_workflows = list_block_workflows(blocks)
+                # get the date of each block
+                block_date = get_block_analysis_date(donor_data, block_workflows) 
+                # map each workflow run id to its workflow name
+                workflow_names = map_workflow_ids_to_names(samples_workflows)
+                # get the workflow names
+                block_workflow_names = get_node_labels(block_workflows, workflow_names)
+                # convert workflow relationships to adjacency matrix for each block
+                matrix = make_adjacency_matrix(block_workflows, parent_workflows)
+                # create figures
+                figures = plot_workflow_network(matrix, block_workflow_names)
+                # check if blocks are complete
+                complete = is_block_complete(block_workflows, expected_workflows, workflow_names)
+                # check if blocks have extra workflows
+                clean = is_block_clean(block_workflows, expected_workflows)
+                # get the amount of data for each workflow
+                workflow_info = collect_donor_workflow_info(donor_data)
+                amount_data = {i: workflow_info[i]['lane_count'] for i in workflow_info}
+                # order blocks based on scores
+                ordered_blocks = order_blocks(blocks, amount_data, complete, clean)
+                # name each block according to the selected block order
+                names = name_WGS_blocks(ordered_blocks)
+               
+                for samples in blocks:
+                    WGS_blocks[samples] = {}
+                    for block in blocks[samples]:
+                        WGS_blocks[samples][block] = {}
+                        # record network image
+                        WGS_blocks[samples][block]['network'] = figures[samples][block]
+                        # record all workflow ids
+                        WGS_blocks[samples][block]['workflows'] = block_workflows[samples][block]
+                        # record block date
+                        WGS_blocks[samples][block]['date'] = block_date[samples][block]
+                        # record complete status
+                        WGS_blocks[samples][block]['complete'] = complete[samples][block]
+                        # record extra workflow status
+                        WGS_blocks[samples][block]['clean'] = clean[samples][block]
+                        # record block name
+                        WGS_blocks[samples][block]['name'] = names[samples][block]
+                        # add project and case ids
+                        WGS_blocks[samples][block]['project_id'] = get_project_name(donor_data)
+                        WGS_blocks[samples][block]['case_id'] = donor_data['donor']
+    
+    return WGS_blocks
+
+
 
 
 
@@ -1727,6 +2632,20 @@ def generate_database(database, provenance_data_file, calcontaqc_db):
     print('added sample information to database')
     
     
+    # add WGS blocks
+    expected_WGS_workflows = sorted(['mutect2', 'variantEffectPredictor', 'delly', 'varscan', 'sequenza', 'mavis']) 
+    qc_workflows = ('wgsmetrics', 'insertsizemetrics', 'bamqc', 'calculatecontamination',
+                              'callability', 'fastqc', 'crosscheckfingerprintscollector',
+                              'fingerprintcollector', 'bwamem', 'bammergepreprocessing',
+                              'ichorcna', 'tmbanalysis', 'casava', 'bcl2fastq',
+                              'fileimportforanalysis', 'fileimport', 'import_fastq',
+                              'dnaseqqc', 'hotspotfingerprintcollector', 'rnaseqqc')
+    add_WGS_blocks_to_db(database, provenance_data, donors_to_update, 'WGS_blocks',
+                             expected_WGS_workflows, qc_workflows, library_type = 'WG',
+                             platform = 'novaseq')
+    print('added WGS blocks to database')
+    
+    
     
     # update the checksums for donors
     add_checksums_info_to_db(database, donors_to_update, 'Checksums')
@@ -1736,7 +2655,7 @@ def generate_database(database, provenance_data_file, calcontaqc_db):
 
 
 
-generate_database('test2.db', 'provenance_reporter.json', '57163009F163C387D7636FFFAFE10FFAFCDFC643.sqlite')    
+#generate_database('test2.db', 'provenance_reporter.json', '57163009F163C387D7636FFFAFE10FFAFCDFC643.sqlite')    
 
 
 
