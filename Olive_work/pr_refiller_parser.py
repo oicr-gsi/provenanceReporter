@@ -1858,7 +1858,7 @@ def identify_WGTS_blocks(D, parent_workflows, bmpp):
             # get the parent workflows
             parent = parent_workflows[wfrun_id]
             # check that parent workflows are in bmpp list
-            if all([i in bmpp for i in parent]):
+            if parent and all([i in bmpp for i in parent]):
                 # get the anchor workflow
                 parent_workflow = '.'.join(sorted(parent))
                 if samples not in blocks:
