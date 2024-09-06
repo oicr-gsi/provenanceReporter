@@ -213,7 +213,7 @@ def define_column_names():
                     'Workflow_Inputs': ['library', 'run', 'lane', 'wfrun_id', 'limskey', 'barcode', 'platform', 'project_id', 'case_id'],
                     'Samples': ['case_id', 'donor_id', 'species', 'sex', 'miso', 'project_id'],
                     'WGS_blocks': ['project_id', 'case_id', 'samples', 'anchor_wf', 'workflows', 'name', 'date', 'complete', 'clean', 'network'],
-                    'WT_blocks': ['project_id', 'case_id', 'samples', 'anchor_wf', 'workflows', 'name', 'date', 'release_status', 'complete', 'clean', 'network'],
+                    'WT_blocks': ['project_id', 'case_id', 'samples', 'anchor_wf', 'workflows', 'name', 'date', 'complete', 'clean', 'network'],
                     'Calculate_Contamination': ['sample_id', 'group_id', 'case_id', 'library_type', 'tissue_origin', 'tissue_type', 'contamination', 'merged_limskey'],
                     'Checksums': ['project_id', 'case_id', 'md5']
                     }
@@ -243,7 +243,7 @@ def define_column_types():
                                         'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)'],
                     'Samples': ['VARCHAR(128) PRIMARY KEY NOT NULL', 'VARCHAR(256)', 'VARCHAR(256)', 'VARCHAR(128)', 'VARCHAR(572)', 'VARCHAR(128)'],
                     'WGS_blocks': ['VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(572)', 'VARCHAR(572)', 'TEXT', 'VARCHAR(256)', 'VARCHAR(128)', 'INT', 'INT', 'TEXT'],
-                    'WT_blocks': ['VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(572)', 'VARCHAR(572)', 'TEXT', 'VARCHAR(256)', 'VARCHAR(128)', 'INT', 'INT', 'INT', 'TEXT'],
+                    'WT_blocks': ['VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(572)', 'VARCHAR(572)', 'TEXT', 'VARCHAR(256)', 'VARCHAR(128)', 'INT', 'INT', 'TEXT'],
                     'Calculate_Contamination': ['VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'FLOAT', 'VARCHAR(572)'],
                     'Checksums': ['VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(572)']
                     }
@@ -2754,7 +2754,7 @@ def generate_database(database, provenance_data_file, calcontaqc_db):
 
 
 
-#generate_database('test2.db', 'provenance_reporter.json', '57163009F163C387D7636FFFAFE10FFAFCDFC643.sqlite')    
+generate_database('test2.db', 'provenance_reporter.json', '57163009F163C387D7636FFFAFE10FFAFCDFC643.sqlite')    
 
 
 
