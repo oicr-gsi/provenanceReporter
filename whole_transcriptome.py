@@ -14,7 +14,7 @@ from whole_genome import map_analysis_workflows_to_sample, get_parent_workflows,
     get_workflow_limskeys, get_file_release_status, get_block_release_status, is_block_clean, \
     get_amount_data, order_blocks, map_limskey_to_library, map_library_to_sample, \
     map_library_to_case, get_workflow_output    
-from networks import get_node_labels, make_adjacency_matrix, plot_workflow_network
+ 
 
 
 def get_WT_call_ready_cases(project_name, platform, database, library_type='WT'):
