@@ -823,6 +823,59 @@ def add_WGS_blocks_to_db(database, provenance_data, donors_to_update, table,
         
 
 
+def add_WT_blocks_to_db(database, provenance_data, donors_to_update, table,
+                        expected_workflows, qc_workflows, library_type = 'WT', platform = 'novaseq'):
+    '''
+    (str, str, str, str) -> None
+    
+    Inserts WGS blocks data into WGS_blocks table of database    
+    
+    Parameters
+    ----------
+    - database (str): Path to the databae file
+    - provenance_data (list): List of dictionaries, each representing the data of a single donor
+    - donors_to_update (dict): Dictionary with donors for which records needs to be updated
+    - table (str): Name of table in database
+    - expected_workflows (list): List of expected workflow names to define a complete block
+    - qc_workflows (tuple): List of QC workflows to exclude from analysis blocks
+    - library_type (str): Library design of the data forming the blocks. Default is WT
+    - platform (str): Sequencing platform. Default is novaseq
+    '''
+    
+    if donors_to_update:
+        # get the column names
+        column_names = define_column_names()[table]
+        # remove rows for donors to update
+        delete_records(donors_to_update, database, table)
+        print('deleted records in {0}'.format(table))
+        
+        # make a list of data to insert in the database
+        newdata = []
+    
+        for donor_data in provenance_data:
+            donor = donor_data['donor']
+            # check if donor needs to be updated
+            if donor in donors_to_update and donors_to_update[donor] != 'delete':
+                blocks = find_donor_WT_blocks(donor_data, library_type, platform, expected_workflows, qc_workflows)
+                for samples in blocks:
+                    for block in blocks[samples]:
+                        L = [blocks[samples][block]['project_id'],
+                             blocks[samples][block]['case_id'],
+                             samples,
+                             block,
+                             ';'.join(blocks[samples][block]['workflows']),
+                              blocks[samples][block]['name'],
+                              blocks[samples][block]['date'],
+                              blocks[samples][block]['complete'],
+                              blocks[samples][block]['clean'],
+                              blocks[samples][block]['network']]
+                        newdata.append(L)
+        
+        # add data
+        insert_data(database, table, newdata, column_names)
+    
+    
+
 def is_project_active(donor_data):
     '''
     (dict) -> bool
@@ -1293,89 +1346,6 @@ def collect_donor_library_info(donor_data):
     return D       
         
 
-        
-
-
-
-def collect_donor_file_qc_info(donor_data):
-    '''
-    
-    
-    
-    
-
-    Parameters
-    ----------
-    donor_info : TYPE
-        DESCRIPTION.
-
-    Returns
-    -------
-    None.
-
-    '''
-
-    D = {}
-        
-    for i in range(len(donor_data['nabu_data'])):
-        ticket = donor_data['nabu_data'][i]['comment']
-        file_swid = donor_data['nabu_data'][i]['file_id']
-        project = donor_data['nabu_data'][i]['project']
-        user = donor_data['nabu_data'][i]['username']
-        
-        
-        pass
-        
-                # 'case_id',
-                # 'skip',
-                # 'date',
-                # 'status',
-                # 'reference',
-                # 'fresh',
-                
-
-
-
-#    'file_path': '/oicr/data/archive/seqware/seqware_analysis_12/hsqwprod/seqware-results/bcl2fastq_3.1.2/25619611/AHCT_0029_01_LB01-01_220503_A00469_0305_AHYMN2DRXY_1_TTCTGGAA-TACTGCAG_R2.fastq.gz',
-#    'file_swid': '25620329',
-#    'fileqc_id': '58037',
-#    'qc_date': '2022-10-28T17:16:11.457Z',
-#    'qc_passed': 'True',
-
-#    'workflow': 'bcl2fastq'}],
-#  [{'comment': 'GDR-839',
-#    'file_id': 'vidarr:research/file/31c12c06d91562e28142e4e95a394b6d9fc769ced2a2216d5e904096bb2aff04',
-#    'file_path': '/oicr/data/archive/seqware/seqware_analysis_12/hsqwprod/seqware-results/bcl2fastq_3.1.2/25618917/AHCT_0029_01_LB02-01_220503_A00469_0305_AHYMN2DRXY_1_TTCTGGAA-CGATTCCG_R2.fastq.gz',
-#    'file_swid': '25619744',
-#    'fileqc_id': '57741',
-#    'project': 'AHCT',
-#    'qc_date': '2022-10-28T17:16:11.457Z',
-#    'qc_passed': 'True',
-#    'username': 'rjovelin',
-#    'workflow': 'bcl2fastq'}],
-#  [{'comment': 'GDR-839',
-#    'file_id': 'vidarr:research/file/87056488f0a3a34da37114965e438008bacf7a1e2ca44a741c40eeecc1d81df0',
-#    'file_path': '/oicr/data/archive/seqware/seqware_analysis_12/hsqwprod/seqware-results/bcl2fastq_3.1.2/25619611/AHCT_0029_01_LB01-01_220503_A00469_0305_AHYMN2DRXY_1_TTCTGGAA-TACTGCAG_R1.fastq.gz',
-#    'file_swid': '25620299',
-#    'fileqc_id': '57996',
-#    'project': 'AHCT',
-#    'qc_date': '2022-10-28T17:16:11.457Z',
-#    'qc_passed': 'True',
-#    'username': 'rjovelin',
-#    'workflow': 'bcl2fastq'}],
-#  [{'comment': 'GDR-839',
-#    'file_id': 'vidarr:research/file/d586a196c2ed7bb95daaeb5eda6f01cdc91dc710d42b388eb24a2ede14257c02',
-#    'file_path': '/oicr/data/archive/seqware/seqware_analysis_12/hsqwprod/seqware-results/bcl2fastq_3.1.2/25618917/AHCT_0029_01_LB02-01_220503_A00469_0305_AHYMN2DRXY_1_TTCTGGAA-CGATTCCG_R1.fastq.gz',
-#    'file_swid': '25619727',
-#    'fileqc_id': '57569',
-#    'project': 'AHCT',
-#    'qc_date': '2022-10-28T17:16:11.457Z',
-#    'qc_passed': 'True',
-#    'username': 'rjovelin',
-#    'workflow': 'bcl2fastq'}]]
-
-
-
 def collect_donor_sample_info(donor_data):
     '''
     (dict) -> dict
@@ -1797,14 +1767,6 @@ def exclude_qc_workflows(samples_workflows, qc_workflows):
         
     return D                  
             
-
-non_analysis_workflows = ('wgsmetrics', 'insertsizemetrics', 'bamqc', 'calculatecontamination',
-                          'callability', 'fastqc', 'crosscheckfingerprintscollector',
-                          'fingerprintcollector', 'bwamem', 'bammergepreprocessing',
-                          'ichorcna', 'tmbanalysis', 'casava', 'bcl2fastq',
-                          'fileimportforanalysis', 'fileimport', 'import_fastq',
-                          'dnaseqqc', 'hotspotfingerprintcollector', 'rnaseqqc')
-
 
 
 def collect_sample_workflows(donor_data, platform):
@@ -2396,7 +2358,7 @@ def order_blocks(blocks, amount_data, complete, clean):
 
 
 
-def name_WGS_blocks(ordered_blocks):
+def name_blocks(ordered_blocks, pipeline):
     '''
     (dict) -> dict  
     
@@ -2405,6 +2367,7 @@ def name_WGS_blocks(ordered_blocks):
     Parameters
     ----------
     - ordered_blocks (dict): Dictionary with bmpp parent worflows ordered by amount of data for each sample pair
+    - pipeline (str): Name of pipeline. Values are WG or WT
     '''
         
     names = {}
@@ -2413,7 +2376,7 @@ def name_WGS_blocks(ordered_blocks):
         names[block] = {}
         # loop in reverse order, list is sorted according to ascending scores
         for i in ordered_blocks[block][::-1]:
-            k = 'WGS Analysis Block {0}'.format(counter)
+            k = '{0} Analysis Block {1}'.format(pipeline, counter)
             names[block][i] = k
             counter += 1
     return names
@@ -2486,7 +2449,7 @@ def find_donor_WGS_blocks(donor_data, library_type, platform, expected_workflows
                 # order blocks based on scores
                 ordered_blocks = order_blocks(blocks, amount_data, complete, clean)
                 # name each block according to the selected block order
-                names = name_WGS_blocks(ordered_blocks)
+                names = name_blocks(ordered_blocks, 'WG')
                
                 for samples in blocks:
                     WGS_blocks[samples] = {}
@@ -2512,8 +2475,194 @@ def find_donor_WGS_blocks(donor_data, library_type, platform, expected_workflows
 
 
 
+def get_donor_star(donor_data, platform, library_type):
+    '''
+    (dict, str, str) -> list
+    
+    Returns a list of star workflow Ids corresponding to the specific donor  
+    with input sequences from platform and library_type
+    
+    Parameters
+    ----------
+    - donor_data (dict): Dictionary with a single donor data   
+    - platform (str): Sequencing platform. Values are novaseq, miseq, nextseq and hiseq
+    - library_type (str): 2-letters code describing the type of the library (eg, WG, WT,..)
+    '''
+    
+    L = []
+        
+    for i in range(len(donor_data['cerberus_data'])):
+        library_design = donor_data['cerberus_data'][i]['library_design']
+        workflow = donor_data['cerberus_data'][i]['workflow']
+        instrument = donor_data['cerberus_data'][i]['instrument_model']
+        wfrun_id = donor_data['cerberus_data'][i]['workflow_run_accession']
+        if 'star_call_ready' in workflow.lower() and platform in instrument.lower() and library_type == library_design:
+            L.append(wfrun_id)
+    L = list(set(L))        
+            
+    return L
 
 
+
+def map_samples_to_star_runs(samples_workflows, star_ids):
+    '''
+    (dict, list) -> dict
+        
+    Returns a dictionary with tumor samples for each star run id
+          
+    Parameters
+    ----------
+    - samples_workflows (dict): Dictionary with workflow information for all samples of a given donor
+    - star_ids (list): List of BamMergePreprocessing workflow run identifiers for a single case
+    '''
+
+    D = {}
+    
+    for star_run_id in star_ids:
+        samples = {'tumour': []}
+        for sample in samples_workflows:
+            for d in samples_workflows[sample]['workflows']:
+                if d['wfrun_id'] == star_run_id:
+                    if samples_workflows[sample]['tissue_type'] == 'R':
+                        tissue = 'normal'
+                    else:
+                        tissue = 'tumour'
+                    if tissue == 'tumour':
+                        if sample not in samples[tissue]:
+                            samples[tissue].append(sample)
+        D[star_run_id] = samples                
+    
+    return D
+
+    
+def get_WT_case_call_ready_samples(star_samples):
+    '''
+    (dict) -> dict
+    
+    Returns a dictionary with tumor samples processed for all star_call_ready
+    workflow run ids for a specific donor
+        
+    Parameters
+    ----------
+    - star_samples (dict): Dictionary with tumor samples for each star run id
+    '''
+     
+    D = {'tumour': []}
+    for i in star_samples:
+        D['tumour'].extend(star_samples[i]['tumour'])
+    return D    
+    
+
+
+
+
+def map_workflows_to_samples(samples_workflows, samples):
+    '''
+    (dict, dict) -> dict
+    
+    Returns a dictionary with workflows processed by the WT pipeline for tumor samples
+    
+    Parameters
+    ----------
+    - samples_workflows (dict): Dictionary with workflows for all samples of a given donor
+    - samples (dict): Dictionary with tumor samples
+    '''
+    
+    D = {}
+    for i in samples['tumour']:
+        D[i] = samples_workflows[i]['workflows']
+        
+    return D    
+        
+    
+
+
+def find_donor_WT_blocks(donor_data, library_type, platform, expected_workflows, qc_workflows):
+    '''
+    (str, str, str, list) -> dict
+    
+    Returns a dictionary with the WGS blocks for case in project
+    
+    Parameters
+    ----------
+    - donor_data (dict): Dictionary with a single donor data   
+    - library_type (str): 2-letters code describing the type of the library (eg, WG, WT,..)
+    - platform (str): Sequencing platform. Values are novaseq, miseq, nextseq and hiseq
+    - expected_workflows (list): List of expected workflow names to define a complete block
+    - qc_workflows (list): List of QC workflows to exclude
+    '''
+    
+    
+    WT_blocks = {}
+    
+    # build the somatic calling block
+    # identify all call ready star runs for novaseq
+    star = get_donor_star(donor_data, platform, library_type)
+
+    if star:
+        # get workflows of all samples for the donor
+        samples_workflows = collect_sample_workflows(donor_data, platform)
+        star_samples = map_samples_to_star_runs(samples_workflows, star)
+        # identify all the samples processed
+        samples = get_WT_case_call_ready_samples(star_samples)
+        if samples['tumour']:
+            # exclude QC workflows
+            samples_workflows = exclude_qc_workflows(samples_workflows, qc_workflows)
+            D = map_workflows_to_samples(samples_workflows, samples)
+            if D:
+                # find the parents of each workflow
+                files = map_file_to_worklow(donor_data)
+                workflow_inputs = get_workflow_inputs(donor_data)
+                parent_workflows = identify_parent_children_workflows(workflow_inputs, files)
+                # find the blocks for that donor           
+                blocks = identify_WGTS_blocks(D, parent_workflows, star)
+                # list all workflows for each block
+                block_workflows = list_block_workflows(blocks)
+                # get the date of each block
+                block_date = get_block_analysis_date(donor_data, block_workflows) 
+                # map each workflow run id to its workflow name
+                workflow_names = map_workflow_ids_to_names(samples_workflows)
+                # get the workflow names
+                block_workflow_names = get_node_labels(block_workflows, workflow_names)
+                # convert workflow relationships to adjacency matrix for each block
+                matrix = make_adjacency_matrix(block_workflows, parent_workflows)
+                # create figures
+                figures = plot_workflow_network(matrix, block_workflow_names)
+                # check if blocks are complete
+                complete = is_block_complete(block_workflows, expected_workflows, workflow_names)
+                # check if blocks have extra workflows
+                clean = is_block_clean(block_workflows, expected_workflows)
+                # get the amount of data for each workflow
+                workflow_info = collect_donor_workflow_info(donor_data)
+                amount_data = {i: workflow_info[i]['lane_count'] for i in workflow_info}
+                # order blocks based on scores
+                ordered_blocks = order_blocks(blocks, amount_data, complete, clean)
+                # name each block according to the selected block order
+                names = name_blocks(ordered_blocks, 'WT')
+            
+                           
+                for samples in blocks:
+                    WT_blocks[samples] = {}
+                    for block in blocks[samples]:
+                        WT_blocks[samples][block] = {}
+                        # record network image
+                        WT_blocks[samples][block]['network'] = figures[samples][block]
+                        # record all workflow ids
+                        WT_blocks[samples][block]['workflows'] = block_workflows[samples][block]
+                        # record block date
+                        WT_blocks[samples][block]['date'] = block_date[samples][block]
+                        # record complete status
+                        WT_blocks[samples][block]['complete'] = complete[samples][block]
+                        # record extra workflow status
+                        WT_blocks[samples][block]['clean'] = clean[samples][block]
+                        # record block name
+                        WT_blocks[samples][block]['name'] = names[samples][block]
+                        # add project and case ids
+                        WT_blocks[samples][block]['project_id'] = get_project_name(donor_data)
+                        WT_blocks[samples][block]['case_id'] = donor_data['donor']
+    
+    return WT_blocks
+            
 
 
 def generate_database(database, provenance_data_file, calcontaqc_db):
@@ -2574,7 +2723,6 @@ def generate_database(database, provenance_data_file, calcontaqc_db):
     add_samples_info_to_db(database, provenance_data, donors_to_update, 'Samples')
     print('added sample information to database')
     
-    
     # add WGS blocks
     expected_WGS_workflows = sorted(['mutect2', 'variantEffectPredictor', 'delly', 'varscan', 'sequenza', 'mavis']) 
     qc_workflows = ('wgsmetrics', 'insertsizemetrics', 'bamqc', 'calculatecontamination',
@@ -2582,13 +2730,21 @@ def generate_database(database, provenance_data_file, calcontaqc_db):
                               'fingerprintcollector', 'bwamem', 'bammergepreprocessing',
                               'ichorcna', 'tmbanalysis', 'casava', 'bcl2fastq',
                               'fileimportforanalysis', 'fileimport', 'import_fastq',
-                              'dnaseqqc', 'hotspotfingerprintcollector', 'rnaseqqc')
+                              'dnaseqqc', 'hotspotfingerprintcollector', 'rnaseqqc',
+                              'rnaseqqc_lane_level', 'rnaseqqc_call_ready')
+                              
     add_WGS_blocks_to_db(database, provenance_data, donors_to_update, 'WGS_blocks',
                              expected_WGS_workflows, qc_workflows, library_type = 'WG',
                              platform = 'novaseq')
     print('added WGS blocks to database')
     
     
+    # add WT blocks
+    expected_WT_workflows = sorted(['arriba', 'rsem', 'starfusion', 'mavis'])
+    add_WT_blocks_to_db(database, provenance_data, donors_to_update, 'WT_blocks',
+                            expected_WT_workflows, qc_workflows, library_type = 'WT',
+                            platform = 'novaseq')
+    print('added WGS blocks to database')
     
     # update the checksums for donors
     add_checksums_info_to_db(database, donors_to_update, 'Checksums')
@@ -2732,33 +2888,6 @@ def generate_database(database, provenance_data_file, calcontaqc_db):
 #     return workflows
 
 
-# def add_missing_QC_status(D, project, database, table = 'Files'):
-#     '''
-#     (dict, str, str, str) -> dict
-    
-#     - D (dict): Dictionary with QC information for project files
-#     - project (str): Name of project of interest
-#     - database (str): Path to the database file
-#     - table (str): Table in database storing file information. Default is Files
-#     - nabu_api (str): URL of the nabu API
-#     '''
-    
-#     # QC may not be available for all files
-#     # retrieve file swids from database instead of parsing again fpr
-#     # add empty values to qc fields if qc not available
-#     conn = sqlite3.connect(database)
-#     cur = conn.cursor()
-#     cur.execute('SELECT {0}.file_swid FROM {0} WHERE {0}.project_id = \"{1}\"'.format(table, project))
-#     records = cur.fetchall()
-#     records = [i[0] for i in records]
-#     conn.close()
-    
-#     for file_swid in records:
-#         if file_swid not in D[project]:
-#             D[project][file_swid] = {'skip': '', 'user': '', 'date': '', 'status': '', 'reference': '', 'fresh': '', 'ticket': ''}
-    
-#     return D
-    
 
 
 # def match_donor_to_file_swid(fpr_data, projects):
@@ -2783,35 +2912,6 @@ def generate_database(database, provenance_data_file, calcontaqc_db):
 #     return D            
         
     
-
-
-# def collect_qc_info(project, database, nabu_api):
-#     '''
-#     (str, str, str, str) -> dict
-
-#     Returns a dictionary with QC status of all files in project    
-        
-#     Parameters
-#     ----------
-#     - project (str): Name of project of interest
-#     - database (str): Path to the database file
-#     - nabu_api (str): URL of the nabu API
-#     '''
-
-#     # track qc info for all files in project
-#     D = {project: {}}
-
-#     # make a list of workflows for project
-#     workflows = get_project_workflows(project, database)
-#     for workflow in workflows:
-#         qc = get_QC_status_from_nabu(project, workflow, nabu_api)     
-#         # update dict
-#         D[project].update(qc[project])
-#     # add project files that may be missing QC info in Nabu
-#     D = add_missing_QC_status(D, project, database)
-
-#     return D
-
 
 
 
@@ -3606,7 +3706,7 @@ def generate_database(database, provenance_data_file, calcontaqc_db):
 #     Parameters:
 #     -----------
 #     - fpr (str): Path to Path to the File Provenance Report
-#     - nabu (str): URL of the Nabu API
+#     
 #     - pinery (str): Pinery API
 #     - database (str): Path to the database file
 #     - lims_info (str): Path to the json file with lims information
@@ -3679,7 +3779,6 @@ def generate_database(database, provenance_data_file, calcontaqc_db):
 # if __name__ == '__main__':
 #     parser = argparse.ArgumentParser(prog = 'waterzooiDataCollector.py', description='Script to add data to the waterzooi database')
 #     parser.add_argument('-f', '--fpr', dest='fpr', default = '/scratch2/groups/gsi/production/vidarr/vidarr_files_report_latest.tsv.gz', help='Path to the File Provenance Report. Default is /scratch2/groups/gsi/production/vidarr/vidarr_files_report_latest.tsv.gz')
-#     parser.add_argument('-n', '--nabu', dest='nabu', default='https://nabu-prod.gsi.oicr.on.ca', help='URL of the Nabu API. Default is https://nabu-prod.gsi.oicr.on.ca')
 #     parser.add_argument('-p', '--pinery', dest = 'pinery', default = 'http://pinery.gsi.oicr.on.ca', help = 'Pinery API. Default is http://pinery.gsi.oicr.on.ca')
 #     parser.add_argument('-cq', '--calcontaqc', dest = 'calcontaqc_db', default = '/scratch2/groups/gsi/production/qcetl_v1/calculatecontamination/latest', help = 'Path to the merged rnaseq calculateContamination database. Default is /scratch2/groups/gsi/production/qcetl_v1/calculatecontamination/latest')
 #     parser.add_argument('-db', '--database', dest='database', help='Path to the waterzooi database', required=True)    
