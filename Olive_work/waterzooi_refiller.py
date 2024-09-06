@@ -9,13 +9,9 @@ Created on Mon Aug 12 11:48:39 2024
 
 import sqlite3
 import json
-import requests
-import gzip
 import argparse
 import time
-import traceback
 import os
-import subprocess
 import hashlib
 import matplotlib
 matplotlib.use('agg')
