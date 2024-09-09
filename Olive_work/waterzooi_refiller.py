@@ -397,15 +397,18 @@ def add_project_info_to_db(database, provenance_data, donors_to_update, library_
         # make a list of data to insert in the database
         newdata = []
         
+        # make a list of projects already set for updates
+        deleted_projects = []
+        
+        
         # connect to db
         conn = connect_to_db(database)
         
         for donor_data in provenance_data:
             donor = donor_data['donor']
-            # check if donor needs to be updated
-            if donor in donors_to_update and donors_to_update[donor] != 'delete':
-                # get the project id
-                project_id = get_project_name(donor_data)
+            project_id = get_project_name(donor_data)
+            # check if donor info has changed and that project 
+            if donor in donors_to_update and project_id not in deleted_projects:
                 # delete project info
                 query = 'DELETE FROM {0} WHERE project_id = \"{1}\"'.format(project_table, project_id)
                 conn.execute(query)
@@ -417,7 +420,8 @@ def add_project_info_to_db(database, provenance_data, donors_to_update, library_
                 # get the library types
                 library_types = ','.join(sorted(list(set(project_info.values())))) 
                 L = [project_id, pipeline, last_updated, str(samples), library_types]
-                newdata.append(L)            
+                newdata.append(L)
+                deleted_projects.append(project_id)
         
         conn.close()
         
