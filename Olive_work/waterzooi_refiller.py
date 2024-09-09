@@ -284,7 +284,88 @@ def add_checksums_info_to_db(database, donors_to_update, table = 'Checksums'):
 
 
 
-def add_project_info_to_db(database, provenance_data, table = 'Projects'):
+# def add_project_info_to_db(database, provenance_data, table = 'Projects'):
+#     '''
+#     (str, list, str) -> None
+    
+#     Add project information into Projects table of database
+       
+#     Parameters
+#     ----------
+#     - database (str): Path to the database file
+#     - provenance_data (list): List of dictionaries, each representing the data of a single donor
+#     - table (str): Name of Table in database. Default is Projects
+#     '''
+    
+#     # collect project information
+#     project_info = collect_project_info(provenance_data)
+    
+#     for project in project_info:
+#         # add time stamp to each project
+#         project_info[project]['last_updated'] = time.strftime('%Y-%m-%d_%H:%M', time.localtime(time.time()))
+#         # get the number of samples
+#         project_info[project]['samples'] = len(project_info[project]['samples'])
+#         # get the library types
+#         project_info[project]['library_types'] = ','.join(sorted(project_info[project]['library_types']))
+#         # add the project id
+#         project_info[project]['project_id'] = project
+        
+        
+#     # connect to db
+#     conn = sqlite3.connect(database, timeout=30)
+#     # get column names
+#     data = conn.execute("SELECT * FROM {0}".format(table))
+#     column_names = [column[0] for column in data.description]
+
+#     for project in project_info:
+#         # remove project info from table
+#         conn.execute('DELETE FROM {0} WHERE project_id = \"{1}\"'.format(table, project))
+#         conn.commit()
+#         # add project info in database
+#         # order values according to column names
+#         vals = [project_info[project][i] for i in column_names]
+#         # insert project info
+#         conn.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(vals)))
+#         conn.commit()
+    
+#     conn.close()
+
+
+
+
+
+
+
+
+def collect_project_info_from_db(database, donor_id, table = 'Libraries'):
+    '''
+    (list) -> dict
+    
+    Returns a dictionary with project level information for each active project in provenance_data
+    
+    Parameters
+    ----------
+    - provenance_data (list): List of dictionaries, each representing the data of a single donor
+    '''
+
+    D = {}
+
+    # connect to db
+    conn = sqlite3.connect(database, timeout=30)
+    # get column names
+    data = conn.execute('SELECT * FROM {0} WHERE case_id = \"{1}\"'.format(table, donor_id))
+    
+    for i in data:
+        library_design = i['library_type']
+        sample = '_'.join([i['case_id'], i['tissue_type'], i['tissue_origin'],
+                           library_design, i['group_id']])
+        D[sample] = library_design
+                               
+    return D
+
+    
+
+def add_project_info_to_db(database, provenance_data, donors_to_update, library_table = 'Libraries', project_table = 'Projects'):
     '''
     (str, list, str) -> None
     
@@ -297,38 +378,38 @@ def add_project_info_to_db(database, provenance_data, table = 'Projects'):
     - table (str): Name of Table in database. Default is Projects
     '''
     
-    # collect project information
-    project_info = collect_project_info(provenance_data)
+    # # collect project information
+    # project_info = collect_project_info(provenance_data)
     
-    for project in project_info:
-        # add time stamp to each project
-        project_info[project]['last_updated'] = time.strftime('%Y-%m-%d_%H:%M', time.localtime(time.time()))
-        # get the number of samples
-        project_info[project]['samples'] = len(project_info[project]['samples'])
-        # get the library types
-        project_info[project]['library_types'] = ','.join(sorted(project_info[project]['library_types']))
-        # add the project id
-        project_info[project]['project_id'] = project
-        
-        
-    # connect to db
-    conn = sqlite3.connect(database, timeout=30)
-    # get column names
-    data = conn.execute("SELECT * FROM {0}".format(table))
-    column_names = [column[0] for column in data.description]
-
-    for project in project_info:
-        # remove project info from table
-        conn.execute('DELETE FROM {0} WHERE project_id = \"{1}\"'.format(table, project))
-        conn.commit()
-        # add project info in database
-        # order values according to column names
-        vals = [project_info[project][i] for i in column_names]
-        # insert project info
-        conn.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(vals)))
-        conn.commit()
     
-    conn.close()
+    if donors_to_update:
+        # get the column names
+        column_names = define_column_names()[project_table]
+        # remove rows for donors to update
+        delete_records(donors_to_update, database, project_table)
+        print('deleted records in {0}'.format(project_table))
+    
+        # make a list of data to insert in the database
+        newdata = []
+            
+        for donor_data in provenance_data:
+            donor = donor_data['donor']
+            # check if donor needs to be updated
+            if donor in donors_to_update and donors_to_update[donor] != 'delete':
+                project_info = collect_project_info_from_db(database, donor, library_table)
+                pipeline = get_pipeline(donor_data)
+                last_updated = time.strftime('%Y-%m-%d_%H:%M', time.localtime(time.time()))
+                samples = len(project_info)
+                # get the library types
+                library_types = ','.join(sorted(list(set(project_info.values)))) 
+                # add the project id
+                project_id = get_project_name(donor_data)
+                L = [project_id, pipeline, last_updated, str(samples), library_types]
+                newdata.append(L)            
+        
+        # add data
+        insert_data(database, project_table, newdata, column_names)
+        
 
 
 def add_file_info_to_db(database, provenance_data, donors_to_update, table = 'Files'):
@@ -1272,34 +1353,34 @@ def collect_donor_workflow_inputs(donor_data):
     return L
 
 
-def collect_project_info(provenance_data):
-    '''
-    (list) -> dict
+# def collect_project_info(provenance_data):
+#     '''
+#     (list) -> dict
     
-    Returns a dictionary with project level information for each active project in provenance_data
+#     Returns a dictionary with project level information for each active project in provenance_data
     
-    Parameters
-    ----------
-    - provenance_data (list): List of dictionaries, each representing the data of a single donor
-    '''
+#     Parameters
+#     ----------
+#     - provenance_data (list): List of dictionaries, each representing the data of a single donor
+#     '''
 
 
-    D = {}
+#     D = {}
 
 
-    for i in range(len(provenance_data)):
-        project_name = get_project_name(provenance_data[i])
-        if project_name not in D:
-            D[project_name] = {'samples': [], 'library_types': []}
-        samples = get_donor_samples_and_library_types(provenance_data[i])
-        pipeline = get_pipeline(provenance_data[i])
-        D[project_name]['pipeline'] = pipeline
-        D[project_name]['samples'].extend(list(samples.keys()))
-        D[project_name]['library_types'].extend(list(samples.values()))
-        D[project_name]['samples'] = list(set(D[project_name]['samples']))
-        D[project_name]['library_types'] = list(set(D[project_name]['library_types']))
+#     for i in range(len(provenance_data)):
+#         project_name = get_project_name(provenance_data[i])
+#         if project_name not in D:
+#             D[project_name] = {'samples': [], 'library_types': []}
+#         samples = get_donor_samples_and_library_types(provenance_data[i])
+#         pipeline = get_pipeline(provenance_data[i])
+#         D[project_name]['pipeline'] = pipeline
+#         D[project_name]['samples'].extend(list(samples.keys()))
+#         D[project_name]['library_types'].extend(list(samples.values()))
+#         D[project_name]['samples'] = list(set(D[project_name]['samples']))
+#         D[project_name]['library_types'] = list(set(D[project_name]['library_types']))
     
-    return D    
+#     return D    
         
         
 def map_file_to_worklow(donor_data):
@@ -2431,9 +2512,6 @@ def generate_database(database, provenance_data_file, calcontaqc_db):
     donors_to_update = donors_info_to_update(md5sums, recorded_md5sums)
     print('determined donors to update')
     
-    # add project information
-    add_project_info_to_db(database, provenance_data, 'Projects')
-    print('added project info to database')
     
     # add file information
     add_file_info_to_db(database, provenance_data, donors_to_update, 'Files')
@@ -2441,6 +2519,9 @@ def generate_database(database, provenance_data_file, calcontaqc_db):
     # add library information
     add_library_info_to_db(database, provenance_data, donors_to_update, 'Libraries')
     print('added library info to database')
+    # add project information
+    add_project_info_to_db(database, provenance_data, donors_to_update, library_table = 'Libraries', project_table = 'Projects')
+    print('added project info to database')
     # add workflow information
     add_workflows_to_db(database, provenance_data, donors_to_update, 'Workflows')
     print('added workflow info to database')
