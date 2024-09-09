@@ -351,9 +351,12 @@ def collect_project_info_from_db(database, donor_id, table = 'Libraries'):
     D = {}
 
     # connect to db
-    conn = sqlite3.connect(database, timeout=30)
+    conn = connect_to_db(database)
     # get column names
     data = conn.execute('SELECT * FROM {0} WHERE case_id = \"{1}\"'.format(table, donor_id))
+    data = data.fetchall()
+    conn.close()
+    
     
     for i in data:
         library_design = i['library_type']
@@ -385,27 +388,38 @@ def add_project_info_to_db(database, provenance_data, donors_to_update, library_
     if donors_to_update:
         # get the column names
         column_names = define_column_names()[project_table]
+        
+        
         # remove rows for donors to update
-        delete_records(donors_to_update, database, project_table)
-        print('deleted records in {0}'.format(project_table))
+        #delete_records(donors_to_update, database, project_table)
+        #print('deleted records in {0}'.format(project_table))
     
         # make a list of data to insert in the database
         newdata = []
-            
+        
+        # connect to db
+        conn = connect_to_db(database)
+        
         for donor_data in provenance_data:
             donor = donor_data['donor']
             # check if donor needs to be updated
             if donor in donors_to_update and donors_to_update[donor] != 'delete':
+                # get the project id
+                project_id = get_project_name(donor_data)
+                # delete project info
+                query = 'DELETE FROM {0} WHERE project_id = \"{1}\"'.format(project_table, project_id)
+                conn.execute(query)
+                conn.commit()
                 project_info = collect_project_info_from_db(database, donor, library_table)
                 pipeline = get_pipeline(donor_data)
                 last_updated = time.strftime('%Y-%m-%d_%H:%M', time.localtime(time.time()))
                 samples = len(project_info)
                 # get the library types
-                library_types = ','.join(sorted(list(set(project_info.values)))) 
-                # add the project id
-                project_id = get_project_name(donor_data)
+                library_types = ','.join(sorted(list(set(project_info.values())))) 
                 L = [project_id, pipeline, last_updated, str(samples), library_types]
                 newdata.append(L)            
+        
+        conn.close()
         
         # add data
         insert_data(database, project_table, newdata, column_names)
@@ -2573,7 +2587,7 @@ if __name__ == '__main__':
      
     # get arguments from the command line
     args = parser.parse_args()
-    args.func(args)
+    #args.func(args)
     
     generate_database(args.database, args.provenance, args.calcontaqc_db)    
 
