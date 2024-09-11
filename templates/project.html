@@ -32,43 +32,8 @@
     <td><button id="miso_button"><a href="https://miso.oicr.on.ca/miso/project/shortname/{{project['project_id']}}" target="_blank">MISO</a></button>
   </tr>
   <tr>
-    <th>Project description:</th>
-    {% if project['description'] %}
-      <td>{{ project['description'] }}</td>
-    {% else %}
-      <td>Not provided</td>
-    {% endif %}
-  </tr>
-  <tr>
     <th>Pipeline:</th>
     <td>{{ project['pipeline'] }}</td>
-  </tr>
-  <tr>
-    <th>Status:</th>
-    <td>{{ project['active'] }}</td>  
-  </tr>
-  <tr>
-    <th>Contact name:</th>
-    {% if project['contact_name'] %}
-      <td>{{ project['contact_name'] }}</td>
-    {% else %}
-      <td>Not provided</td>
-    {% endif %}     
-  <tr>
-    <th>Contact email:</th>
-    {% if project['contact_email'] %}     
-      <td>{{ project['contact_email'] }}</td>
-    {% else %}
-      <td>Not provided</td>   
-    {% endif %}
-  </tr>
-  <tr>
-    <th>Expected cases:</th>
-    <td>{{ project['expected_samples'] }}</td>
-  </tr>
-  <tr>
-    <th>Sequenced cases:</th>
-    <td>{{ project['sequenced_samples'] }}</td>
   </tr>
   <tr>
     <th>Library types:</th>
@@ -87,8 +52,6 @@
       <th><div class="tooltip">Case Id<span class="tooltiptext">OICR-generated case identifier</span></th>
       <th><div class="tooltip">Donor Id<span class="tooltiptext">User-supplied donor identifier</span></th>
       <th><div class="tooltip">MISO<span class="tooltiptext">Link to the MISO sample page</span></th>
-      <th><div class="tooltip">Parent project<span class="tooltiptext">Project to which the samples are assigned</span></>
-      <th><div class="tooltip">Created<span class="tooltiptext">Date the sample was registered in MISO</span></th>
       <th><div class="tooltip">Normals<span class="tooltiptext">Count of normal samples</span></th>
       <th><div class="tooltip">Tumours<span class="tooltiptext">Count of tumour samples</span></th>
       {% for library_type in library_types %}
@@ -100,8 +63,6 @@
         <td>{{ i['case_id'] }}</td>
         <td>{{ i['donor_id'] }}</td>        
         <td><button id="miso_button"><a href="{{ i['miso'] }}" target="_blank">MISO</a></button>
-        <td>{{ i['parent_project'] }}</td>        
-        <td>{{ i['created_date'] | format_created_time}}</td>
         <td>{{ counts[i['case_id']]['normal'] }}</td>
         <td>{{ counts[i['case_id']]['tumor'] }}</td>
         {% for library_type in library_types %}

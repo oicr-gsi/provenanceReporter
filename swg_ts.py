@@ -73,43 +73,9 @@ def get_swg_ts(project_name, database, workflow, workflow_table = 'Workflows', w
     return D
 
 
-def get_input_release_status(data, release_status):
+def review_data(data, selected_workflows):
     '''
-    (dict, dict) -> dict
-        
-    Returns a dictionary with the release status of the input sequences of the ichorcna workflows
-    
-    Parameters
-    ----------
-    - data (dict): Dictionary storing the shallow whole genome or targeted sequencing
-                   data for a given project
-    - release_status (dict): Release status of individual files for a given project
-    '''
-    
-    D = {}
-    
-    for donor in data:
-        if donor not in D:
-            D[donor] = {}
-        for sample in data[donor]:
-            if sample not in D[donor]:
-                D[donor][sample] = {}
-            for workflow_id in data[donor][sample]:
-                status = []
-                for limskey in data[donor][sample][workflow_id]['limskey']:
-                    for i in release_status[limskey]:
-                        status.append(i[1])
-                if all(map(lambda x: x.lower() == 'pass', status)):
-                    D[donor][sample][workflow_id] = 1
-                else:
-                    D[donor][sample][workflow_id] = 0
-    return D
-
-   
-
-def review_data(data, selected_workflows, input_release_status):
-    '''
-    (dict, dict, dict) -> dict 
+    (dict, dict) -> dict 
     
     Returns a dictionary with review status of shallow whole genome data for each samples
     of each case in project
@@ -118,8 +84,6 @@ def review_data(data, selected_workflows, input_release_status):
     ----------
     - data (dict): Dictionary storing the shallow whole genome or targeted sequencing data for a given project
     - selected_workflows (dict): Dictionary with workflow selection status
-    - input_release_status (status): Dictionary with the release status of the input
-                                     sequences of the ichorcna workflows
     '''
     
     D = {}
@@ -135,10 +99,7 @@ def review_data(data, selected_workflows, input_release_status):
                     D[donor][sample] = workflow_id
                     break
                 else:
-                    if input_release_status[donor][sample][workflow_id]:
-                        D[donor][sample] = 'ready'
-                    else:
-                        D[donor][sample] = 'review'
+                    D[donor][sample] = 'review'
                 
     return D
 
@@ -335,7 +296,7 @@ def create_swg_ts_project_json(database, project_name, data, workflow_names, sel
 
 
 
-def score_workflows(data, amount_data, release_status, dates):
+def score_workflows(data, amount_data, dates):
     '''
     (dict, dict, dict, dict) -> dict
     
@@ -346,7 +307,6 @@ def score_workflows(data, amount_data, release_status, dates):
     ----------
     - data (dict): Dictionary storing the shallow whole genome or targeted sequencing data for a given project
     - amount_data (dict): Dictionary of amount of data for each workflow
-    - release_status (dict): Dictionary with release status for each sub-blocks
     - dates (dict): Dictionary with workflow creation dates
     '''
     
@@ -373,27 +333,13 @@ def score_workflows(data, amount_data, release_status, dates):
                     if C[i] == e[workflow_id]:
                         ranks[case][sample][workflow_id] = (i + 1) / len(C)
      
-    # score workflows for each sample
-    D = {}
-    for case in data:
-        for sample in data[case]:
-            for workflow_id in data[case][sample]:
-                score = 0
-                score += ranks[case][sample][workflow_id]
-                score += release_status[case][sample][workflow_id]
-                if case not in D:
-                    D[case] = {}
-                if sample not in D[case]:
-                    D[case][sample] = {}
-                D[case][sample][workflow_id] = score
-   
-    return D
+    return ranks
 
 
 
-def order_workflows(data, amount_data, release_status, dates):
+def order_workflows(data, amount_data, dates):
     '''
-    (dict, dict, dict, dict) -> dict
+    (dict, dict, dict) -> dict
     
     Returns a dictionary with ichorcna or consensusCruncher workflows ordered by amount of lane of data,
     creation dates and release status for each sample
@@ -402,12 +348,11 @@ def order_workflows(data, amount_data, release_status, dates):
     ----------
     - data (dict): Dictionary storing the shallow whole genome or targeted sequencing data for a given project
     - amount_data (dict): Dictionary of amount of data for each workflow
-    - release_status (dict): Dictionary with release status for each sub-blocks
     - dates (dict): Dictionary with workflow creation dates
     '''
     
     # score the workflows
-    scores = score_workflows(data, amount_data, release_status, dates)
+    scores = score_workflows(data, amount_data, dates)
         
     D = {}
     for case in data:

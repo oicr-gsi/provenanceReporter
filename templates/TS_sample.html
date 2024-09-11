@@ -27,7 +27,7 @@
     <th>Sample</th>
     <th>Platform</th>
     <th>Lane count</th>
-    <th><div class="tooltip">Release status<span class="tooltiptext">Input raw sequences released?</span></div></th>
+    
     
     
     {% for i in lanes %}
@@ -37,25 +37,11 @@
         <td rowspan = {{rowNum}}>{{i}}</td>
         <td>{{platforms.0}}</td>
         <td>{{lanes[i][platforms.0]['count']}}</td>
-        <td>
-          {% if lanes[i][platforms.0]['released'] %}
-            <span style="font-size:20px;color:#70db70">&#10004;</span>
-          {% else %}
-            <span style="font-size:20px;color:#ff3300;">&#10006;</span>
-          {% endif %}
-        </td>
       </tr> 
         {% for j in platforms[1:] %}
           <tr>  
             <td>{{j}}</td>
             <td>{{lanes[i][j]['count']}}</td>
-            <td>
-              {% if lanes[i][j]['released'] %}
-                <span style="font-size:20px;color:#70db70">&#10004;</span>
-              {% else %}
-                <span style="font-size:20px;color:#ff3300;">&#10006;</span>
-              {% endif %}
-            </td>
           </tr>
         {% endfor %}
     {% endfor %}
@@ -71,12 +57,6 @@
             <td>
               {{creation_dates[workflow_id] | readable_time}}
             </td>
-            <td>
-              {% if status[case][sample][workflow_id] %}
-                <div class="tooltip">Release Status:<span class="tooltiptext">Input raw sequences released?</span></div> <span style="font-size:32px;color:#70db70">&#10004;</span>
-              {% else %}
-                <div class="tooltip">Release Status:<span class="tooltiptext">Input raw sequences released?</span></div> <span style="font-size:32px;color:#ff3300;">&#10006;</span>
-              {% endif %}
             <td>
               <button class="select_button" id="select" type = "submit" value="submit">Select workflows</button>
             </td>

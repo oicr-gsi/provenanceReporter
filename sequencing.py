@@ -27,11 +27,10 @@ def collect_sequence_info(project_name, database):
     # get sequences    
     conn = connect_to_db(database)
     files = conn.execute("SELECT Files.file, Files.workflow, Files.version, Files.wfrun_id, Files.attributes, \
-                         FilesQC.status, FilesQC.ticket, Workflow_Inputs.run, Workflow_Inputs.lane, Workflow_Inputs.platform, \
+                         Workflow_Inputs.run, Workflow_Inputs.lane, Workflow_Inputs.platform, \
                          Libraries.library, Libraries.case_id, Libraries.ext_id, Libraries.group_id, Libraries.group_id_description, \
                          Libraries.library_type, Libraries.tissue_origin, Libraries.tissue_type \
-                         from Files JOIN FilesQC JOIN Workflow_Inputs JOIN Libraries WHERE Files.project_id = '{0}' \
-                         AND FilesQC.project_id = '{0}' AND FilesQC.file_swid = Files.file_swid \
+                         from Files JOIN Workflow_Inputs JOIN Libraries WHERE Files.project_id = '{0}' \
                          AND Workflow_Inputs.project_id = '{0}' AND Libraries.project_id = '{0}' \
                          AND Files.wfrun_id = Workflow_Inputs.wfrun_id AND Workflow_Inputs.library = Libraries.library \
                          AND LOWER(Files.workflow) in ('casava', 'bcl2fastq', 'fileimportforanalysis', 'fileimport', 'import_fastq');".format(project_name)).fetchall()
@@ -74,24 +73,17 @@ def get_sequences(L):
             file = L[i]['file']
             run = L[i]['run'] + '_' + str(L[i]['lane'])
             platform = L[i]['platform']
-            status = L[i]['status']
-            ticket = L[i]['ticket']
             read_count = json.loads(L[i]['attributes'])['read_count'] if 'read_count' in json.loads(L[i]['attributes']) else 'NA' 
             sample_id = '_'.join([case, tissue_origin, tissue_type, group_id]) 
                        
-            if 'GDR' in ticket:
-                ticket = os.path.join('https://jira.oicr.on.ca/browse/', os.path.basename(ticket))    
-            else:
-                ticket = ''
             readcount = '{:,}'.format(int(read_count)) if read_count != 'NA' else 'NA'
             fileprefix = os.path.basename(file)
             fileprefix = '_'.join(fileprefix.split('_')[:-1])
             d = {'case': case, 'sample': sample, 'sample_id': sample_id, 'library': library, 'run': run,
-                 'read_count': readcount, 'workflow': workflow, 'release_status': status,
-                 'ticket': ticket, 'prefix':fileprefix, 'platform': platform,
-                 'group_id': group_id, 'group_description': group_description,
-                 'tissue_type': tissue_type, 'library_type': library_type,
-                 'tissue_origin': tissue_origin}
+                 'read_count': readcount, 'workflow': workflow, 'prefix':fileprefix,
+                 'platform': platform, 'group_id': group_id,
+                 'group_description': group_description, 'tissue_type': tissue_type,
+                 'library_type': library_type, 'tissue_origin': tissue_origin}
             F.append(d)
        
     F.sort(key = lambda x: x['case'])

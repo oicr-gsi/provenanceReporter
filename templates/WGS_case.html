@@ -30,8 +30,7 @@
     <th>Sample</th>
     <th>Platform</th>
     <th>Lane count</th>
-    <th><div class="tooltip">Release status<span class="tooltiptext">Input raw sequences released?</span></div></th>
-    
+        
     
     {% for i in lanes %}
       {% set platforms = lanes[i].keys() | list | sort %}
@@ -40,25 +39,11 @@
         <td rowspan = {{rowNum}}>{{i}}</td>
         <td>{{platforms.0}}</td>
         <td>{{lanes[i][platforms.0]['count']}}</td>
-        <td>
-          {% if lanes[i][platforms.0]['released'] %}
-            <span style="font-size:20px;color:#70db70">&#10004;</span>
-          {% else %}
-            <span style="font-size:20px;color:#ff3300;">&#10006;</span>
-          {% endif %}
-        </td>
       </tr> 
         {% for j in platforms[1:] %}
           <tr>  
             <td>{{j}}</td>
             <td>{{lanes[i][j]['count']}}</td>
-            <td>
-              {% if lanes[i][j]['released'] %}
-                <span style="font-size:20px;color:#70db70">&#10004;</span>
-              {% else %}
-                <span style="font-size:20px;color:#ff3300;">&#10006;</span>
-              {% endif %}
-            </td>
           </tr>
         {% endfor %}
     {% endfor %}
@@ -83,11 +68,6 @@
                 {% else %}
                   <td><div class="tooltip">Clean:<span class="tooltiptext">Only expected workflows?</span></div> <span style="font-size:32px;color:#ff3300;">&#10006;</span></td>
                 {% endif %}               
-                {% if block['release_status'] %}
-                  <td><div class="tooltip">Release Status:<span class="tooltiptext">Input raw sequences released?</span></div> <span style="font-size:32px;color:#70db70">&#10004;</span></td>
-                {% else %}
-                  <td><div class="tooltip">Release Status:<span class="tooltiptext">Input raw sequences released?</span></div> <span style="font-size:32px;color:#ff3300;">&#10006;</span></td>
-                {% endif %}
                 {% if contamination[block['anchor_wf']] == 'NA' %}
                   <td> Contamination: {{contamination[block['anchor_wf']]}} <span style="font-size:32px;color:#ff3300">&#10006;</span></td>
                 {% elif contamination[block['anchor_wf']] < 4 %}
@@ -129,13 +109,13 @@
               <tr>
                 <td>
                   <a class="workflow" href="{{ url_for('workflow', project_name=project['project_id'], pipeline='whole_genome_sequencing', case=case, sample_pair=sample_pair, workflow_id=bmpp_run) }}">
-                    {{bmpp_run | shorten_workflow_id}}
+                    {{bmpp_run | basename | shorten_workflow_id}}
                   </a>
                 </td>
-                <td>{{workflow_names[bmpp_run].0}}</td>
+                <td>{{workflow_names[bmpp_run | basename].0}}</td>
                 <td>{{file_counts[bmpp_run]}}</td>
                 <td>{{amount_data[bmpp_run]}}</td>
-                <td>{{creation_dates[bmpp_run] | readable_time}}</td>
+                <td>{{creation_dates[bmpp_run | basename] | readable_time}}</td>
                 <td>
                   <dl>
                     {% for i in block['pairs'][bmpp_run]['normal'] %}
@@ -179,10 +159,10 @@
               <tr>
                 <td>
                   <a class="workflow" href="{{ url_for('workflow', project_name=project['project_id'], pipeline='whole_genome_sequencing', case=case, sample_pair=sample_pair, workflow_id=workflow_id) }}">
-                    {{workflow_id | shorten_workflow_id}}
+                    {{workflow_id | basename | shorten_workflow_id}}
                   </a>
                 </td>
-                <td>{{workflow_names[workflow_id].0}}</td>
+                <td>{{workflow_names[workflow_id | basename].0}}</td>
                 <td>
                   <dl>
                     {% for i in parents[workflow_id] %}
@@ -201,7 +181,7 @@
                 </td>
                 <td>{{file_counts[workflow_id]}}</td>              
                 <td>{{amount_data[workflow_id]}}</td>             
-                <td>{{creation_dates[workflow_id] | readable_time}}</td>
+                <td>{{creation_dates[workflow_id | basename] | readable_time}}</td>
                 <td>
                   {% if selected[workflow_id] %}
                     <input class="checkbox" type="checkbox" name="workflow" value="{{workflow_id}}" id="workflow" checked/>

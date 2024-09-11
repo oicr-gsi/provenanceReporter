@@ -505,7 +505,7 @@ def get_WGTS_blocks_info(project_name, case, database, table):
     '''
     
     conn = connect_to_db(database)
-    data = conn.execute("SELECT DISTINCT samples, anchor_wf, workflows, name, date, release_status, \
+    data = conn.execute("SELECT DISTINCT samples, anchor_wf, workflows, name, date, \
                         complete, clean, network from {0} WHERE project_id = '{1}' AND \
                         case_id = '{2}'".format(table, project_name, case)).fetchall() 
     conn.close()
@@ -647,7 +647,7 @@ def update_wf_selection(workflows, selected_workflows, selection_status, databas
             status = 0
         
         # update only if status has changed
-        if selection_status[i] != status:
+        if selection_status[os.path.basename(i)] != status:
             cur.execute('UPDATE Workflows SET selected = \"{0}\" WHERE wfrun_id = \"{1}\"'.format(status, i))
             conn.commit()
     conn.close()
@@ -678,14 +678,14 @@ def get_wgs_blocks(project, database, table = 'WGS_blocks'):
     for i in data:
         case, samples, anchor = i['case_id'], i['samples'], i['anchor_wf']
         workflows = i['workflows'].split(';')
-        clean, complete, release_status = int(i['clean']), int(i['complete']), int(i['release_status'])
+        clean, complete = int(i['clean']), int(i['complete'])
         if case not in D:
             D[case] = {}
         if samples not in D[case]:
             D[case][samples] = {}
         assert anchor not in D[case][samples]
         D[case][samples][anchor] = {'workflows': workflows, 'clean': clean,
-                                    'complete': complete, 'release_status': release_status}
+                                    'complete': complete}
             
     return D
     
@@ -734,7 +734,7 @@ def review_wgs_blocks(blocks, selected_workflows):
             for anchor in blocks[case][samples]:
                 # do not include call-ready workflows to determine selection/review status
                 # these may be shared across multiple blocks
-                L = [selected_workflows[i] for i in blocks[case][samples][anchor]['workflows'] if i not in anchor] 
+                L = [selected_workflows[os.path.basename(i)] for i in blocks[case][samples][anchor]['workflows'] if i not in anchor] 
                 
                 if any(L):
                     D[case][samples] = anchor
@@ -1037,10 +1037,9 @@ def get_block_level_contamination(project_name, database, blocks, sample_pair):
         block_conta = []
         for workflow_id in workflow.split('.'):
             # get the limskeys for that workflow
-            workflow_limskeys = limskeys[workflow_id]
+            workflow_limskeys = limskeys[os.path.basename(workflow_id)]
             # group the limskeys by sample
             workflow_limskeys = group_limskeys(workflow_limskeys)
-            
             # use the maximum contamination of each sample 
             conta = [contamination[i] for i in workflow_limskeys if i in contamination]
             if conta:
@@ -1096,7 +1095,7 @@ def get_sample_sequencing_amount(project_name, case, samples, database, workflow
     '''
     (str, str, str, str, str, str, str) -> dict
 
-    Returns a dictionary with the lane counts and release status for sequencing workflows
+    Returns a dictionary with the lane counts for sequencing workflows
     for each sequencing platform for each sample in samples 
 
     Parameters
@@ -1119,9 +1118,6 @@ def get_sample_sequencing_amount(project_name, case, samples, database, workflow
     sequencing_workflows = ('casava', 'bcl2fastq', 'fileimportforanalysis', 'fileimport', 'import_fastq')
     workflows = [i for i in workflow_names if workflow_names[i][0].lower() in sequencing_workflows]
 
-    release_status = get_file_release_status(project_name, database)
-    
-    
     # find libraries for each sample
     L = {}
     for sample in samples.split('|'):
@@ -1154,18 +1150,40 @@ def get_sample_sequencing_amount(project_name, case, samples, database, workflow
             lanes[sample][platform]['count'] += amount_data[workflow]    
             lanes[sample][platform]['workflows'].append(workflow)  
     
-    
-    # get the release status of OICR-generated sequences
-    for sample in lanes:
-        for platform in lanes[sample]:
-            for workflow in lanes[sample][platform]['workflows']:
-                if workflow_names[workflow][0].lower() in ['casava', 'bcl2fastq']:
-                    limskeys = list(libraries[workflow].keys())
-                    lanes[sample][platform]['limskeys'].extend(limskeys)
-                    status = []
-                    for i in limskeys:
-                        for j in release_status[i]:
-                            status.append(j[1])
-                    lanes[sample][platform]['released'] = all(map(lambda x: x.lower() == 'pass', status))
     return lanes    
        
+
+
+
+
+
+def get_input_sequences(project_name, database):
+    '''
+    (str, str) -> dict
+    
+    Returns a dictionary with file swid for each limskey
+    corresponding to fastq-generating workflows casava and bcl2fastq for the project of interest
+       
+    Parameters
+    ----------
+    - project_name (str): Name of project of interest
+    - database (str): Path to the sqlite database 
+    '''
+    
+    # ignore fastq-import workflows because files from these workflows are not released    
+    conn = connect_to_db(database)
+    data = conn.execute("SELECT Files.file_swid, Files.limskey FROM Files WHERE \
+                        Files.project_id = '{0}' AND LOWER(Files.workflow) \
+                        IN ('casava', 'bcl2fastq', 'fileimportforanalysis', \
+                        'fileimport', 'import_fastq');".format(project_name)).fetchall()
+    conn.close()
+
+    D = {}
+    for i in data:
+        if i['limskey'] not in D:
+            D[i['limskey']] = []
+        D[i['limskey']].append(i['file_swid'])
+    return D    
+
+
+
