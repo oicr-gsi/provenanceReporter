@@ -958,8 +958,7 @@ def donors_info_to_update(md5sums, recorded_md5sums):
         else:
             if recorded_md5sums[donor]['md5'] != md5sums[donor]['md5']:
                 donors[donor] = md5sums[donor]
-                assert donors[donor]['project_id'] == md5sums[donor]['project_id']
-        
+            
     # delete donors that are no longer recorded
     for donor in recorded_md5sums:
         if donor not in md5sums:
