@@ -113,8 +113,8 @@
                   </a>
                 </td>
                 <td>{{workflow_names[bmpp_run | basename].0}}</td>
-                <td>{{file_counts[bmpp_run]}}</td>
-                <td>{{amount_data[bmpp_run]}}</td>
+                <td>{{file_counts[bmpp_run | basename]}}</td>
+                <td>{{amount_data[bmpp_run | basename]}}</td>
                 <td>{{creation_dates[bmpp_run | basename] | readable_time}}</td>
                 <td>
                   <dl>
@@ -165,9 +165,9 @@
                 <td>{{workflow_names[workflow_id | basename].0}}</td>
                 <td>
                   <dl>
-                    {% for i in parents[workflow_id] %}
+                    {% for i in parents[workflow_id | basename] %}
                       <dt>
-                        {% for k in parents[workflow_id][i] %}
+                        {% for k in parents[workflow_id | basename][i] %}
                           <div class="tooltip">
                             <a class="workflow" href="{{ url_for('workflow', project_name=project['project_id'], pipeline='whole_genome_sequencing', case=case, sample_pair=sample_pair, workflow_id=k) }}">
                               {{k | shorten_workflow_id}}
@@ -179,8 +179,8 @@
                     {% endfor %}
                   </dl>
                 </td>
-                <td>{{file_counts[workflow_id]}}</td>              
-                <td>{{amount_data[workflow_id]}}</td>             
+                <td>{{file_counts[workflow_id | basename]}}</td>              
+                <td>{{amount_data[workflow_id | basename]}}</td>             
                 <td>{{creation_dates[workflow_id | basename] | readable_time}}</td>
                 <td>
                   {% if selected[workflow_id] %}
