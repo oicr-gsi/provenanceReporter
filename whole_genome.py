@@ -449,7 +449,7 @@ def get_call_ready_samples(project_name, bmpp_run_id, database):
                         Libraries.tissue_origin, Libraries.library_type \
                         FROM Libraries JOIN Workflow_Inputs WHERE Workflow_Inputs.library = Libraries.library \
                         AND Workflow_Inputs.wfrun_id = '{0}' AND Libraries.project_id = '{1}' \
-                        AND Workflow_Inputs.project_id = '{1}'".format(bmpp_run_id, project_name)).fetchall()
+                        AND Workflow_Inputs.project_id = '{1}'".format(os.path.basename(bmpp_run_id), project_name)).fetchall()
     conn.close()
 
     data = list(set(data))
