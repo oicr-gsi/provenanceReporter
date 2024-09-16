@@ -299,10 +299,12 @@ def create_WGS_project_block_json(project_name, database, blocks, block_status, 
                 # block already reviewed and workflows selected
                 anchor_wf = block_status[case][samples]
                 for workflow in blocks[case][samples][anchor_wf]['workflows']:
+                    workflow = os.path.basename(workflow)
+                    
                     # get workflow name and version
                     workflow_name = workflow_names[workflow][0]
                     workflow_version = workflow_names[workflow][1]
-                                                   
+                               
                     # check workflow status
                     if selected_workflows[workflow]:
                         # get workflow output files
