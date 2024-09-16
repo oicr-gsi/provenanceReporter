@@ -5,6 +5,7 @@ Created on Tue Jun  6 13:35:40 2023
 @author: rjovelin
 """
 
+import os
 import itertools
 from utilities import connect_to_db, get_children_workflows, remove_non_analysis_workflows, get_donors
 from whole_genome import map_limskey_to_library, map_library_to_sample, \
@@ -138,6 +139,9 @@ def create_WT_project_block_json(project_name, database, blocks, block_status, s
                 anchor_wf = block_status[case][sample]
                                 
                 for workflow in blocks[case][sample][anchor_wf]['workflows']:
+                    
+                    workflow = os.path.basename(workflow)
+                    
                     # get workflow name and version
                     workflow_name = workflow_names[workflow][0]
                     workflow_version = workflow_names[workflow][1]
