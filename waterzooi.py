@@ -390,7 +390,7 @@ def wgs_case(project_name, case, sample_pair):
 
 
 
-@app.route('/<project_name>/<pipeline>/<case>/<sample_pair>/<workflow_id>')
+@app.route('/<project_name>/<pipeline>/<case>/<sample_pair>/<path:workflow_id>')
 def workflow(project_name, pipeline, case, sample_pair, workflow_id):
     
     database = 'waterzooi.db'
