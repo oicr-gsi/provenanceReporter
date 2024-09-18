@@ -2476,7 +2476,7 @@ def generate_database(database, provenance_data_file, calcontaqc_db):
     add_library_info_to_db(database, provenance_data, donors_to_update, 'Libraries')
     print('added library info to database')
     # add project information
-    add_project_info_to_db(database, provenance_data, donors_to_update, library_table = 'Libraries', project_table = 'Projects')
+    add_project_info_to_db(database, provenance_data, 'Libraries', 'Projects')
     print('added project info to database')
     # add workflow information
     add_workflows_to_db(database, provenance_data, donors_to_update, 'Workflows')
