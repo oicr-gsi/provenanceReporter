@@ -316,9 +316,9 @@ def collect_project_info_from_db(database, table = 'Libraries'):
 
     
 
-def add_project_info_to_db(database, provenance_data, donors_to_update, library_table = 'Libraries', project_table = 'Projects'):
+def add_project_info_to_db(database, provenance_data, library_table = 'Libraries', project_table = 'Projects'):
     '''
-    (str, list, str) -> None
+    (str, dict, str, str) -> None
     
     Add project information into Projects table of database
        
@@ -326,7 +326,8 @@ def add_project_info_to_db(database, provenance_data, donors_to_update, library_
     ----------
     - database (str): Path to the database file
     - provenance_data (list): List of dictionaries, each representing the data of a single donor
-    - table (str): Name of Table in database. Default is Projects
+    - library_table (str): Name of Table storing library information in database. Default is Libraries
+    - project_table (str): Name of Table storing project information in database. Default is Projects
     '''
     
     # get the column names
