@@ -34,34 +34,16 @@ from sequencing import get_sequences, collect_sequence_info, platform_name
 from swg_ts import get_swg_ts, review_data, \
     create_swg_ts_sample_json, create_swg_ts_project_json, get_swg_ts_standard_deliverables, \
     order_workflows    
+from exome import get_EX_standard_deliverables
    
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 # map pipelines to views
 routes = {'Whole Genome': 'whole_genome_sequencing',
           'Whole Transcriptome': 'whole_transcriptome',
           'Shallow Whole Genome': 'shallow_whole_genome',
-          'Targeted Sequencing': 'targeted_sequencing'}
+          'Targeted Sequencing': 'targeted_sequencing',
+          'Exome': 'exome'}
 
 
 app = Flask(__name__)
@@ -292,6 +274,7 @@ def whole_genome_sequencing(project_name):
         deliverable = request.form.get('deliverable')
         # get the workflow names
         workflow_names = get_workflow_names(project_name, database)
+        
         if deliverable == 'selected':
             block_data = create_WGS_project_block_json(project_name, database, blocks, block_status, selected, workflow_names)
         elif deliverable == 'standard':
@@ -388,6 +371,131 @@ def wgs_case(project_name, case, sample_pair):
                            lanes=lanes
                            )
 
+
+
+@app.route('/<project_name>/exome/', methods=['POST', 'GET'])
+def exome(project_name):
+    
+    database = 'waterzooi.db'
+    workflow_db = 'workflows.db'
+    # get the project info for project_name from db
+    project = get_project_info(project_name, database)
+    # get the pipelines from the library definitions in db
+    pipelines = get_pipelines(project_name, database)
+    # get samples and libraries and workflow ids for each case
+    cases = get_call_ready_cases(project_name, 'novaseq', 'EX', database)
+    samples = sorted(list(cases.keys()))
+    # get the block counts
+    blocks = get_wgs_blocks(project_name, database, 'EX_blocks')
+    block_counts = get_block_counts(blocks)
+       
+    # get analysis block status
+    # extract selected status of each workflow
+    selected = get_selected_workflows(project_name, workflow_db, 'Workflows')
+    block_status = review_wgs_blocks(blocks, selected)
+    # make a list of donor ids with block status
+    
+    if request.method == 'POST':
+        deliverable = request.form.get('deliverable')
+        # get the workflow names
+        workflow_names = get_workflow_names(project_name, database)
+        
+        if deliverable == 'selected':
+            block_data = create_WGS_project_block_json(project_name, database, blocks, block_status, selected, workflow_names)
+        elif deliverable == 'standard':
+            # get the pipeline deliverables       
+            deliverables = get_EX_standard_deliverables()
+            block_data = create_WGS_project_block_json(project_name, database, blocks, block_status, selected, workflow_names, deliverables)
+        else:
+            block_data = {}
+                
+        return Response(
+            response=json.dumps(block_data),
+            mimetype="application/json",
+            status=200,
+            headers={"Content-disposition": "attachment; filename={0}.EX.json".format(project_name)})
+
+    else:
+        return render_template('Exome.html',
+                           routes = routes,
+                           project=project,
+                           samples=samples,
+                           cases=cases,
+                           pipelines=pipelines,
+                           block_status = block_status,
+                           block_counts = block_counts
+                           )
+
+
+
+@app.route('/<project_name>/exome/<case>/<sample_pair>', methods = ['POST', 'GET'])
+def ex_case(project_name, case, sample_pair):
+    
+    database = 'waterzooi.db'
+    workflow_db = 'workflows.db'
+    
+    # get the number of lane sequence per sequence and platform and the corresponding release status
+    lanes = get_sample_sequencing_amount(project_name, case, sample_pair, database,
+                                         'Workflows', 'Workflow_Inputs', 'Libraries')
+    # get the project info for project_name from db
+    project = get_project_info(project_name, database)
+    # get the pipelines from the library definitions in db
+    pipelines = get_pipelines(project_name, database)
+    # get miso link
+    miso_link = get_miso_sample_link(project_name, case, database)
+    # get the WGS blocks
+    blocks = get_WGTS_blocks_info(project_name, case, database, 'EX_blocks')
+    # sort sample pairs names
+    sample_pairs_names = sorted(list(blocks.keys()))
+    # get the workflow names
+    workflow_names = get_workflow_names(project_name, database)
+    # get the file count of each workflow in project
+    file_counts = get_workflow_file_count(project_name, database)
+    # get the amount of data for each workflow
+    amount_data = get_amount_data(project_name, database)
+    # get the creation date of all workflows
+    creation_dates = get_workflows_analysis_date(project_name, database)
+    # get the sequencing platform of each workflow
+    platforms = get_sequencing_platform(project_name, database)
+    # find the parents of each workflow
+    parents = get_parent_workflows(project_name, database)
+    # extract selected status of each workflow
+    selected = get_selected_workflows(project_name, workflow_db, 'Workflows')
+    # get the contamination for each anchor workflow 
+    contamination = get_block_level_contamination(project_name, database, blocks, sample_pair)
+        
+    if request.method == 'POST':
+        # get the list of checked workflows        
+        selected_workflows = request.form.getlist('workflow')
+        # get the workflows of each block for sample pair and case
+        case_workflows = get_case_workflows(case, database, 'EX_blocks')
+        # list all the workflows for a given sample pair
+        # may include workflows from different blocks for a sample sample pair
+        # this ensures blocks are mutually exclusive within a sample pair but not within a case
+        workflows = []
+        for i in case_workflows[sample_pair]:
+            workflows.extend(case_workflows[sample_pair][i])
+        update_wf_selection(workflows, selected_workflows, selected, workflow_db, 'Workflows')
+        return redirect(url_for('ex_case', case=case, project_name=project_name, sample_pair=sample_pair))
+    else:
+        return render_template('EX_case.html',
+                           project=project,
+                           routes = routes,
+                           case=case,
+                           pipelines=pipelines,
+                           blocks=blocks,
+                           sample_pairs_names=sample_pairs_names,
+                           workflow_names=workflow_names,
+                           file_counts=file_counts,
+                           amount_data=amount_data,
+                           creation_dates=creation_dates,
+                           platforms=platforms,
+                           parents=parents,
+                           selected = selected,
+                           sample_pair=sample_pair,
+                           contamination=contamination, 
+                           lanes=lanes
+                           )
 
 
 @app.route('/<project_name>/<pipeline>/<case>/<sample_pair>/<path:workflow_id>')
@@ -823,9 +931,9 @@ def download_block_data(project_name, pipeline, case, pair, anchor_wf, table, se
     database = 'waterzooi.db'
     workflow_db = 'workflows.db'
     
-    
     # get the WGS blocks
     blocks = get_WGTS_blocks_info(project_name, case, database, table)
+    
     # get the workflow names
     workflow_names = get_workflow_names(project_name, database)
     # get selected workflows
@@ -833,7 +941,7 @@ def download_block_data(project_name, pipeline, case, pair, anchor_wf, table, se
     # create json with workflow information for block for DARE
     #block_data = create_block_json(project_name, blocks, pair, anchor_wf, workflow_names, selected_workflows, selection)
     
-    if pipeline == 'WG':
+    if pipeline in ['WG', 'EX']:
         block_data = create_WG_block_json(database, project_name, case, blocks, pair, anchor_wf, workflow_names, selected_workflows, selection)
     elif pipeline == 'WT':
         block_data = create_WT_block_json(database, project_name, case, blocks, pair, anchor_wf, workflow_names, selected_workflows, selection)

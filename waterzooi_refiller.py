@@ -58,6 +58,7 @@ def define_column_names():
                     'Workflow_Inputs': ['library', 'run', 'lane', 'wfrun_id', 'limskey', 'barcode', 'platform', 'project_id', 'case_id'],
                     'Samples': ['case_id', 'donor_id', 'species', 'sex', 'miso', 'project_id'],
                     'WGS_blocks': ['project_id', 'case_id', 'samples', 'anchor_wf', 'workflows', 'name', 'date', 'complete', 'clean', 'network'],
+                    'EX_blocks': ['project_id', 'case_id', 'samples', 'anchor_wf', 'workflows', 'name', 'date', 'complete', 'clean', 'network'],
                     'WT_blocks': ['project_id', 'case_id', 'samples', 'anchor_wf', 'workflows', 'name', 'date', 'complete', 'clean', 'network'],
                     'Calculate_Contamination': ['sample_id', 'group_id', 'case_id', 'library_type', 'tissue_origin', 'tissue_type', 'contamination', 'merged_limskey'],
                     'Checksums': ['project_id', 'case_id', 'md5']
@@ -88,6 +89,7 @@ def define_column_types():
                                         'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)'],
                     'Samples': ['VARCHAR(128) PRIMARY KEY NOT NULL', 'VARCHAR(256)', 'VARCHAR(256)', 'VARCHAR(128)', 'VARCHAR(572)', 'VARCHAR(128)'],
                     'WGS_blocks': ['VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(572)', 'VARCHAR(572)', 'TEXT', 'VARCHAR(256)', 'VARCHAR(128)', 'INT', 'INT', 'TEXT'],
+                    'EX_blocks': ['VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(572)', 'VARCHAR(572)', 'TEXT', 'VARCHAR(256)', 'VARCHAR(128)', 'INT', 'INT', 'TEXT'],
                     'WT_blocks': ['VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(572)', 'VARCHAR(572)', 'TEXT', 'VARCHAR(256)', 'VARCHAR(128)', 'INT', 'INT', 'TEXT'],
                     'Calculate_Contamination': ['VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(128)', 'FLOAT', 'VARCHAR(572)'],
                     'Checksums': ['VARCHAR(128)', 'VARCHAR(128)', 'VARCHAR(572)']
@@ -118,7 +120,7 @@ def create_table(database, table):
     # define table format including constraints    
     table_format = ', '.join(list(map(lambda x: ' '.join(x), list(zip(column_names, column_types)))))
 
-    if table  in ['Workflows', 'Parents', 'Files', 'Libraries', 'Workflow_Inputs', 'Samples', 'WGS_blocks', 'WT_blocks', 'Checksums']:
+    if table  in ['Workflows', 'Parents', 'Files', 'Libraries', 'Workflow_Inputs', 'Samples', 'WGS_blocks', 'WT_blocks', 'EX_blocks', 'Checksums']:
         constraints = '''FOREIGN KEY (project_id)
             REFERENCES Projects (project_id)'''
         table_format = table_format + ', ' + constraints 
@@ -133,7 +135,7 @@ def create_table(database, table):
     if table == 'Worklows':
         table_format = table_format + ', PRIMARY KEY (wfrun_id, project_id)'
     
-    if table in ['WGS_blocks', 'WT_blocks']:
+    if table in ['WGS_blocks', 'WT_blocks', 'EX_blocks']:
         constraints = '''FOREIGN KEY (case_id)
           REFERENCES Samples (case_id)'''
         table_format = table_format + ', PRIMARY KEY (samples, anchor_wf)'
@@ -189,7 +191,7 @@ def initiate_db(database):
     tables = [i[0] for i in tables]    
     conn.close()
     for i in ['Projects', 'Workflows', 'Parents', 'Files', 'Libraries',
-              'Workflow_Inputs', 'Samples', 'WGS_blocks', 'WT_blocks', 
+              'Workflow_Inputs', 'Samples', 'WGS_blocks', 'WT_blocks', 'EX_blocks',
               'Calculate_Contamination', 'Checksums']:
         if i not in tables:
             create_table(database, i)
@@ -668,7 +670,8 @@ def add_WGS_blocks_to_db(database, provenance_data, donors_to_update, table,
     - table (str): Name of table in database
     - expected_workflows (list): List of expected workflow names to define a complete block
     - qc_workflows (tuple): List of QC workflows to exclude from analysis blocks
-    - library_type (str): Library design of the data forming the blocks. Default is WG
+    - library_type (str): Library design of the data forming the blocks.
+                          Accepted values are WG and EX
     - platform (str): Sequencing platform. Default is novaseq
     '''
     
@@ -756,7 +759,6 @@ def add_WT_blocks_to_db(database, provenance_data, donors_to_update, table,
         
         # add data
         insert_data(database, table, newdata, column_names)
-    
     
 
 def is_project_active(donor_data):
@@ -2243,6 +2245,7 @@ def find_donor_WGS_blocks(donor_data, library_type, platform, expected_workflows
 
 
 
+
 def get_donor_star(donor_data, platform, library_type):
     '''
     (dict, str, str) -> list
@@ -2501,10 +2504,17 @@ def generate_database(database, provenance_data_file, calcontaqc_db):
                               'ichorcna', 'tmbanalysis', 'casava', 'bcl2fastq',
                               'fileimportforanalysis', 'fileimport', 'import_fastq',
                               'dnaseqqc', 'hotspotfingerprintcollector', 'rnaseqqc',
-                              'rnaseqqc_lane_level', 'rnaseqqc_call_ready')
+                              'rnaseqqc_lane_level', 'rnaseqqc_call_ready', 'calculatecontamination')
                               
     add_WGS_blocks_to_db(database, provenance_data, donors_to_update, 'WGS_blocks',
                              expected_WGS_workflows, qc_workflows, library_type = 'WG',
+                             platform = 'novaseq')
+    print('added WGS blocks to database')
+    
+    # add EX blocks
+    expected_EX_workflows = sorted(['mutect2', 'variantEffectPredictor', 'varscan', 'sequenza']) 
+    add_WGS_blocks_to_db(database, provenance_data, donors_to_update, 'EX_blocks',
+                             expected_EX_workflows, qc_workflows, library_type = 'EX',
                              platform = 'novaseq')
     print('added WGS blocks to database')
     
