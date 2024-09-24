@@ -65,7 +65,7 @@ def get_workflows_analysis_date(project_name, database):
     # connect to db
     conn = connect_to_db(database)
     # extract project info
-    data = conn.execute("SELECT DISTINCT creation_date, wfrun_id FROM Files WHERE project_id='{0}'".format(project_name)).fetchall()
+    data = conn.execute("SELECT DISTINCT creation_date, wfrun_id FROM Files WHERE project_id= ?;", (project_name,)).fetchall()
     conn.close()
     
     D = {}
@@ -90,7 +90,8 @@ def get_workflow_file_count(project_name, database, workflow_table='Workflows'):
     '''
     
     conn = connect_to_db(database)
-    data = conn.execute("SELECT DISTINCT {0}.file_count, {0}.wfrun_id FROM {0} WHERE {0}.project_id = '{1}'".format(workflow_table, project_name)).fetchall()
+    query = "SELECT DISTINCT {0}.file_count, {0}.wfrun_id FROM {0} WHERE {0}.project_id = ?;".format(workflow_table)
+    data = conn.execute(query, (project_name,)).fetchall()
     conn.close()
 
     counts = {}
@@ -114,7 +115,8 @@ def get_workflow_limskeys(project_name, database, workflow_input_table='Workflow
     '''
         
     conn = connect_to_db(database)
-    data = conn.execute("SELECT {0}.limskey, {0}.wfrun_id FROM {0} WHERE {0}.project_id = '{1}'".format(workflow_input_table, project_name)).fetchall()
+    query = "SELECT {0}.limskey, {0}.wfrun_id FROM {0} WHERE {0}.project_id = ?;".format(workflow_input_table)
+    data = conn.execute(query, (project_name,)).fetchall()
     conn.close()
 
     D = {}
@@ -141,7 +143,8 @@ def get_amount_data(project_name, database, workflow_table='Workflows'):
     '''
     
     conn = connect_to_db(database)
-    data = conn.execute("SELECT DISTINCT {0}.lane_count, {0}.wfrun_id FROM {0} WHERE {0}.project_id = '{1}'".format(workflow_table, project_name)).fetchall()
+    query = "SELECT DISTINCT {0}.lane_count, {0}.wfrun_id FROM {0} WHERE {0}.project_id = ?;".format(workflow_table)
+    data = conn.execute(query, (project_name,)).fetchall()
     conn.close()
 
     counts = {}
@@ -382,14 +385,15 @@ def get_call_ready_cases(project_name, platform, library_type, database):
 
     # get all the samples for project name 
     conn = connect_to_db(database)
-    data = conn.execute("SELECT Libraries.library, Libraries.case_id, Libraries.project_id, \
-                          Libraries.ext_id, Libraries.group_id, Libraries.library_type, \
-                          Libraries.tissue_type, Libraries.tissue_origin, \
-                          Workflows.wf, Workflows.wfrun_id, Workflow_Inputs.platform \
-                          from Workflow_Inputs JOIN Libraries JOIN Workflows \
-                          WHERE Libraries.project_id = '{0}' AND Workflow_Inputs.project_id = '{0}' \
-                          AND Workflows.project_id = '{0}' AND Workflow_Inputs.wfrun_id = Workflows.wfrun_id \
-                          AND Workflow_Inputs.library = Libraries.library AND Libraries.library_type = '{1}';".format(project_name, library_type)).fetchall()
+    query = "SELECT Libraries.library, Libraries.case_id, Libraries.project_id, \
+             Libraries.ext_id, Libraries.group_id, Libraries.library_type, \
+             Libraries.tissue_type, Libraries.tissue_origin, \
+             Workflows.wf, Workflows.wfrun_id, Workflow_Inputs.platform \
+             from Workflow_Inputs JOIN Libraries JOIN Workflows \
+             WHERE Libraries.project_id = ? AND Workflow_Inputs.project_id = ? \
+             AND Workflows.project_id = ? AND Workflow_Inputs.wfrun_id = Workflows.wfrun_id \
+             AND Workflow_Inputs.library = Libraries.library AND Libraries.library_type = ?;"
+    data = conn.execute(query, (project_name, project_name, project_name, library_type)).fetchall()
     conn.close()
     
     cases = {}
@@ -508,9 +512,10 @@ def get_WGTS_blocks_info(project_name, case, database, table):
     '''
     
     conn = connect_to_db(database)
-    data = conn.execute("SELECT DISTINCT samples, anchor_wf, workflows, name, date, \
-                        complete, clean, network from {0} WHERE project_id = '{1}' AND \
-                        case_id = '{2}'".format(table, project_name, case)).fetchall() 
+    query = "SELECT DISTINCT samples, anchor_wf, workflows, name, date, \
+             complete, clean, network from {0} WHERE project_id = ? AND \
+             case_id = ?;".format(table)
+    data = conn.execute(query, (project_name, case)).fetchall() 
     conn.close()
 
     L = [dict(i) for i in data]
@@ -553,7 +558,8 @@ def get_sequencing_platform(project_name, database, table = 'Workflow_Inputs'):
     '''
                 
     conn = connect_to_db(database)
-    data = conn.execute("SELECT DISTINCT wfrun_id, platform FROM {0} WHERE project_id = '{1}'".format(table, project_name)).fetchall() 
+    query = "SELECT DISTINCT wfrun_id, platform FROM {0} WHERE project_id = ?;".format(table)
+    data = conn.execute(query, (project_name,)).fetchall() 
     conn.close()
 
     D = {}
@@ -579,7 +585,8 @@ def get_selected_workflows(project_name, database, table = 'Workflows'):
     '''
                 
     conn = connect_to_db(database)
-    data = conn.execute("SELECT DISTINCT wfrun_id, selected FROM {0} WHERE project_id = '{1}'".format(table, project_name)).fetchall() 
+    query = "SELECT DISTINCT wfrun_id, selected FROM {0} WHERE project_id = ?;".format(table)
+    data = conn.execute(query, (project_name,)).fetchall() 
     conn.close()
 
     D = {}
@@ -603,9 +610,8 @@ def get_case_workflows(case, database, table = 'WGS_blocks'):
     '''
         
     conn = connect_to_db(database)    
-    cur = conn.cursor()
-    cur.execute("SELECT samples, anchor_wf, workflows FROM {0} WHERE case_id = '{1}'".format(table, case))
-    data = cur.fetchall()   
+    query = "SELECT samples, anchor_wf, workflows FROM {0} WHERE case_id = ?;".format(table)
+    data = conn.execute(query, (case,)).fetchall()
     conn.close()
     
     D = {}
@@ -642,7 +648,6 @@ def update_wf_selection(workflows, selected_workflows, selection_status, databas
     
     # update selected status
     conn = connect_to_db(database)
-    cur = conn.cursor()
     for i in workflows:
         if i in selected_workflows:
             status = 1
@@ -651,7 +656,8 @@ def update_wf_selection(workflows, selected_workflows, selection_status, databas
         
         # update only if status has changed
         if selection_status[os.path.basename(i)] != status:
-            cur.execute('UPDATE Workflows SET selected = \"{0}\" WHERE wfrun_id = \"{1}\"'.format(status, i))
+            query = 'UPDATE Workflows SET selected = ? WHERE wfrun_id = ?;'
+            conn.execute(query, (status, i))
             conn.commit()
     conn.close()
 
@@ -671,9 +677,8 @@ def get_wgs_blocks(project, database, table = 'WGS_blocks'):
     '''
 
     conn = connect_to_db(database)    
-    cur = conn.cursor()
-    cur.execute("SELECT DISTINCT * FROM {0} WHERE project_id = '{1}'".format(table, project))
-    data = cur.fetchall()
+    query = "SELECT DISTINCT * FROM {0} WHERE project_id = ?;".format(table)
+    data = conn.execute(query, (project,)).fetchall()
     conn.close()
     
     D = {}
@@ -768,7 +773,8 @@ def map_limskey_to_library(project_name, database, table='Workflow_Inputs'):
     '''
     
     conn = connect_to_db(database)
-    data = conn.execute("SELECT DISTINCT library, limskey, wfrun_id FROM {0} WHERE project_id = '{1}'".format(table, project_name)).fetchall()
+    query = "SELECT DISTINCT library, limskey, wfrun_id FROM {0} WHERE project_id = ?;".format(table)
+    data = conn.execute(query, (project_name,)).fetchall()
     conn.close()
     
     D = {}
@@ -798,11 +804,9 @@ def map_library_to_sample(project_name, database, table = 'Libraries'):
     '''
     
     conn = connect_to_db(database)
-    # data = conn.execute("SELECT DISTINCT library, sample, tissue_type, tissue_origin, \
-    #                      library_type, group_id FROM {0} WHERE project_id = '{1}' AND sample = '{2}'".format(table, project_name, case)).fetchall()
-    
-    data = conn.execute("SELECT DISTINCT library, case_id, tissue_type, tissue_origin, \
-                        library_type, group_id FROM {0} WHERE project_id = '{1}'".format(table, project_name)).fetchall()
+    query = "SELECT DISTINCT library, case_id, tissue_type, tissue_origin, \
+             library_type, group_id FROM {0} WHERE project_id = ?;".format(table)
+    data = conn.execute(query, (project_name,)).fetchall()
     conn.close()
     
     
@@ -843,7 +847,8 @@ def map_library_to_case(project_name, database, table = 'Libraries'):
     
     # get the workflow output files sorted by sample
     conn = connect_to_db(database)
-    data = conn.execute("SELECT DISTINCT library, case_id FROM {0} WHERE project_id = '{1}'".format(table, project_name)).fetchall()
+    query = "SELECT DISTINCT library, case_id FROM {0} WHERE project_id = ?".format(table)
+    data = conn.execute(query, (project_name,)).fetchall()
     conn.close()
     
     D = {}
@@ -873,7 +878,8 @@ def get_workflow_output(project_name, database, libraries, samples, donors, tabl
 
     # get the workflow output files sorted by sample
     conn = connect_to_db(database)
-    data = conn.execute("SELECT DISTINCT file, limskey, file_swid, wfrun_id FROM {0} WHERE project_id = '{1}'".format(table, project_name)).fetchall()
+    query = "SELECT DISTINCT file, limskey, file_swid, wfrun_id FROM {0} WHERE project_id = ?;".format(table)
+    data = conn.execute(query, (project_name,)).fetchall()
     conn.close()
     
     D = {}
@@ -907,7 +913,8 @@ def map_fileswid_to_filename(project_name, database, table='Files'):
 
    # get the workflow output files sorted by sample
    conn = connect_to_db(database)
-   data = conn.execute("SELECT DISTINCT file_swid, file FROM {0} WHERE project_id = '{1}'".format(table, project_name)).fetchall()
+   query = "SELECT DISTINCT file_swid, file FROM {0} WHERE project_id = ?;".format(table)
+   data = conn.execute(query, (project_name,)).fetchall()
    conn.close()
 
    D = {}
@@ -958,7 +965,8 @@ def get_contamination(sample_id, database, table = 'Calculate_Contamination'):
     '''    
    
     conn = connect_to_db(database)
-    data = conn.execute("SELECT DISTINCT contamination, merged_limskey FROM {0} WHERE sample_id = '{1}'".format(table, sample_id)).fetchall()
+    query = "SELECT DISTINCT contamination, merged_limskey FROM {0} WHERE sample_id = ?;".format(table)
+    data = conn.execute(query, (sample_id,)).fetchall()
     conn.close()
 
     D = {}
