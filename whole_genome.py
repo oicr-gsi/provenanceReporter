@@ -32,8 +32,8 @@ def get_parent_workflows(project_name, database):
     
     conn = connect_to_db(database)
     data = conn.execute("SELECT Workflows.wf, Parents.parents_id, Parents.children_id \
-                        FROM Parents JOIN Workflows WHERE Parents.project_id = '{0}' \
-                        AND Workflows.project_id = '{0}' AND Workflows.wfrun_id = Parents.parents_id;".format(project_name)).fetchall()
+                        FROM Parents JOIN Workflows WHERE Parents.project_id = ? \
+                        AND Workflows.project_id = ? AND Workflows.wfrun_id = Parents.parents_id;", (project_name, project_name)).fetchall()
     data= list(set(data))
     conn.close()
     
@@ -447,11 +447,12 @@ def get_call_ready_samples(project_name, bmpp_run_id, database):
     '''
     
     conn = connect_to_db(database)
-    data = conn.execute("SELECT Libraries.case_id, Libraries.group_id, Libraries.library, Libraries.tissue_type, \
+    query = "SELECT Libraries.case_id, Libraries.group_id, Libraries.library, Libraries.tissue_type, \
                         Libraries.tissue_origin, Libraries.library_type \
                         FROM Libraries JOIN Workflow_Inputs WHERE Workflow_Inputs.library = Libraries.library \
-                        AND Workflow_Inputs.wfrun_id = '{0}' AND Libraries.project_id = '{1}' \
-                        AND Workflow_Inputs.project_id = '{1}'".format(os.path.basename(bmpp_run_id), project_name)).fetchall()
+                        AND Workflow_Inputs.wfrun_id = ? AND Libraries.project_id = ? \
+                        AND Workflow_Inputs.project_id = ?"
+    data = conn.execute(query, (os.path.basename(bmpp_run_id), project_name, project_name)).fetchall()
     conn.close()
 
     data = list(set(data))
@@ -1074,7 +1075,7 @@ def map_workflow_to_platform(project_name, database, table = 'Workflow_Inputs'):
     # connect to db
     conn = connect_to_db(database)
     # extract library source
-    data = conn.execute("SELECT DISTINCT wfrun_id, limskey, platform FROM {0} WHERE project_id = '{1}';".format(table, project_name)).fetchall()
+    data = conn.execute("SELECT DISTINCT wfrun_id, limskey, platform FROM {} WHERE project_id = ?;".format(table), (project_name,)).fetchall()
     conn.close()
     
     D = {}
@@ -1175,9 +1176,9 @@ def get_input_sequences(project_name, database):
     # ignore fastq-import workflows because files from these workflows are not released    
     conn = connect_to_db(database)
     data = conn.execute("SELECT Files.file_swid, Files.limskey FROM Files WHERE \
-                        Files.project_id = '{0}' AND LOWER(Files.workflow) \
+                        Files.project_id = ? AND LOWER(Files.workflow) \
                         IN ('casava', 'bcl2fastq', 'fileimportforanalysis', \
-                        'fileimport', 'import_fastq');".format(project_name)).fetchall()
+                        'fileimport', 'import_fastq');", (project_name,)).fetchall()
     conn.close()
 
     D = {}

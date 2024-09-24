@@ -388,13 +388,12 @@ def exome(project_name):
     # get the block counts
     blocks = get_wgs_blocks(project_name, database, 'EX_blocks')
     block_counts = get_block_counts(blocks)
-       
     # get analysis block status
     # extract selected status of each workflow
     selected = get_selected_workflows(project_name, workflow_db, 'Workflows')
     block_status = review_wgs_blocks(blocks, selected)
-    # make a list of donor ids with block status
     
+    # make a list of donor ids with block status
     if request.method == 'POST':
         deliverable = request.form.get('deliverable')
         # get the workflow names
