@@ -47,9 +47,9 @@ def get_children_workflows(project_name, database):
     conn = connect_to_db(database)
     data = conn.execute("SELECT DISTINCT Workflows.wf, Parents.parents_id, \
                         Parents.children_id FROM Parents JOIN Workflows \
-                        WHERE Parents.project_id = '{0}' \
-                        AND Workflows.project_id = '{0}' AND \
-                        Workflows.wfrun_id = Parents.children_id;".format(project_name)).fetchall()
+                        WHERE Parents.project_id = ? \
+                        AND Workflows.project_id = ? AND \
+                        Workflows.wfrun_id = Parents.children_id;", (project_name, project_name)).fetchall()
     data= list(set(data))
     conn.close()
     
@@ -76,7 +76,7 @@ def get_workflow_names(project_name, database):
 
     conn = connect_to_db(database)
     data = conn.execute("SELECT DISTINCT Workflows.wfrun_id, Workflows.wf, Workflows.wfv FROM \
-                        Workflows WHERE Workflows.project_id = '{0}';".format(project_name)).fetchall()
+                        Workflows WHERE Workflows.project_id = ?;", (project_name,)).fetchall()
     data= list(set(data))
     conn.close()
     
@@ -141,7 +141,7 @@ def get_miso_sample_link(project_name, case, database):
     '''
     
     conn = connect_to_db(database)
-    data = conn.execute("SELECT miso FROM Samples WHERE project_id = '{0}' AND case_id = '{1}';".format(project_name, case)).fetchall()
+    data = conn.execute("SELECT miso FROM Samples WHERE project_id = ? AND case_id = ?;", (project_name, case)).fetchall()
     data = list(set(data))
     miso_link = data[0]['miso']
     
@@ -189,7 +189,7 @@ def get_pipelines(project_name, database):
     # connect to db
     conn = connect_to_db(database)
     # extract library source
-    library_source = conn.execute("SELECT DISTINCT library_type FROM Files WHERE project_id = '{0}';".format(project_name)).fetchall()
+    library_source = conn.execute("SELECT DISTINCT library_type FROM Files WHERE project_id = ?;", (project_name,)).fetchall()
     library_source = list(set([i['library_type'] for i in  list(set(library_source))]))
     # get the library definitions
     pipelines = [get_library_design(j) for j in library_source if get_library_design(j)]
@@ -214,7 +214,7 @@ def get_donors(project_name, database):
     # connect to db
     conn = connect_to_db(database)
     # extract library source
-    data = conn.execute("SELECT DISTINCT case_id FROM Samples WHERE project_id = '{0}';".format(project_name)).fetchall()
+    data = conn.execute("SELECT DISTINCT case_id FROM Samples WHERE project_id = ?;", (project_name,)).fetchall()
     donors = list(set([i['case_id'] for i in  data]))
     conn.close()
     
