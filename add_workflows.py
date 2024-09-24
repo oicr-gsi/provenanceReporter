@@ -107,6 +107,7 @@ def update_workflow_db(workflow_db, main_db, project_table, workflow_table):
         # add the missing workflows for the project of focus
         add_missing_workflow(workflow_db, project, workflows, workflow_table)
         
+        
 
 def setup_database(database, table = 'Workflows'):
     '''
@@ -139,7 +140,7 @@ def setup_database(database, table = 'Workflows'):
 
 if __name__ == '__main__':
 
-    parser = argparse.ArgumentParser(prog = 'update_workflows.py', description='Updates the Workflows database with workflow ids from the main database', add_help=False)
+    parser = argparse.ArgumentParser(prog = 'add_workflows.py', description='Updates the Workflows database with workflow ids from the main database', add_help=True)
     parser.add_argument('-w', '--workflow_db', dest='workflow_db', help='Path to the database storing workflow information')
     parser.add_argument('-m', '--main_db', dest = 'main_db', help = 'Path to the main database storing production information')
         

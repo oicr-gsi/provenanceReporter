@@ -24,7 +24,7 @@ def get_project_info(project_name, database):
     # connect to db
     conn = connect_to_db(database)
     # extract project info
-    project = conn.execute('SELECT * FROM Projects WHERE project_id=\"{0}\"'.format(project_name)).fetchall()[0]
+    project = conn.execute('SELECT * FROM Projects WHERE project_id=?', (project_name,)).fetchall()[0]
     conn.close()
     
     return project
@@ -43,8 +43,7 @@ def get_cases(project_name, database):
     '''
     
     conn = connect_to_db(database)
-    data = conn.execute("SELECT DISTINCT case_id, donor_id, species, sex, created_date, modified_date, miso, parent_project FROM Samples WHERE project_id = '{0}'".format(project_name)).fetchall()
-    
+    data = conn.execute("SELECT DISTINCT case_id, donor_id, species, sex, miso FROM Samples WHERE project_id = ?", (project_name,)).fetchall()
     data = [dict(i) for i in data]
        
     return data
@@ -63,55 +62,32 @@ def get_sample_counts(project_name, database):
     '''
     
     conn = connect_to_db(database)
-    
-    data = conn.execute("SELECT DISTINCT case_id, tissue_type, group_id FROM Libraries WHERE project_id = '{0}';".format(project_name)).fetchall()
+    data = conn.execute("SELECT DISTINCT case_id, tissue_type, tissue_origin, library_type, group_id FROM Libraries WHERE project_id = ?;", (project_name,)).fetchall()
     conn.close()
 
     counts = {}
     for i in data:
         donor = i['case_id']
+        sample = '_'.join([i['case_id'], i['tissue_type'], i['tissue_origin'],
+                           i['library_type'], i['group_id']])
         if i['tissue_type'] == 'R':
-            normal = i['case_id'] + '_' + i['group_id']      
-            tumor = ''
+            tissue = 'normal'
         else:
-            normal = ''
-            tumor = i['case_id'] + '_' + i['group_id']
+            tissue = 'tumor'
         if donor not in counts:
             counts[donor] = {}
-        if 'normal' not in counts[donor]:
-            counts[donor]['normal'] = set()
-        if 'tumor' not in counts[donor]:
-            counts[donor]['tumor'] = set()
-        if normal:
-            counts[donor]['normal'].add(normal)
-        elif tumor:
-            counts[donor]['tumor'].add(tumor)
-
-
+        if tissue not in counts[donor]:
+            counts[donor][tissue] = set()
+        counts[donor][tissue].add(sample)
+        
     for i in counts:
-        counts[i]['normal'] = len(counts[i]['normal'])
-        counts[i]['tumor'] = len(counts[i]['tumor'])
-               
+        for j in ['normal', 'tumor']:
+            if j in counts[i]:
+                counts[i][j] = len(counts[i][j])
+            else:
+                counts[i][j] = 0
                     
     return counts            
-
-
-def add_missing_donors(cases, counts):
-    '''
-    (list, dict) -> dict
-    
-    Update the sample counts with 0 values when donor_id found in cases is not already in counts
-    
-    Parameters
-    ----------
-    - cases (list): List of dictionary with case information
-    - counts (dict): Dictionary with library and sample counts for each donor
-    '''
-        
-    for i in cases:
-        if i['case_id'] not in counts:
-            counts[i['case_id']] = {'normal': 0, 'tumor': 0}
-    return counts    
 
 
 def get_library_types(project_name, database):
@@ -129,7 +105,7 @@ def get_library_types(project_name, database):
     # connect to db
     conn = connect_to_db(database)
     # extract library types
-    data = conn.execute("SELECT DISTINCT library_types FROM Projects WHERE project_id = '{0}';".format(project_name)).fetchall()
+    data = conn.execute("SELECT DISTINCT library_types FROM Projects WHERE project_id = ?;", (project_name,)).fetchall()
     conn.close()
     
     library_types = sorted(list(map(lambda x: x.strip(), data[0]['library_types'].split(','))))

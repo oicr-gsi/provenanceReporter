@@ -59,7 +59,6 @@
 Flow cell identifier, 6. Lane number, 7. Demultiplex barcodes</span></th>
         <th><div class="tooltip">Read Pairs<span class="tooltiptext">Number of read pairs. The number of reads is twice the number of read pairs</span></th>
         <th>Workflow</th> 
-        <th>Release status</th>
       </thead>     
 
       {% for i in sequences %}
@@ -77,11 +76,6 @@ Flow cell identifier, 6. Lane number, 7. Demultiplex barcodes</span></th>
           <td> {{i['prefix']}} </td>        
           <td class='alnright'> {{i['read_count']}} </td>
           <td> {{i['workflow']}} </td>
-          {% if i['ticket'] %}
-            <td><a class="miso_link" href="{{i['ticket']}}" target="_blank">{{ i['release_status'] }}</a></td>
-          {% else %}
-            <td> {{i['release_status']}} </td>
-          {% endif %}
         </tr>
       {% endfor %}               
     </table>

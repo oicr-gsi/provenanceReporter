@@ -6,7 +6,7 @@
   <a href="{{ url_for('sequencing', project_name=project['project_id']) }}">Sequencing</a>
   {% for i in pipelines %}
     {% if i in routes %}
-      {% if i == 'Whole Genome' %}
+      {% if i == 'Exome' %}
         <a class="selected" href="{{ url_for(routes[i], project_name=project['project_id']) }}">{{i}}</a>
       {% else %}
         <a href="{{ url_for(routes[i], project_name=project['project_id']) }}">{{i}}</a>   
@@ -21,7 +21,7 @@
 {% block content %}
   <div class="project_title">
     {% if cases %}
-    <p style="font-size:22px; font-style:normal;"> WGS analysis data for <span id ="count"> {{ cases|length }} </span> cases</p>
+    <p style="font-size:22px; font-style:normal;"> Exome analysis data for <span id ="count"> {{ cases|length }} </span> cases</p>
     {% else %}
       <span style="font-size:30px; font-style:normal;"> No cases to display</span>
     {% endif %}  
@@ -117,7 +117,7 @@
        
             <td>
               {% if myList %}
-                <a class="project_links" href="{{ url_for('wgs_case', project_name=project['project_id'], case=i, sample_pair=myList[0])}}">
+                <a class="project_links" href="{{ url_for('ex_case', project_name=project['project_id'], case=i, sample_pair=myList[0])}}">
                   {% if block_status[i][myList.0] != 'review' and block_status[i][myList.0] != 'ready' %}
                     {{block_status[i][myList.0] | basename | shorten_workflow_id}}
                   {% else %}
@@ -139,7 +139,7 @@
                   {{block_counts[i][j]}}
                 </td>
                 <td>
-                  <a class="project_links" href="{{ url_for('wgs_case', project_name=project['project_id'], case=i, sample_pair=j)}}">
+                  <a class="project_links" href="{{ url_for('ex_case', project_name=project['project_id'], case=i, sample_pair=j)}}">
                     {% if block_status[i][j] != 'review' and block_status[i][j] != 'ready' %}
                       {{block_status[i][j] | basename | shorten_workflow_id}}
                     {% else %}

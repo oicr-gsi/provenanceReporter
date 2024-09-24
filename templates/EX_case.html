@@ -82,9 +82,9 @@
                     <div class="download-dropdown-small">
                       <button class="download-dropbtn-small">Download json</button>
                         <div class="download-dropdown-content-small">
-                          <button class="download_button_small"><a href="{{url_for('download_block_data', project_name=project['project_id'], pipeline='WG', case=case, pair=pair, anchor_wf=block['anchor_wf'], table='WGS_blocks', selection='all')}}">all</a></button>
+                          <button class="download_button_small"><a href="{{url_for('download_block_data', project_name=project['project_id'], pipeline='EX', case=case, pair=pair, anchor_wf=block['anchor_wf'], table='EX_blocks', selection='all')}}">all</a></button>
                           <br>
-                          <button class="download_button_small"><a href="{{url_for('download_block_data', project_name=project['project_id'], pipeline='WG', case=case, pair=pair, anchor_wf=block['anchor_wf'], table='WGS_blocks', selection='standard')}}">standard</a></button>
+                          <button class="download_button_small"><a href="{{url_for('download_block_data', project_name=project['project_id'], pipeline='EX', case=case, pair=pair, anchor_wf=block['anchor_wf'], table='EX_blocks', selection='standard')}}">standard</a></button>
                         </div>
                     </div>
                   </td>
@@ -108,7 +108,7 @@
             {% for bmpp_run in block['call_ready'] %}
               <tr>
                 <td>
-                  <a class="workflow" href="{{ url_for('workflow', project_name=project['project_id'], pipeline='whole_genome_sequencing', case=case, sample_pair=sample_pair, workflow_id=bmpp_run) }}">
+                  <a class="workflow" href="{{ url_for('workflow', project_name=project['project_id'], pipeline='exome', case=case, sample_pair=sample_pair, workflow_id=bmpp_run) }}">
                     {{bmpp_run | basename | shorten_workflow_id}}
                   </a>
                 </td>
@@ -158,7 +158,7 @@
             {% for workflow_id in block['callers'] %}
               <tr>
                 <td>
-                  <a class="workflow" href="{{ url_for('workflow', project_name=project['project_id'], pipeline='whole_genome_sequencing', case=case, sample_pair=sample_pair, workflow_id=workflow_id) }}">
+                  <a class="workflow" href="{{ url_for('workflow', project_name=project['project_id'], pipeline='exome', case=case, sample_pair=sample_pair, workflow_id=workflow_id) }}">
                     {{workflow_id | basename | shorten_workflow_id}}
                   </a>
                 </td>
@@ -169,7 +169,7 @@
                       <dt>
                         {% for k in parents[workflow_id | basename][i] %}
                           <div class="tooltip">
-                            <a class="workflow" href="{{ url_for('workflow', project_name=project['project_id'], pipeline='whole_genome_sequencing', case=case, sample_pair=sample_pair, workflow_id=k) }}">
+                            <a class="workflow" href="{{ url_for('workflow', project_name=project['project_id'], pipeline='exome', case=case, sample_pair=sample_pair, workflow_id=k) }}">
                               {{k | shorten_workflow_id}}
                               <span class="tooltiptext">{{i}}</span>
                             </a>   
