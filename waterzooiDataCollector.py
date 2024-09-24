@@ -16,7 +16,7 @@ import traceback
 import os
 import subprocess
 import hashlib
-from utilities import connect_to_db, secret_key_generator
+from utilities import connect_to_db
 from whole_genome import get_workflow_limskeys, find_WGS_blocks
 from whole_transcriptome import find_WT_blocks
 
@@ -181,37 +181,28 @@ def add_missing_QC_status(D, project, database, table = 'Files'):
     
 
 
-
-def match_donor_to_file_swid(fpr, project):
+def match_donor_to_file_swid(fpr_data, projects):
     '''
-    (str, str, str) -> dict
+    (str, dict) -> dict
     
-    Returns a dictionary matching each file swid for a project to its donor_id
+    Returns a dictionary matching each file swid for each valid project to its donor_id
     
     Parameters
     ----------
-    - fpr (str): Path to File Provenance Report file
-    - project_name (str): Project of interest
+    - fpr_data (dict): Dictionary with file information extracted from File Provenance Report file
+    - projects (list): List of projects 
     '''
     
-    infile = open_fpr(fpr)
-    # skip header
-    infile.readline()
-        
     D = {}
-    for line in infile:
-        line = line.rstrip()
-        if line:
-            line = line.split('\t')
-            # keep only file info for project_name
-            if project == line[1]:
-                # get donor id
-                case_id = line[7]
-                # get file_swid
-                file_swid = line[44]
-                D[file_swid] = case_id
-    infile.close()
-    return D
+    for project in fpr_data:
+        for case_id in fpr_data[project]:
+            for file_swid in fpr_data[project][case_id]:
+                if project not in D:
+                    D[project] = {}
+                D[project][file_swid] = case_id
+    return D            
+        
+    
 
 
 def collect_qc_info(project, database, nabu_api):
@@ -242,112 +233,6 @@ def collect_qc_info(project, database, nabu_api):
     return D
 
 
-# def collect_file_info_from_fpr(fpr, project_name):
-#     '''
-#     (str, str) -> dict
-
-#     Returns a dictionary with file information for project_name extracted from File Provenance Report
-        
-#     Parameters
-#     ----------
-#     - fpr (str): Path to File Provenance Report file
-#     - project_name (str): Name of project of interest 
-#     '''
-
-#     infile = open_fpr(fpr)
-#     # skip header
-#     infile.readline()
-        
-#     D = {}
-    
-#     for line in infile:
-#         line = line.rstrip()
-#         if line:
-#             line = line.split('\t')
-#             # get project and initiate dict
-#             project = line[1]
-#             # keep only file info for project_name
-#             if project != project_name:
-#                 continue             
-#             if project not in D:
-#                 D[project] = {}
-            
-#             # check if file is skipped
-#             # if line[51].lower() == 'true':
-#             #     continue
-            
-#             case_id = line[7]
-                   
-#             # get creation date
-#             creation_date = line[0]
-#             # convert creation date into epoch time
-#             # remove milliseconds
-#             creation_date = creation_date.split('.')[0]
-#             pattern = '%Y-%m-%d %H:%M:%S'
-#             creation_date = int(time.mktime(time.strptime(creation_date, pattern)))
-#             # get file path
-#             file = line[46]
-#             # get md5sums
-#             md5sum = line[47]
-#             # get file_swid
-#             file_swid = line[44]
-            
-#             # keep only unique string. file swid doesn't match workflow inout file swids
-#             #file_swid = os.path.basename(file_swid)
-            
-#             # get the library type
-#             library_type = line[17]
-#             if library_type:
-#                 d = collect_info({k.split('=')[0]:k.split('=')[1] for k in line[17].split(';')},
-#                          ['geo_library_source_template_type'], ['library_type'])
-#                 library_type = d['library_type']
-#             else:
-#                 library_type = ''
-                        
-#             # get file attributes
-#             attributes = line[45]
-#             if attributes:
-#                 attributes = attributes.split(';')
-#                 attributes = json.dumps({k.split('=')[0]: k.split('=')[1] for k in attributes})
-#             else:
-#                 attributes = ''
-            
-#             # get workflow
-#             workflow = line[30]
-#             # get workflow version
-#             version = line[31]        
-#             # get workflow run accession
-#             workflow_run = line[36]
-#             # get limskey
-#             limskey = line[56]
-            
-#             # get skip and stale status
-#             skip = line[51]
-#             if skip.lower() == 'true':
-#                 skip = 1
-#             else:
-#                 skip = 0
-#             stale = line[52]
-            
-#             # skip stale records
-#             if stale.lower() != 'stale':
-            
-#                 # collect file info
-#                 if file_swid not in D[project]:
-#                     D[project][file_swid] = {'creation_date': creation_date, 'md5sum': md5sum,
-#                                              'workflow': workflow, 'version': version,
-#                                              'wfrun_id': workflow_run, 'file': file,
-#                                              'library_type': library_type, 'attributes': attributes,
-#                                              'limskey': [limskey], 'skip': skip, 'stale': stale,
-#                                              'case_id': case_id}
-#                 else:
-#                     D[project][file_swid]['limskey'].append(limskey)
-#     infile.close()
-#     return D
-
-
-
-
 def get_md5(d):
     '''
     (dict) -> str
@@ -363,31 +248,27 @@ def get_md5(d):
 
 
 
-def donors_info_to_update(database, fpr, project_name, table = 'Checksums'):
+def donors_info_to_update(database, fpr_data, project, table = 'Checksums'):
     '''
     (str, str, str) -> dict
 
-    Returns a dictionary of donors, checksum for each project for which the information extracted from 
-    FPR is different than the information stored in the database.
+    Returns a dictionary of donors, checksum for projhect of interest for which
+    the information extracted from FPR is different than the information stored in the database.
     The information for these donors need to be updated
         
     Parameters
     ----------
     - database (str): Path to the sqlite database
-    - fpr (str): Path to File Provenance Report file
-    - project_name (str): Name of project of interest 
+    - fpr_data (dict): Dictionary with file information extracted from FPR and organized by donor
+    - project (str): Name of project of interest 
     '''
         
-    # parse fpr and get the md5sum of the donor information
-    D = collect_file_info_from_fpr(fpr, project_name)
-            
     # evaluate the checksum of extracted data
     md5 = {}
-    for project in D:
-        for case_id in D[project]:
-            md5sum = get_md5(D[project][case_id])
-            assert case_id not in md5
-            md5[case_id] = md5sum
+    for case_id in fpr_data[project]:
+        md5sum = get_md5(fpr_data[project][case_id])
+        assert case_id not in md5
+        md5[case_id] = md5sum
     
     # connect to database, get recorded md5sums
     conn = connect_to_db(database)
@@ -395,7 +276,7 @@ def donors_info_to_update(database, fpr, project_name, table = 'Checksums'):
     tables = [i['name'] for i in data]
     records = {}
     if table in tables:
-        data = conn.execute('SELECT case_id, md5 FROM {0} WHERE project_id = \"{1}\"'.format(table, project_name)).fetchall()  
+        data = conn.execute('SELECT case_id, md5 FROM {0} WHERE project_id = \"{1}\"'.format(table, project)).fetchall()  
         for i in data:
             records[i['case_id']] = i['md5']
     conn.close()
@@ -419,7 +300,7 @@ def donors_info_to_update(database, fpr, project_name, table = 'Checksums'):
 
 
 
-def collect_file_info_from_fpr(fpr, project_name):
+def collect_file_info_from_fpr(fpr, projects):
     '''
     (str, str) -> dict
 
@@ -435,7 +316,7 @@ def collect_file_info_from_fpr(fpr, project_name):
     # skip header
     infile.readline()
         
-    D = {}
+    fpr_data = {}
     
     for line in infile:
         line = line.rstrip()
@@ -443,88 +324,144 @@ def collect_file_info_from_fpr(fpr, project_name):
             line = line.split('\t')
             # get project and initiate dict
             project = line[1]
-            # keep only file info for project_name
-            if project != project_name:
-                continue             
-            if project not in D:
-                D[project] = {}
-            
-            # check if file is skipped
-            # if line[51].lower() == 'true':
-            #     continue
-            
-            case_id = line[7]
+            if project in projects:
+                if project not in fpr_data:
+                    fpr_data[project] = {}
                    
-            # get creation date
-            creation_date = line[0]
-            # convert creation date into epoch time
-            # remove milliseconds
-            creation_date = creation_date.split('.')[0]
-            pattern = '%Y-%m-%d %H:%M:%S'
-            creation_date = int(time.mktime(time.strptime(creation_date, pattern)))
-            # get file path
-            file = line[46]
-            # get md5sums
-            md5sum = line[47]
-            # get file_swid
-            file_swid = line[44]
+                # skip stale records
+                stale = line[52]
+                if stale.lower() != 'stale':
+                    case_id = line[7]
+                    # get creation date
+                    creation_date = line[0]
+                    # convert creation date into epoch time
+                    # remove milliseconds
+                    creation_date = creation_date.split('.')[0]
+                    pattern = '%Y-%m-%d %H:%M:%S'
+                    creation_date = int(time.mktime(time.strptime(creation_date, pattern)))
+                    # get file path
+                    file = line[46]
+                    # get md5sums
+                    md5sum = line[47]
+                    # get file_swid
+                    file_swid = line[44]
             
-            # keep only unique string. file swid doesn't match workflow inout file swids
-            #file_swid = os.path.basename(file_swid)
-            
-            # get the library type
-            library_type = line[17]
-            if library_type:
-                d = collect_info({k.split('=')[0]:k.split('=')[1] for k in line[17].split(';')},
-                         ['geo_library_source_template_type'], ['library_type'])
-                library_type = d['library_type']
-            else:
-                library_type = ''
+                    # get the library type
+                    library_type = line[17]
+                    if library_type:
+                        d = collect_info({k.split('=')[0]:k.split('=')[1] for k in line[17].split(';')},
+                                 ['geo_library_source_template_type'], ['library_type'])
+                        library_type = d['library_type']
+                    else:
+                        library_type = ''
                         
-            # get file attributes
-            attributes = line[45]
-            if attributes:
-                attributes = attributes.split(';')
-                attributes = json.dumps({k.split('=')[0]: k.split('=')[1] for k in attributes})
-            else:
-                attributes = ''
+                    # get file attributes
+                    attributes = line[45]
+                    if attributes:
+                        attributes = attributes.split(';')
+                        attributes = json.dumps({k.split('=')[0]: k.split('=')[1] for k in attributes})
+                    else:
+                        attributes = ''
             
-            # get workflow
-            workflow = line[30]
-            # get workflow version
-            version = line[31]        
-            # get workflow run accession
-            workflow_run = line[36]
-            # get limskey
-            limskey = line[56]
-            
-            # get skip and stale status
-            skip = line[51]
-            if skip.lower() == 'true':
-                skip = 1
-            else:
-                skip = 0
-            stale = line[52]
-            
-            # skip stale records
-            if stale.lower() != 'stale':
-                if case_id not in D[project]:
-                    D[project][case_id] = {}
+                    # get workflow attributes
+                    wf_attributes = line[37]
+                    if wf_attributes:
+                        wf_attributes = wf_attributes.split(';')
+                        wf_attributes = json.dumps({k.split('=')[0]: k.split('=')[1] for k in wf_attributes if k.split('=')[0] not in ['cromwell-workflow-id', 'major_olive_version']})
+                    else:
+                        wf_attributes = ''                
+       
+                    # get workflow
+                    workflow = line[30]
+                    # get workflow version
+                    version = line[31]        
+                    # get workflow run accession
+                    workflow_run = line[36]
+                    # get limskey
+                    limskey = line[56]
+                    
+                    skip = line[51]
+                    if skip.lower() == 'true':
+                        skip = 1
+                    else:
+                        skip = 0
+                    
+                    if case_id not in fpr_data[project]:
+                        fpr_data[project][case_id] = {}
                 
-                # collect file info
-                if file_swid not in D[project][case_id]:
-                    D[project][case_id][file_swid] = {'creation_date': creation_date, 'md5sum': md5sum,
-                                             'workflow': workflow, 'version': version,
-                                             'wfrun_id': workflow_run, 'file': file,
-                                             'library_type': library_type, 'attributes': attributes,
-                                             'limskey': [limskey], 'skip': skip, 'stale': stale,
-                                             'case_id': case_id}
-                else:
-                    D[project][case_id][file_swid]['limskey'].append(limskey)
+                    # collect file info
+                    if file_swid not in fpr_data[project][case_id]:
+                        fpr_data[project][case_id][file_swid] = {'creation_date': creation_date, 'md5sum': md5sum,
+                                                 'workflow': workflow, 'version': version,
+                                                 'wfrun_id': workflow_run, 'file': file,
+                                                 'library_type': library_type, 'attributes': attributes,
+                                                 'wf_attributes': wf_attributes, 'limskey': [limskey],
+                                                 'skip': skip, 'stale': stale, 'case_id': case_id}
+                    else:
+                        fpr_data[project][case_id][file_swid]['limskey'].append(limskey)
+    
     infile.close()
-    return D
+    return fpr_data
 
 
+
+def extract_workflow_info(fpr, projects):
+    '''
+    (str, str) -> dict
+    
+    Returns a dictionary with library input information for all workflows for project_name
+    
+    Parameters
+    ----------
+    - fpr (str): Path to the File Provenance Report
+    - project_name (str): Name of project of interest
+    '''
+
+    # create a dict to store workflow input libraries
+    D = {}
+
+    infile = open_fpr(fpr)
+    # skip header
+    infile.readline()
+    
+    for line in infile:
+        line = line.rstrip()
+        if line:
+            line = line.split('\t')
+            # get project name
+            project = line[1]
+            if project in projects:
+                # do not include stale records
+                stale = line[52]
+                if stale.lower() != 'stale':
+                    # get sample name
+                    sample = line[7]
+                    # get workflow name and workflow run accession
+                    workflow, workflow_run = line[30], line[36]
+                                  
+                    # get lane and run
+                    run, lane = line[18], line[24]            
+                    # get library and limskey
+                    library, limskey  = line[13], line[56]
+            
+                    # get barcode and platform
+                    barcode, platform = line[27], line[22]
+            
+                    d = {'run': run, 'lane': lane, 'library': library, 'limskey': limskey, 'barcode': barcode, 'platform': platform}
+            
+                    if project not in D:
+                        D[project] = {}
+                    if workflow_run not in D[project]:
+                        D[project][workflow_run] = {}
+                    if sample not in D[project][workflow_run]:
+                        D[project][workflow_run][sample] = {'sample': sample, 'workflow': workflow, 'libraries': [d]}
+                    else:
+                        assert sample == D[project][workflow_run][sample]['sample']
+                        assert workflow == D[project][workflow_run][sample]['workflow']
+                        if d not in D[project][workflow_run][sample]['libraries']:
+                            D[project][workflow_run][sample]['libraries'].append(d)
+    
+    return D            
 
 
 
@@ -637,20 +574,97 @@ def open_fpr(fpr):
 
 
 
-def get_workflow_relationships(fpr, project_name):
+def match_file_worklow_ids(fpr_data, project):
     '''
-    (str, str) -> (dict, dict, dict)
+    (dict, str) -> dict
 
-    Returns a tuple with dictionaries with worklow information, parent file ids for each workflow,
-    and workflow id for each file from project of interest
+    Returns a dictionary of file swids matched to their workflow run id for a project of interest    
+    
+    Parameters
+    ----------
+    - fpr_data (dict): Dictionary with file information parsed from FPR
+    - project (str): Name of the project of interest
+    '''
+    
+    D = {}
+    D[project] = {}
+    
+    for case_id in fpr_data[project]:
+        for file_swid in fpr_data[project][case_id]:
+            workflow_id = fpr_data[project][case_id][file_swid]['wfrun_id']
+            if file_swid in D[project]:
+                assert D[project][file_swid] == workflow_id
+            else:
+                D[project][file_swid] = workflow_id
+    return D        
+
+
+
+def get_workflow_information(fpr_data, donors_to_update, project, database, file_table='Files', workflow_input_table='Workflow_Inputs'):
+    '''
+    (dict, dict, str, str, str, str) -> dict    
+    
+    Returns a dictinary with workflow information for the project of interest
+        
+    Parameters
+    ----------
+    - fpr_data (dict): Dictionary with file information parsed from FPR
+    - donors_to_update (dict): Dictionary with donors for which records needs to be updated
+    - project (str): Name of the project of interest
+    - database (str): Path to the sqlite database
+    - file_table (str): Table in database storing file information
+    - workflow_input_table (str): Table in database storing the worflow input information
+    '''
+    
+    D = {}
+    D[project] = {}
+    
+    if donors_to_update:
+        for case_id in donors_to_update:
+            for file_swid in fpr_data[project][case_id]:
+                workflow = fpr_data[project][case_id][file_swid]['workflow']
+                version = fpr_data[project][case_id][file_swid]['version']
+                workflow_id = fpr_data[project][case_id][file_swid]['wfrun_id']
+                attributes = fpr_data[project][case_id][file_swid]['wf_attributes']
+                skip = fpr_data[project][case_id][file_swid]['skip']
+                stale = fpr_data[project][case_id][file_swid]['stale']
+            
+                D[project][workflow_id] = {'wfrun_id': workflow_id,
+                                           'wf': workflow,
+                                           'wfv': version,
+                                           'attributes': attributes,
+                                           'project_id': project,
+                                           'case_id': case_id,
+                                           'skip': skip,
+                                           'stale': stale}
+    
+        # get the file count for each workflow
+        counts = count_files(project, database, file_table)
+        # update workflow information with file count
+        update_workflow_information(project, D, counts, 'file_count')
+        # get the amount of data for each workflow
+        limskeys = get_workflow_limskeys(project, database, workflow_input_table)
+        for i in limskeys:
+            limskeys[i] = len(limskeys[i])
+        # update workflow information with lane count
+        update_workflow_information(project, D, limskeys, 'lane_count')
+    
+    return D
+
+
+def get_parent_file_ids(fpr, projects):
+    '''
+    (str, list) -> dict
+
+    Returns a dictionary with parent file ids for each workflow in each project 
     
     Parameters
     ----------
     - fpr (str): Path to the File Provenance Report
-    - project_name (str): Name of project of interest
+    - projects (list): List of valid projects
     '''
 
-    F, P, W = {}, {}, {}
+    P = {}
 
     # open fpr
     infile = open_fpr(fpr)
@@ -663,77 +677,29 @@ def get_workflow_relationships(fpr, project_name):
             line = line.split('\t')
             # get project name
             project = line[1]
-            
-            if project != project_name:
-                continue
-            
-            # # skip any workflow/file that has a skipped file
-            # if line[51].lower() == 'true':
-            #     continue
-                        
-            # get workflow, workflow version and workflow run accession
-            workflow, workflow_version, workflow_run = line[30], line[31], line[36]
-            # get file swid
-            file_swid = line[44]
-            
-            # get skip and stale status
-            skip = line[51]
-            if skip.lower() == 'true':
-                skip = 1
-            else:
-                skip = 0
-            stale = line[52]
-            
-            # get the donor id
-            donor = line[7]
-            
-            # do not include stale records
-            if stale.lower() != 'stale':
-                input_files = line[38]
-                if input_files:
-                    input_files = sorted(input_files.split(','))
-                else:
-                    input_files = []
-            
-                # get workflow attributes
-                attributes = line[37]
-                if attributes:
-                    attributes = attributes.split(';')
-                    attributes = json.dumps({k.split('=')[0]: k.split('=')[1] for k in attributes if k.split('=')[0] not in ['cromwell-workflow-id', 'major_olive_version']})
-                else:
-                    attributes = ''                
-       
-                if project not in P:
-                    P[project] = {}
-      
-                if workflow_run in P[project]:
-                    assert P[project][workflow_run] == input_files
-                else:
-                    P[project][workflow_run] = input_files
-                
-                if project not in W:
-                    W[project] = {}
-                if workflow_run in W[project]:
-                    recorded = sorted([W[project][workflow_run][i] for i in W[project][workflow_run] if i not in ['skip', 'stale']])
-                    newrecord = sorted([workflow_run, workflow_version, workflow, attributes, project, donor])
-                    assert recorded == newrecord
-                else:
-                    W[project][workflow_run] = {'wfrun_id': workflow_run, 'wfv': workflow_version,
-                                                'wf': workflow, 'attributes': attributes,
-                                                'skip': skip, 'stale': stale, 'project_id': project,
-                                                'case_id': donor}
-        
-                if project not in F:
-                    F[project] = {}
-                if file_swid in F[project]:
-                    assert F[project][file_swid] == workflow_run
-                else:
-                    F[project][file_swid] = workflow_run
-    
+            if project in projects:
+                stale = line[52]
+                # do not include stale records
+                if stale.lower() != 'stale':
+                    # get workflow, workflow version and workflow run accession
+                    workflow_run = line[36]
+                    # get input files          
+                    input_files = line[38]
+                    if input_files:
+                        input_files = sorted(input_files.split(','))
+                    else:
+                        input_files = []
+                           
+                    if project not in P:
+                        P[project] = {}
+                    if workflow_run in P[project]:
+                        assert P[project][workflow_run] == input_files
+                    else:
+                        P[project][workflow_run] = input_files
+     
     infile.close()
     
-    return W, P, F        
-
+    return P         
 
 
 def identify_parent_children_workflows(P, F):
@@ -778,7 +744,7 @@ def get_provenance_data(provenance):
     - provenance (str): URL of the pinery provenance API 
     '''
     
-    response = requests.get(provenance)
+    response = requests.get(provenance, timeout = (10,120))
     if response.ok:
         L = response.json()
     else:
@@ -815,9 +781,9 @@ def get_sample_info(pinery, project):
     return cases   
     
 
-def get_parent_sample_info(pinery, project, sample_info):
+def get_parent_sample_info(pinery, project, samples):
     '''
-    (str, str, str) -> dict
+    (str, str, dict) -> dict
     
     Return a dictionary with sample information, including samples not sequenced
     for each project
@@ -826,80 +792,14 @@ def get_parent_sample_info(pinery, project, sample_info):
     ----------
     - pinery (str): Pinery API
     - project (str): Name of project
-    - sample_info (str): Path to the json file with sample information
+    - samples (dict): Dictionary with samples information extracted from Pinery
     '''
     
     cases = get_sample_info(pinery, project)
-    
-    infile = open(sample_info)
-    samples = json.load(infile)
-    infile.close()
-    
     L = [samples[i] for i in cases if i in samples]
         
     return L   
 
-
-def extract_workflow_info(fpr, project_name):
-    '''
-    (str, str) -> dict
-    
-    Returns a dictionary with library input information for all workflows for project_name
-    
-    Parameters
-    ----------
-    - fpr (str): Path to the File Provenance Report
-    - project_name (str): Name of project of interest
-    '''
-
-    # create a dict to store workflow input libraries
-    D = {}
-
-    infile = open_fpr(fpr)
-    # skip header
-    infile.readline()
-    
-    for line in infile:
-        line = line.rstrip()
-        if line:
-            line = line.split('\t')
-            # get project name
-            project = line[1]
-            # keep only info for project name
-            if project != project_name:
-                continue             
-    
-            # do not include stale records
-            stale = line[52]
-            if stale.lower() != 'stale':
-    
-                # get sample name
-                sample = line[7]
-                # get workflow name and workflow run accession
-                workflow, workflow_run = line[30], line[36]
-                                  
-                # get lane and run
-                run, lane = line[18], line[24]            
-                # get library and limskey
-                library, limskey  = line[13], line[56]
-            
-                # get barcode and platform
-                barcode, platform = line[27], line[22]
-            
-                d = {'run': run, 'lane': lane, 'library': library, 'limskey': limskey, 'barcode': barcode, 'platform': platform}
-            
-                if project not in D:
-                    D[project] = {}
-                if workflow_run not in D[project]:
-                    D[project][workflow_run] = {}
-                if sample not in D[project][workflow_run]:
-                    D[project][workflow_run][sample] = {'sample': sample, 'workflow': workflow, 'libraries': [d]}
-                else:
-                    assert sample == D[project][workflow_run][sample]['sample']
-                    assert workflow == D[project][workflow_run][sample]['workflow']
-                    if d not in D[project][workflow_run][sample]['libraries']:
-                        D[project][workflow_run][sample]['libraries'].append(d)
-    return D            
 
 
 def define_column_names():
@@ -987,17 +887,14 @@ def create_table(database, table):
     #if table  in ['Workflows', 'Parents', 'Files', 'FilesQC', 'Libraries', 'Workflow_Inputs', 'Samples', 'WGS_blocks', 'WT_blocks', 'Calculate_Contamination']:
     if table  in ['Workflows', 'Parents', 'Files', 'FilesQC', 'Libraries', 'Workflow_Inputs', 'Samples', 'WGS_blocks', 'WT_blocks', 'Checksums']:
         constraints = '''FOREIGN KEY (project_id)
-            REFERENCES Projects (project_id)
-            ON DELETE CASCADE ON UPDATE CASCADE'''
+            REFERENCES Projects (project_id)'''
         table_format = table_format + ', ' + constraints 
     
     if table == 'Parents':
         constraints = '''FOREIGN KEY (parents_id)
-          REFERENCES Workflows (wfrun_id)
-          ON DELETE CASCADE ON UPDATE CASCADE,
+          REFERENCES Workflows (wfrun_id),
           FOREIGN KEY (children_id)
-              REFERENCES Workflows (wfrun_id)
-              ON DELETE CASCADE ON UPDATE CASCADE''' 
+              REFERENCES Workflows (wfrun_id)''' 
         table_format = table_format + ', ' + constraints + ', PRIMARY KEY (parents_id, children_id, project_id)'
     
     if table == 'Worklows':
@@ -1005,38 +902,31 @@ def create_table(database, table):
     
     if table in ['WGS_blocks', 'WT_blocks']:
         constraints = '''FOREIGN KEY (case_id)
-          REFERENCES Samples (case_id)
-          ON DELETE CASCADE ON UPDATE CASCADE'''
+          REFERENCES Samples (case_id)'''
         table_format = table_format + ', PRIMARY KEY (samples, anchor_wf)'
       
     if table == 'Files':
         constraints = '''FOREIGN KEY (wfrun_id)
-            REFERENCES Workflows (wfrun_id)
-            ON DELETE CASCADE ON UPDATE CASCADE,
+            REFERENCES Workflows (wfrun_id),
             FOREIGN KEY (file_swid)
-               REFERENCES FilesQC (file_swid)
-               ON DELETE CASCADE ON UPDATE CASCADE'''
+               REFERENCES FilesQC (file_swid)'''
         table_format = table_format + ', ' + constraints
     
     if table == 'Workflow_Inputs':
         constraints = '''FOREIGN KEY (wfrun_id)
-            REFERENCES Workflows (wfrun_id)
-            ON DELETE CASCADE ON UPDATE CASCADE,
+            REFERENCES Workflows (wfrun_id),
             FOREIGN KEY (library)
-              REFERENCES Libraries (library)
-              ON DELETE CASCADE ON UPDATE CASCADE'''
+              REFERENCES Libraries (library)'''
         table_format = table_format + ', ' + constraints
     
     if table == 'Samples':
         constraints = '''FOREIGN KEY (donor_id)
-            REFERENCES Libraries (ext_id)
-            ON DELETE CASCADE ON UPDATE CASCADE'''
+            REFERENCES Libraries (ext_id)'''
         table_format = table_format + ', ' + constraints
 
     if table == 'Libraries':
         constraints = '''FOREIGN KEY (case_id)
-            REFERENCES Samples (case_id)
-            ON DELETE CASCADE ON UPDATE CASCADE'''
+            REFERENCES Samples (case_id)'''
         table_format = table_format + ', ' + constraints
 
     # connect to database
@@ -1047,6 +937,8 @@ def create_table(database, table):
     cur.execute(cmd)
     conn.commit()
     conn.close()
+
+
 
 
 
@@ -1109,15 +1001,16 @@ def delete_records(donors, database, table):
     
     conn = sqlite3.connect(database)
     cur = conn.cursor()
-    for i in donors:
-        cur.execute('DELETE FROM {0} WHERE case_id = \"{1}\"'.format(table, i))
-        conn.commit()
+    id_list = list(donors.keys())
+    query = "DELETE FROM {0} WHERE case_id IN ({1})".format(table, ", ".join("?" * len(id_list)))
+    cur.execute(query, id_list)
+    conn.commit()
     conn.close()
 
 
-def add_project_info_to_db(database, pinery, project, lims_info, table = 'Projects'):
+def add_project_info_to_db(database, pinery, project, lims, table = 'Projects'):
     '''
-    (str, str, str, str, str) -> None
+    (str, str, str, dict, str) -> None
     
     Add project information into Projects table of database
        
@@ -1126,7 +1019,7 @@ def add_project_info_to_db(database, pinery, project, lims_info, table = 'Projec
     - database (str): Path to the database file
     - pinery (str): Pinery API, http://pinery.gsi.oicr.on.ca
     - project (str): Name of project of interest
-    - lims_info (str): Path to the json file with lims information
+    - lims (dict): Dictionary with lims information extracted from pinery
     - table (str): Name of Table in database. Default is Projects
     '''
     
@@ -1154,9 +1047,6 @@ def add_project_info_to_db(database, pinery, project, lims_info, table = 'Projec
     projects[project]['expected_samples'] = len(set(samples))
     
     # add number of sequenced cases for project
-    infile = open(lims_info)
-    lims = json.load(infile)
-    infile.close()
     projects[project]['sequenced_samples'] = len(lims[project].keys())
     
     # add library types
@@ -1178,83 +1068,6 @@ def add_project_info_to_db(database, pinery, project, lims_info, table = 'Projec
     conn.commit()
     
     conn.close()
-
-
-
-
-def add_workflows(workflows, database, project_name, donors_to_update,  table = 'Workflows'):
-    '''
-    (dict, str, str, dict, str) -> None
-    
-    Inserts or updates workflow information to table Workflows in database
-           
-    Parameters
-    ----------
-    - workflows (dict): Dictionary with workflow information
-    - database (str): Path to the database file
-    - project_name (str): Name of project of interest
-    - donors_to_update (dict): Dictionary with donors for which records needs to be updated
-    - workflow_table (str): Name of the table storing workflow information. Default is Workflows
-    '''
-    
-    # remove rows for donors to update
-    if donors_to_update:
-        delete_records(donors_to_update, database, table)
-    
-        # get column names
-        column_names = define_column_names()[table]
-    
-        # connect to db
-        conn = sqlite3.connect(database, timeout=30)
-        cur = conn.cursor()
-    
-        for workflow_run in workflows[project_name]:
-            case_id = workflows[project_name][workflow_run]['case_id'] 
-            if case_id in donors_to_update and donors_to_update[case_id] != 'delete':
-                # insert data into table
-                values = [workflows[project_name][workflow_run][i] for i in column_names if i in workflows[project_name][workflow_run]]
-                cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(values)))
-                conn.commit()
-        conn.close()
-
-
-def add_workflow_relationships(workflows, parent_workflows, database, project, donors_to_update, table = 'Parents'):    
-    '''
-    (dict, dict, str, str, str) -> None
-    
-    Inserts or updates parent-children workflow relatiionships to table Parents in database
-    
-    Parameters
-    ----------    
-    - workflows (dict): Dictionary with workflow information  
-    - parent_workflows (dict): Dictionary with children-parents workflow relationships 
-    - database (str): Path to the database file
-    - project (str): name of project of interest
-    - table (str): Name of the table storing parents-children workflow relationships
-    '''
-    
-    # remove rows for donors to update
-    if donors_to_update:
-        delete_records(donors_to_update, database, table)
-       
-        # get column names
-        column_names = define_column_names()[table]
-    
-        # connect to db
-        conn = sqlite3.connect(database, timeout=30)
-        cur = conn.cursor()
-    
-        for workflow in parent_workflows[project]:
-            for parent in parent_workflows[project][workflow]:
-                if parent != 'NA':
-                    assert workflows[project][workflow]['case_id'] == workflows[project][parent]['case_id']
-                case_id = workflows[project][workflow]['case_id']
-                if case_id in donors_to_update and donors_to_update[case_id] != 'delete':
-                    # insert data into table
-                    cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), (parent, workflow, project, case_id)))
-                    conn.commit()
-        conn.close()
-
 
 
 def parse_calculate_contamination_db(calcontaqc_db):
@@ -1313,8 +1126,6 @@ def parse_calculate_contamination_db(calcontaqc_db):
            
     return D                         
                          
-                         
-
 
 def add_contamination_info(database, calcontaqc_db, donors_to_update, table = 'Calculate_Contamination'):
     '''
@@ -1334,15 +1145,16 @@ def add_contamination_info(database, calcontaqc_db, donors_to_update, table = 'C
     # remove rows for donors to update
     if donors_to_update:
         delete_records(donors_to_update, database, table)
+        print('deleted records in Calculate_Contamination')
 
         # collect ata from the calculate contamination cache
         D = parse_calculate_contamination_db(calcontaqc_db)
         
         if D:
+            # make a list of data to insert
+            newdata = []
             # connect to db
             conn = sqlite3.connect(database)
-            cur = conn.cursor()
-        
             # get column names
             column_names = define_column_names()[table]
 
@@ -1352,11 +1164,14 @@ def add_contamination_info(database, calcontaqc_db, donors_to_update, table = 'C
                     for sample_id in D[case_id]:
                         for i in D[case_id][sample_id]:
                            L = [i[j] for j in  column_names]
-                           cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
-                           conn.commit()
+                           newdata.append(L)
         
-        conn.close()
-
+        if newdata:
+            vals = '(' + ','.join(['?'] * len(newdata[0])) + ')'
+            conn.executemany('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), vals), newdata)
+            conn.commit()
+            conn.close()
+        
 
 
 def count_files(project_name, database, file_table = 'Files'):
@@ -1399,38 +1214,50 @@ def update_workflow_information(project, workflows, D, key):
     '''
     
     for workflow_id in D:
-        workflows[project][workflow_id][key] = D[workflow_id]
+        # workflow id may not be in workflows when updating 
+        if workflow_id in workflows[project]:
+            workflows[project][workflow_id][key] = D[workflow_id]
     
 
-
-# def match_donor_to_workflows(database, project, table='Workflows'):
-#     '''
-#     (str, str, str) -> dict
+def add_workflows_to_db(fpr_data, workflows, database, project, donors_to_update, table = 'Workflows'):
+    '''
+    (dict, dict, str, str, dict, str) -> None
     
-#     Returns a dictionary matching each workflow in project to its donor_id
+    Inserts or updates workflow information 
+ 
+    Parameters
+    ----------    
+    - fpr_data (dict): Dictionary with file information extracted from the File Provenance Report
+    - workflows (dict): Dictionary with workflow information of the project of interest
+    - database (str): Path to the database file
+    - project (str): Name of project of interest
+    - donors_to_update (dict): Dictionary with donors for which records needs to be updated
+    - table (str): Name of the table storing workflow information. Default is Workflows
+    '''
     
-#     Parameters
-#     ----------
-#     - database (str): Path to the sqlite database
-#     - project (str): Project of interest
-#     - table (str): Table storing the file information. Default is Workflows
-#     '''
+    if donors_to_update:
+        # make a list of data to insert
+        newdata = []
+        delete_records(donors_to_update, database, table)
         
-#     conn = sqlite3.connect(database)
-#     conn.row_factory = sqlite3.Row
-#     records = conn.execute('SELECT {0}.wfrun_id, {0}.case_id FROM {0} WHERE {0}.project_id = \"{1}\"'.format(table, project)).fetchall()
-#     conn.close()
+        # get column names
+        column_names = define_column_names()[table]
+        # connect to db
+        conn = sqlite3.connect(database, timeout=30)
+            
+        for workflow_run in workflows[project]:
+            case_id = workflows[project][workflow_run]['case_id'] 
+            if case_id in donors_to_update and donors_to_update[case_id] != 'delete':
+                # insert data into table
+                L = [workflows[project][workflow_run][i] for i in column_names if i in workflows[project][workflow_run]]
+                newdata.append(L)
+        vals = '(' + ','.join(['?'] * len(newdata[0])) + ')'
+        conn.executemany('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), vals), newdata)
+        conn.commit()
+        conn.close()
+
     
-#     D = {}
-#     for i in records:
-#         assert i['wfrun_id'] not in D
-#         D[i['wfrun_id']] = i['case_id']
-
-#     return D
-
-
-
-def add_workflows_info_to_db(fpr, database, project_name, donors_to_update, workflow_table = 'Workflows', parent_table = 'Parents', children_table = 'Children', file_table = 'Files', workflow_input_table = 'Workflow_Inputs'):
+def add_workflows_relationships_to_db(fpr_data, workflows, parents, database, project, donors_to_update, table = 'Parents'):
     '''
     (str, str, str, dict, str, str, str, str) -> None
     
@@ -1438,46 +1265,48 @@ def add_workflows_info_to_db(fpr, database, project_name, donors_to_update, work
  
     Parameters
     ----------    
-    - fpr (str): Path to the File Provenance Report
+    - fpr_data (dict): Dictionary with file information extracted from the File Provenance Report
+    - workflows (dict): Dictionary with workflows information of the current project
+    - parents (dict): Dictionary with file ids input of the workflows
     - database (str): Path to the database file
     - project_name (str): Name of project of interest
     - donors_to_update (dict): Dictionary with donors for which records needs to be updated
     - workflow_table (str): Name of the table storing workflow information. Default is Workflows
-    - parent_table (str): Name of the table storing parents-children workflow relationships. Default is Parents
-    - children_table (str): Name of the table storing children-parents workflow relationships. Default is Children
-    - file_table (str): Name of the table storing file information. Default is Files
-    - workflow_input_table (str): Name of the table storing the workflow input information. Default is Workflow_Inputs
+    - table (str): Name of the table storing parents-children workflow relationships. Default is Parents
     '''
 
-    
     if donors_to_update:
-        
-        # get the workflow inputs and workflow info
-        workflows, parents, files = get_workflow_relationships(fpr, project_name)
-    
-        # get the file count for each workflow
-        counts = count_files(project_name, database, file_table)
-        # update workflow information with file count
-        update_workflow_information(project_name, workflows, counts, 'file_count')
-    
-        # get the amount of data for each workflow
-        limskeys = get_workflow_limskeys(project_name, database, workflow_input_table)
-        for i in limskeys:
-            limskeys[i] = len(limskeys[i])
-        # update workflow information with lane count
-        update_workflow_information(project_name, workflows, limskeys, 'lane_count')
-    
+        # match file swids to workflow runs
+        files = match_file_worklow_ids(fpr_data, project)
+        # identify the parent-child workflow relationships
         # check that project is defined in FPR (ie, may be defined in Pinery but no data recorded in FPR)
-        if workflows and parents and files:
+        if parents[project] and files:
             # create a dict {workflow: [parent workflows]}
-            parent_workflows = identify_parent_children_workflows(parents, files)
-            # add workflow info
-            add_workflows(workflows, database, project_name, donors_to_update, workflow_table)
-            # add parents-children workflow relationships to Parents table
-            add_workflow_relationships(workflows, parent_workflows, database, project_name, donors_to_update, parent_table)    
-       
-    
-def add_fileQC_info_to_db(database, project, nabu_api, fpr, donors_to_update, table='FilesQC'):
+            parent_workflows = identify_parent_children_workflows({project: parents[project]}, files)
+            # remove rows for donors to update
+            # make a list of data to insert
+            newdata = []
+            delete_records(donors_to_update, database, table)
+            # get column names
+            column_names = define_column_names()[table]
+            # connect to db
+            conn = sqlite3.connect(database, timeout=30)
+            
+            for workflow in workflows[project]:
+                for parent in parent_workflows[project][workflow]:
+                    if parent != 'NA':
+                        assert workflows[project][workflow]['case_id'] == workflows[project][parent]['case_id']
+                    case_id = workflows[project][workflow]['case_id']
+                    if case_id in donors_to_update and donors_to_update[case_id] != 'delete':
+                        L = (parent, workflow, project, case_id)
+                        newdata.append(L)
+            vals = '(' + ','.join(['?'] * len(newdata[0])) + ')'
+            conn.executemany('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), vals), newdata)
+            conn.commit()
+            conn.close()
+
+            
+def add_fileQC_info_to_db(database, project, nabu_api, matched_ids, donors_to_update, table='FilesQC'):
     '''
     (str, str, str, dict, str, str) -> None
     
@@ -1486,9 +1315,9 @@ def add_fileQC_info_to_db(database, project, nabu_api, fpr, donors_to_update, ta
     Parameters
     ----------
     - database (str): Path to the database file
-    - fpr (str): Path to the File Provenance Report
     - project (str): Name of project of interest
     - nabu_api (str): URL of the nabu API
+    - matched_ids (dict): Dictionary of matched file swids and donor ids for each project in FPR
     - donors_to_update (dict): Dictionary with donors for which records needs to be updated
     - table (str): Table in database storing the file QC. Default is FilesQC
     '''
@@ -1496,82 +1325,39 @@ def add_fileQC_info_to_db(database, project, nabu_api, fpr, donors_to_update, ta
     # remove rows for donors to update
     if donors_to_update:
         delete_records(donors_to_update, database, table)
+        print('deleted records in FilesQC')
 
         # collect QC info from nabu
         D = collect_qc_info(project, database, nabu_api)
     
         # check that data is recorded in nabu for project
         if D:
-            # match file swids to case id
-            F = match_donor_to_file_swid(fpr, project)
-                        
+            # make a list of data to insert
+            newdata = []
             # connect to db
             conn = sqlite3.connect(database)
-            cur = conn.cursor()
-        
             # get column names
             column_names = define_column_names()[table]
 
             # add data
             for file_swid in D[project]:
                 # check that file swid is recorded in FPR for the same project
-                if file_swid in F:
-                    if F[file_swid] in donors_to_update and donors_to_update[F[file_swid]] != 'delete':
+                if file_swid in matched_ids[project]:
+                    if matched_ids[project][file_swid] in donors_to_update and donors_to_update[matched_ids[project][file_swid]] != 'delete':
                         L = [D[project][file_swid][i] for i in column_names if i in D[project][file_swid]]
-                        L.insert(0, F[file_swid])
+                        L.insert(0, matched_ids[project][file_swid])
                         L.insert(0, project)
                         L.insert(0, file_swid)
-                        cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
-                        conn.commit()
-    
+                        newdata.append(L)
+            vals = '(' + ','.join(['?'] * len(newdata[0])) + ')'
+            conn.executemany('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), vals), newdata)
+            conn.commit()
             conn.close()
+            
 
-
-
-# def add_checksum_to_db(database, project, fpr, table = 'Checksums'):
-#     '''
-#     (str, str, str, str) -> None
-    
-#     Inserts checksum of data for each donor extracted from FPR in database's Checksums table
-       
-#     Parameters
-#     ----------
-#     - database (str): Path to the database file
-#     - project (str): Name of project of interest
-#     - fpr (str): Path to the File Provenance Report
-#     - file_table (str): Table in database storing file information. Default is Files 
-#     - table (str): Table in database storing file information. Default is Files
-#     '''
-
-#     # collect file info from FPR
-#     D = collect_file_info_from_fpr(fpr, project)
-    
-#     # get column names
-#     column_names = define_column_names()[table]
-
-#     # check that data is recorded in FPR for project
-#     if D:
-#         # connect to db
-#         conn = sqlite3.connect(database)
-#         cur = conn.cursor()
-        
-#         # add data
-#         for file_swid in D[project]:
-#             D[project][file_swid]['limskey'] = ';'.join(list(set(D[project][file_swid]['limskey'])))
-#             L = [D[project][file_swid][i] for i in column_names if i in D[project][file_swid]]
-#             L.insert(0, project)
-#             L.insert(0, file_swid)
-#             cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
-#             conn.commit()
-    
-#         conn.close()
-
-
-
-
-def add_file_info_to_db(database, project, fpr, donors_to_update, table = 'Files'):
+def add_file_info_to_db(database, project, fpr_data, donors_to_update, table = 'Files'):
     '''
-    (str, str, str, dict, str) -> None
+    (str, str, dict, dict, str) -> None
     
     Inserts file information in database's Files table
        
@@ -1579,7 +1365,7 @@ def add_file_info_to_db(database, project, fpr, donors_to_update, table = 'Files
     ----------
     - database (str): Path to the database file
     - project (str): Name of project of interest
-    - fpr (str): Path to the File Provenance Report
+    - fpr_data (dict): Dictionary with file information parsed from FPR
     - file_table (str): Table in database storing file information. Default is Files 
     - donors_to_update (dict): Dictionary with donors for which records needs to be updated
     - table (str): Table in database storing file information. Default is Files
@@ -1588,34 +1374,42 @@ def add_file_info_to_db(database, project, fpr, donors_to_update, table = 'Files
     # remove rows for donors to update
     if donors_to_update:
         delete_records(donors_to_update, database, table)
+        print('deleted records in Files')
     
-        # collect file info from FPR
-        D = collect_file_info_from_fpr(fpr, project)
-        
         # get column names
         column_names = define_column_names()[table]
 
         # check that data is recorded in FPR for project
-        if D:
-            # connect to db
-            conn = sqlite3.connect(database)
-            cur = conn.cursor()
+        if project in fpr_data:
+            # make a list of row data
+            newdata = []
             # add data
-            for case in D[project]:
+            for case in fpr_data[project]:
                 if case in donors_to_update and donors_to_update[case] != 'delete':
-                    for file_swid in D[project][case]:
-                        D[project][case][file_swid]['limskey'] = ';'.join(list(set(D[project][case][file_swid]['limskey'])))
-                        L = [D[project][case][file_swid][i] for i in column_names if i in D[project][case][file_swid]]
+                    for file_swid in fpr_data[project][case]:
+                        fpr_data[project][case][file_swid]['limskey'] = ';'.join(list(set(fpr_data[project][case][file_swid]['limskey'])))
+                        L = [fpr_data[project][case][file_swid][i] for i in column_names if i in fpr_data[project][case][file_swid]]
                         L.insert(0, project)
                         L.insert(0, file_swid)
-                        cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
-                        conn.commit()
+                        newdata.append(L)
+            print('organized data')
+            
+            # connect to db
+            conn = sqlite3.connect(database)
+            print('connected to db')
+            #cur = conn.cursor()
+            # add data
+            vals = '(' + ','.join(['?'] * len(newdata[0])) + ')'
+            conn.executemany('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), vals), newdata)
+            print('inserted data')
+            conn.commit()
+            print('commit changes')
             conn.close()
 
 
-def add_library_info_to_db(database, project, pinery, lims_info, donors_to_update, table = 'Libraries'):
+def add_library_info_to_db(database, project, pinery, lims, donors_to_update, table = 'Libraries'):
     '''
-    (str, str, str, dict, str) -> None
+    (str, str, str, dict, dict, str) -> None
     
     Inserts or updates library information in Libraries table of database    
     
@@ -1624,7 +1418,7 @@ def add_library_info_to_db(database, project, pinery, lims_info, donors_to_updat
     - database (str): Path to the databae file
     - project (str): Name of project of interest
     - pinery (str): URL of the sample provenance API: 
-    - lims_info (str): Path to the json file with lims information
+    - lims_info (dict): Dictionary with lims information extracted from Pinery
     - donors_to_update (dict): Dictionary with donors for which records needs to be updated
     - table (str): Table storing library in database. Default is Libraries
     '''
@@ -1632,22 +1426,17 @@ def add_library_info_to_db(database, project, pinery, lims_info, donors_to_updat
     # remove rows for donors to update
     if donors_to_update:
         delete_records(donors_to_update, database, table)
+        print('deleted records in Libraries')
 
-        # collect lims information
-        infile = open(lims_info)
-        lims = json.load(infile)
-        infile.close()
-        
         # check that data is recorded for that project
         if project in lims and lims[project]:
-            lims = {project: lims[project]}
-    
+            # make a list of row data
+            newdata = []
             # get column names
             column_names = define_column_names()[table]
-        
+            
             # connect to db
             conn = sqlite3.connect(database)
-            cur = conn.cursor()
             # add data
             for sample in lims[project]:
                 if sample in donors_to_update and donors_to_update[sample] != 'delete':
@@ -1656,23 +1445,24 @@ def add_library_info_to_db(database, project, pinery, lims_info, donors_to_updat
                         L.insert(0, sample)
                         L.insert(0, library)
                         L.append(project)
-                        # insert project info
-                        cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
-                        conn.commit()
+                        newdata.append(L)
+            vals = '(' + ','.join(['?'] * len(newdata[0])) + ')'
+            conn.executemany('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), vals), newdata)
+            conn.commit()
             conn.close()
 
 
 
-def add_workflow_inputs_to_db(database, fpr, project, donors_to_update, table = 'Workflow_Inputs'):
+def add_workflow_inputs_to_db(database, libraries, project, donors_to_update, table = 'Workflow_Inputs'):
     '''
-    (str, str, dict, str) -> None
+    (str, dict, str, dict, str) -> None
     
     Inserts or updates workflow input library information in table Workflow_Inputs of database    
     
     Parameters
     ----------
     - database (str): Path to the databae file
-    - fpr (str): Path to the File Provenance Report
+    - libraries (dict): Dictionary with workflow inputs extracted from FPR
     - project (str): Name of project of interest
     - donors_to_update (dict): Dictionary with donors for which records needs to be updated
     - table (str): Table storing library in database. Default is Libraries
@@ -1682,18 +1472,16 @@ def add_workflow_inputs_to_db(database, fpr, project, donors_to_update, table = 
     # remove rows for donors to update
     if donors_to_update:
         delete_records(donors_to_update, database, table)
+        print('deleted records in Workflow_Inputs')
 
-        # collect information about library inputs
-        libraries = extract_workflow_info(fpr, project)
-    
         # check that data is recorded in FPR for project
         if libraries:
+            # make a list of data to insert
+            newdata = []
             # connect to db
             conn = sqlite3.connect(database)
-            cur = conn.cursor()
-       
             # get column names
-            data = cur.execute("SELECT * FROM {0} WHERE project_id = '{1}';".format(table, project))
+            data = conn.execute("SELECT * FROM {0} WHERE project_id = '{1}';".format(table, project))
             column_names = [column[0] for column in data.description]
     
             # add or update data
@@ -1711,18 +1499,17 @@ def add_workflow_inputs_to_db(database, fpr, project, donors_to_update, table = 
                             L.append(project)
                             L.insert(3, workflow_run)
                             L.append(sample)
-                    
-                            # insert project info
-                            cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
-                            conn.commit()
-     
+                            newdata.append(L)                      
+            vals = '(' + ','.join(['?'] * len(newdata[0])) + ')'
+            conn.executemany('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), vals), newdata)
+            conn.commit()
             conn.close()
 
 
 
 def add_samples_info_to_db(database, project, pinery, table, donors_to_update, sample_info):
     '''
-    (str, str, str, dict, dict, str) -> None
+    (str, str, str, dict, dict, dict) -> None
     
     Inserts samples data into Samples table of database    
     
@@ -1733,24 +1520,26 @@ def add_samples_info_to_db(database, project, pinery, table, donors_to_update, s
     - pinery (str): Pinery API
     - table (str): Name of table in database
     - donors_to_update (dict): Dictionary with donors for which records needs to be updated
-    - sample_info (str): Path to the json file with sample information
+    - sample_info (dict): Dictionary with sample information extracted from Pinery
     '''
     
     
     # remove rows for donors to update
     if donors_to_update:
         delete_records(donors_to_update, database, table)
+        print('deleted records in Samples')
 
         # collect information about samples
         samples = get_parent_sample_info(pinery, project, sample_info)
     
         if samples:
+            # make a list of row data
+            newdata = []
             # connect to db
             conn = sqlite3.connect(database)
-            cur = conn.cursor()
-   
+             
             # get column names
-            data = cur.execute("SELECT * FROM {0} WHERE project_id = '{1}';".format(table, project))
+            data = conn.execute("SELECT * FROM {0} WHERE project_id = '{1}';".format(table, project))
             column_names = [column[0] for column in data.description]
 
             # add data into table
@@ -1758,11 +1547,11 @@ def add_samples_info_to_db(database, project, pinery, table, donors_to_update, s
                 if i['case'] in donors_to_update and donors_to_update[i['case']] != 'delete':
                    L = [i['case'], i['donor_id'], i['species'], i['sex'], i['miso'],
                          i['created_date'], i['modified_date'], project, i['project']]          
+                   newdata.append(L)
             
-                   # insert project info
-                   cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
-                   conn.commit()
- 
+            vals = '(' + ','.join(['?'] * len(newdata[0])) + ')'
+            conn.executemany('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), vals), newdata)
+            conn.commit()
             conn.close()
 
 
@@ -1793,12 +1582,13 @@ def add_blocks_to_db(database, project, expected_workflows, table, pipeline, don
             blocks = find_WT_blocks(project, database, expected_workflows, donors_to_update)
 
         if blocks:
+            # make a list of row data
+            newdata = []
+            
             # connect to db
             conn = sqlite3.connect(database)
-            cur = conn.cursor()
-   
             # get column names
-            data = cur.execute("SELECT * FROM {0} WHERE project_id = '{1}';".format(table, project))
+            data = conn.execute("SELECT * FROM {0} WHERE project_id = '{1}';".format(table, project))
             column_names = [column[0] for column in data.description]
 
             # add data into table
@@ -1818,11 +1608,10 @@ def add_blocks_to_db(database, project, expected_workflows, table, pipeline, don
                                  d[samples][block]['complete'],
                                  d[samples][block]['clean'],
                                  d[samples][block]['network']]
-            
-                            # insert project info
-                            cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(L)))
-                            conn.commit()
- 
+                            newdata.append(L)
+            vals = '(' + ','.join(['?'] * len(newdata[0])) + ')'
+            conn.executemany('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), vals), newdata)
+            conn.commit()
             conn.close()
 
 
@@ -1843,393 +1632,25 @@ def add_checksums_info_to_db(database, project, donors_to_update, table = 'Check
     
     if donors_to_update:
         delete_records(donors_to_update, database, table)
-    
+        
+        # make a list of data to insert
+        newdata = []
+        
         # connect to db
         conn = sqlite3.connect(database, timeout=30)
-        cur = conn.cursor()
-
         # get column names
-        data = cur.execute("SELECT * FROM {0} WHERE project_id = '{1}';".format(table, project))
+        data = conn.execute("SELECT * FROM {0} WHERE project_id = '{1}';".format(table, project))
         column_names = [column[0] for column in data.description]
 
         # order values according to column names
         for i in donors_to_update:
-            vals = [project, i, donors_to_update[i]]
-            # insert project info
-            cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), tuple(vals)))
-            conn.commit()
-    
+            L = [project, i, donors_to_update[i]]
+            newdata.append(L)
+        vals = '(' + ','.join(['?'] * len(newdata[0])) + ')'
+        conn.executemany('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), vals), newdata)
+        conn.commit()
         conn.close()
 
-    
-def collect_lims_info(args):
-    '''
-    (str, str) -> str
-    
-    Parse sample-provenance in Pinery and writes information as json
-    
-    Parameters
-    ----------
-    - pinery (str): Pinery API
-    - lims_info (str): Path to the output json file with lims information
-    ''' 
-
-    sample_provenance = args.pinery + '/provenance/v9/sample-provenance'
-    # get sample info from pinery
-    L = get_provenance_data(sample_provenance)
-    
-    # store lims information for each library of each project
-    # {project: {sample: {library_info}}}    
-    D = {}
-
-    for i in L:
-        project = i['studyTitle']
-        sample = i['rootSampleName']  
-        if project not in D:
-            D[project] = {}
-        if sample not in D[project]:
-            D[project][sample] = {}
-    
-        # collect sample information
-        d = collect_info(i['sampleAttributes'], ['geo_tissue_type', 'geo_external_name', 'geo_tissue_origin',
-                 'geo_library_source_template_type', 'geo_prep_kit',
-                 'geo_tissue_preparation', 'geo_receive_date', 'geo_group_id', 'geo_group_id_description'], ['tissue_type', 'ext_id', 'tissue_origin', 'library_type', 
-                         'prep', 'tissue_prep', 'sample_received_date', 'group_id', 'group_id_description'])
-        # add library name
-        library = i['sampleName']
-                        
-        # store sample information
-        if library not in D[project][sample]:
-            D[project][sample][library] = d
-            
-        #update sample information for each library if some fields are missing
-        for k in d:
-            if D[project][sample][library][k] == '':
-                D[project][sample][library][k] = d[k]    
-    
-    newfile = open(args.lims_info, 'w')
-    json.dump(D, newfile)
-    newfile.close()    
-
-
-
-def collect_parent_sample_info(args):
-    '''
-    (str, str) -> str
-    
-    Parse sample-provenance in Pinery and writes information as json
-    
-    Parameters
-    ----------
-    - pinery (str): Pinery API
-    - samples_info (str): Path to the output json file with sample information
-    ''' 
-
-    provenance = args.pinery + '/samples'
-    # get sample info from pinery
-    L = get_provenance_data(provenance)
-    
-    D = {}
-
-    for i in L:
-        if i['name'].count('_') == 1:
-            case = i['name']
-            sex, species, donor_id = '', '', ''
-            for j in i['attributes']:
-                if j['name'] == 'Sex':
-                    sex = j['value']
-                if j['name'] == 'Organism':
-                    species= j['value']
-                if j['name'] == 'External Name':
-                    donor_id = j['value']
-            sample_id = i['id']
-            miso = 'https://miso.oicr.on.ca/miso/sample/{0}'.format(sample_id.replace('SAM', ''))    
-            project = i['project_name']
-            modified_date = i['modified_date']
-            created_date = i['created_date']
-            D[case] = {'project': project, 'sex': sex, 'species': species,
-                       'miso': miso, 'donor_id': donor_id, 'case': case, 'modified_date': modified_date,
-                       'created_date': created_date}
-        
-    newfile = open(args.samples_info, 'w')
-    json.dump(D, newfile)
-    newfile.close()    
-    
-    
-    
-def add_info(args):
-    '''
-    (list) -> None
-    
-    Adds infornation for a given project to the provenance reporter database
-    
-    Parameters
-    ----------
-    - fpr (str): Path to Path to the File Provenance Report
-    - nabu (str): URL of the Nabu API
-    - pinery (str): Pinery api
-    - database (str): Path to the database file
-    - lims_info (str): Path to the json file with lims information
-    - project (str): Name of the project
-    '''
-    
-    # create database if file doesn't exist
-    if os.path.isfile(args.database) == False:
-        initiate_db(args.database)
-    
-    # get the donors for which records need to be updated
-    donors_to_update = donors_info_to_update(args.database, args.fpr, args.project, 'Checksums')
-    print('donors to update', len(donors_to_update))
-    
-    # add project information    
-    add_project_info_to_db(args.database, args.pinery, args.project, args.lims_info, 'Projects')
-    print('added projects')
-    
-    # add file info
-    add_file_info_to_db(args.database, args.project, args.fpr, donors_to_update, 'Files')
-    print('added files')
-    
-    # add library information
-    add_library_info_to_db(args.database, args.project, args.pinery, args.lims_info, donors_to_update, 'Libraries')
-    print('added libraries')
-    
-    # add sample information
-    add_samples_info_to_db(args.database, args.project, args.pinery, 'Samples', donors_to_update, args.samples_info)
-    print('added samples') 
-    
-    # add workflow input
-    add_workflow_inputs_to_db(args.database, args.fpr, args.project, donors_to_update, 'Workflow_Inputs')
-    print('added workflow inputs')
-    
-    # add calculate contamination info
-    add_contamination_info(args.database, args.calcontaqc_db, donors_to_update, table = 'Calculate_Contamination')
-    print('added call-ready contamination')
-
-    # add file QC info
-    add_fileQC_info_to_db(args.database, args.project, args.nabu, args.fpr, donors_to_update, 'FilesQC')
-    print('added filesqc')
-    
-    # add workflow information
-    add_workflows_info_to_db(args.fpr, args.database, args.project, donors_to_update, 'Workflows', 'Parents', 'Children', 'Files', 'Workflow_Inputs')
-    print('added workflows')
-    
-    # add WGS blocks
-    expected_WGS_workflows = sorted(['mutect2', 'variantEffectPredictor', 'delly', 'varscan', 'sequenza', 'mavis']) 
-    add_blocks_to_db(args.database, args.project, expected_WGS_workflows, 'WGS_blocks', 'WGS', donors_to_update)
-    print('added wgs blocks')  
-    
-    # add WT blocks
-    expected_WT_workflows = sorted(['arriba', 'rsem', 'starfusion', 'mavis'])
-    add_blocks_to_db(args.database, args.project, expected_WT_workflows, 'WT_blocks', 'WT', donors_to_update)
-    print('added WT blocks')  
-    
-    # update the checksums for donors
-    add_checksums_info_to_db(args.database, args.project, donors_to_update, 'Checksums')
-    print('added checksums')
-
-
-    
-
-def launch_jobs(args):
-    '''
-    (list) -> None
-    
-    Launch qsub jobs to fill the provenance reporter database     
-    
-    Parameters
-    ----------
-    - fpr (str): Path to Path to the File Provenance Report
-    - nabu (str): URL of the Nabu API
-    - pinery (str): Pinery API
-    - database (str): Path to the database file
-    - workingdir (str): Name of the directory where qsubs scripts are written
-    - mem (int): Memory allocated to jobs
-    '''
-    
-    # populate database with project information
-    # extract project information from project provenance
-    projects = extract_project_info(args.pinery)
-    # filter out completed projects
-    projects = filter_completed_projects(projects)
-    # make a list of projects with data in Prinery and FPR
-    projects = get_valid_projects(projects, args.fpr)
-    
-    # make a directory to save the scripts
-    qsubdir = os.path.join(args.workingdir, 'qsubs')
-    os.makedirs(qsubdir, exist_ok=True)
-    # create a log dir
-    logdir = os.path.join(qsubdir, 'logs')
-    os.makedirs(logdir, exist_ok=True)
-    # make a directory to store the project databases
-    databasedir = os.path.join(args.workingdir, 'databases')
-    os.makedirs(databasedir, exist_ok=True)
-    
-    cmd1 = 'module load waterzooi-tools; waterzooiDataCollector collect_lims -p {0} -l {1}'
-        
-    bashScript = os.path.join(qsubdir, 'collect_lims.sh')
-    lims_info_file = os.path.join(args.workingdir, 'lims_info.json')
-    with open(bashScript, 'w') as newfile:
-        #newfile.write(cmd1.format(dbfiller, args.pinery, lims_info_file))
-        newfile.write(cmd1.format(args.pinery, lims_info_file))
-    
-    qsubCmd = "qsub -b y -P gsi -l h_vmem={0}g -N {1}  -e {2} -o {2} \"bash {3}\"".format(args.mem, 'waterzooidb.lims', logdir, bashScript)
-    subprocess.call(qsubCmd, shell=True)
-
-    cmd2 = 'module load waterzooi-tools; waterzooiDataCollector collect_samples -p {0} -s {1}'
-        
-    bashScript = os.path.join(qsubdir, 'collect_samples.sh')
-    samples_info_file = os.path.join(args.workingdir, 'samples_info.json')
-    with open(bashScript, 'w') as newfile:
-        newfile.write(cmd2.format(args.pinery, samples_info_file))
-    qsubCmd = "qsub -b y -P gsi -l h_vmem={0}g -N {1}  -e {2} -o {2} \"bash {3}\"".format(args.mem, 'waterzooidb.samples', logdir, bashScript)
-    subprocess.call(qsubCmd, shell=True)
-
-    cmd3 = 'module load waterzooi-tools; waterzooiDataCollector add_project -f {0} -n {1} -p {2} -d {3} -pr {4} -l {5} -s {6}'
-    
-    # record job names and job exit codes    
-    job_names = []
-
-    for project in projects:
-        database = os.path.join(databasedir, '{0}.db'.format(project))
-        # get name of output file
-        bashScript = os.path.join(qsubdir, '{0}_add_project_info.sh'.format(project))
-        with open(bashScript, 'w') as newfile:
-            newfile.write(cmd3.format(args.fpr, args.nabu, args.pinery, database, project, lims_info_file, samples_info_file))
-        # launch qsub directly, collect job names and exit codes
-        jobName = '{0}.{1}'.format(project, secret_key_generator(20))
-              
-        qsubCmd = 'qsub -b y -P gsi -l h_vmem={0}g,h_rt={1}:0:0 -N {2} -hold_jid "{3}" -e {4} -o {4} "bash {5}"'.format(args.mem, args.run_time, jobName, 'waterzooidb.lims,waterzooidb.samples', logdir, bashScript)
-        subprocess.call(qsubCmd, shell=True)
-        # store job names
-        job_names.append(jobName)
-    
-    # launch job to merge the project databases
-    cmd4 = 'module load waterzooi-tools; waterzooiDataCollector merge -md {0} -jn "{1}" -wd {2}'
-       
-    bashScript = os.path.join(qsubdir, 'merge_db.sh')
-    with open(bashScript, 'w') as newfile:
-        newfile.write(cmd4.format(args.merged_database, ','.join(job_names), args.workingdir))
-    qsubCmd = "qsub -b y -P gsi -l h_vmem={0}g,h_rt={1}:0:0 -N {2}  -hold_jid \"{3}\" -e {4} -o {4} \"bash {5}\"".format(args.mem, args.run_time, 'waterzooidb.merging', ','.join(job_names), logdir, bashScript)
-    subprocess.call(qsubCmd, shell=True)
-
-
-
-def collect_project_info(database, table):
-    '''
-    (str, str) -> list
-    
-    Returns a list of sqlite3.Row extracted from table in database
-        
-    Parameters
-    ----------
-    - database (str): Path to sqlite database
-    - table (str): Table of interest in database
-    '''
-    
-    # collect information from project database for table
-    conn = sqlite3.connect(database)
-    conn.row_factory = sqlite3.Row
-    data = conn.execute('SELECT * FROM {0}'.format(table)).fetchall()
-    conn.close()
-    
-    return data       
-    
-    
-def update_database(merged_database, table, data):
-    '''
-    (str, str, list) -> None
-    
-    Update table in merged_database with data for a given project
-    
-    Parameters
-    ----------
-    - merged_database (str): Path to the merged database
-    - table (str): Table of interest in database
-    - data (list): list of sqlite3.Row extracted from table in project database
-    '''
-    
-    # open merged database, add project data into table
-    conn = sqlite3.connect(merged_database,  timeout=30)
-    cur = conn.cursor()
-    # get the column names
-    c = list(zip(*list(dict(data[0]).items())))[0]
-    for i in data:
-        # get values in order of column names    
-        v = list(zip(*list(dict(i).items())))[1]
-        cur.execute('INSERT INTO {0} {1} VALUES {2}'.format(table, c , v))
-        conn.commit()            
-    conn.close()
-
-
-
-def merge_two_databases(db1, db2):
-    '''
-    (str, str) -> None
-
-    Merge database db2 into database db1
-    Precondition: the two dababases have the same schema
-    
-    Parameters
-    ---------
-    - db1 (str): Path to database 1
-    - db2 (str): Path to database 2
-    '''
-
-    # connect to db1  
-    conn = sqlite3.connect(db1, timeout=30)
-    # attach database db2
-    conn.execute("ATTACH '" + db2 +  "' as dba")
-    conn.execute("BEGIN")
-    # loop over rows in selected info from db2
-    for row in conn.execute("SELECT * FROM dba.sqlite_master WHERE type='table'"):
-        # combine data into db1
-        combine = "INSERT OR IGNORE INTO "+ row[1] + " SELECT * FROM dba." + row[1]
-        conn.execute(combine)
-    conn.commit()
-    # detach from db2
-    conn.execute("detach database dba")
-    conn.close()
-       
-
-
-def merge_databases(merged_database, databases):
-    '''
-    (str, list) -> None    
-    
-    Merge all the project databases located into merged_database
-    
-    Parematers
-    ----------
-    - merged_database (str): Path to the merged database
-    - databases (list): List of paths to the project databases
-    '''
-    
-    start = time.time()
-    
-    # initiate merged database if file doesn't exist
-    if os.path.isfile(merged_database) == False:
-        initiate_db(merged_database)
-    
-    # remove tables
-    conn = sqlite3.connect(merged_database)
-    cur = conn.cursor()
-    cur.execute("SELECT name FROM sqlite_master WHERE type='table';")
-    tables = cur.fetchall()
-    tables = [i[0] for i in tables]
-    for table in tables:
-        # drop table and re-initiate table
-        remove_table(merged_database, table)
-        create_table(merged_database, table)
-              
-    for db in databases:
-        print(os.path.basename(db))
-        try:
-            merge_two_databases(merged_database, db)
-        except:
-            print('could not merge {0} database'.format(os.path.basename(db)))
-    
-    end = time.time()
-    print('merged databases', end - start)
 
 
 def get_job_exit_status(job):
@@ -2279,43 +1700,93 @@ def get_job_exit_status(job):
     return exit_status
 
 
-def merge(args):
+def collect_lims_info(pinery):
     '''
-    (list) -> None
+    (str) -> dict
     
-    Launch job to merge the project databases into a single database
-    
+    Returns a dictionary with lims information extracted from sample-provenance in Pinery
+        
     Parameters
     ----------
-    - database (str): Path to the database file
-    - mem (str): Memory allocated to jobs
-    - job_names (str): Semi-colon separated list of job names 
-    '''
-    
-    # check that jobs completely successfully before merging the project databases
-    if args.job_names:
-        # check if jobs are still running
-        jobs = list(map(lambda x: x.strip(), args.job_names.split(',')))
-        jobs.sort()  
-        
-        # make a list of successfully updated project db
-        updated = []
-        databasedir = os.path.join(args.workingdir, 'databases')
-        for job in jobs:
-            # get exit status
-            exit_status = get_job_exit_status(job)
-            if exit_status == 0:
-                db =  os.path.join(databasedir, job.split('.')[0] + '.db')
-                updated.append(db)
-    else:
-        # make a list of any project databases 
-        databasedir = os.path.join(args.workingdir, 'databases')
-        updated = [os.path.join(databasedir, i) for i in os.listdir(databasedir) if '.db' in i]
-    
-    # merge all projects databases that were successfully updated
-    merge_databases(args.merged_database, updated)
-        
+    - pinery (str): Pinery API
+    ''' 
 
+    sample_provenance = pinery + '/provenance/v9/sample-provenance'
+    # get sample info from pinery
+    L = get_provenance_data(sample_provenance)
+    
+    # store lims information for each library of each project
+    # {project: {sample: {library_info}}}    
+    D = {}
+
+    for i in L:
+        project = i['studyTitle']
+        sample = i['rootSampleName']  
+        if project not in D:
+            D[project] = {}
+        if sample not in D[project]:
+            D[project][sample] = {}
+    
+        # collect sample information
+        d = collect_info(i['sampleAttributes'], ['geo_tissue_type', 'geo_external_name', 'geo_tissue_origin',
+                 'geo_library_source_template_type', 'geo_prep_kit',
+                 'geo_tissue_preparation', 'geo_receive_date', 'geo_group_id', 'geo_group_id_description'], ['tissue_type', 'ext_id', 'tissue_origin', 'library_type', 
+                         'prep', 'tissue_prep', 'sample_received_date', 'group_id', 'group_id_description'])
+        # add library name
+        library = i['sampleName']
+                        
+        # store sample information
+        if library not in D[project][sample]:
+            D[project][sample][library] = d
+            
+        #update sample information for each library if some fields are missing
+        for k in d:
+            if D[project][sample][library][k] == '':
+                D[project][sample][library][k] = d[k]    
+    
+    return D
+
+
+
+
+def collect_parent_sample_info(pinery):
+    '''
+    (str) -> dict
+    
+    Returns a dictionary with sample information extracted from sample-provenance in Pinery
+        
+    Parameters
+    ----------
+    - pinery (str): Pinery API
+    ''' 
+
+    provenance = pinery + '/samples'
+    # get sample info from pinery
+    L = get_provenance_data(provenance)
+    
+    D = {}
+
+    for i in L:
+        if i['name'].count('_') == 1:
+            case = i['name']
+            sex, species, donor_id = '', '', ''
+            for j in i['attributes']:
+                if j['name'] == 'Sex':
+                    sex = j['value']
+                if j['name'] == 'Organism':
+                    species= j['value']
+                if j['name'] == 'External Name':
+                    donor_id = j['value']
+            sample_id = i['id']
+            miso = 'https://miso.oicr.on.ca/miso/sample/{0}'.format(sample_id.replace('SAM', ''))    
+            project = i['project_name']
+            modified_date = i['modified_date']
+            created_date = i['created_date']
+            D[case] = {'project': project, 'sex': sex, 'species': species,
+                       'miso': miso, 'donor_id': donor_id, 'case': case, 'modified_date': modified_date,
+                       'created_date': created_date}
+        
+    return D
 
 
 def generate_database(args):
@@ -2334,13 +1805,14 @@ def generate_database(args):
     - samples_info (str): Path to the json file with sample information
     '''
 
-    # check that fpr file exists
-    assert os.path.isfile(args.fpr)
-    # check that lims info file exists
-    assert os.path.isfile(args.lims_info)
-    # check that sample info file exists
-    assert os.path.isfile(args.samples_info)
-    
+    # collect lims info
+    lims_info = collect_lims_info(args.pinery)
+    print('collected lins info')
+    # collect sample info
+    samples_info = collect_parent_sample_info(args.pinery)
+    print('samples info')
+           
+    # collect file info from FPR
     # get the list of valid projects
     # extract project information from project provenance
     projects = extract_project_info(args.pinery)
@@ -2349,116 +1821,89 @@ def generate_database(args):
     # make a list of projects with data in Prinery and FPR
     projects = get_valid_projects(projects, args.fpr)
     projects.sort()
-        
+    fpr_data = collect_file_info_from_fpr(args.fpr, projects)
+    
     # create database if file doesn't exist
     if os.path.isfile(args.database) == False:
         initiate_db(args.database)
-        
+    
+    # collect workflow inputlibraries
+    wf_input = extract_workflow_info(args.fpr, projects)
+    # match file swids to donor ids
+    matched_ids = match_donor_to_file_swid(fpr_data, projects)
+    # get the parent file ids of each workflow
+    parents = get_parent_file_ids(args.fpr, projects)
+    
     # loop over projects
     for project in projects:
         print(project)
         try:
             # get the donors for which records need to be updated
-            donors_to_update = donors_info_to_update(args.database, args.fpr, project, 'Checksums')
-            print('donors to update', len(donors_to_update))
-            # add project information    
-            add_project_info_to_db(args.database, args.pinery, project, args.lims_info, 'Projects')
-            print('added projects')
-            # add file info
-            add_file_info_to_db(args.database, project, args.fpr, donors_to_update, 'Files')
-            print('added files')
-            # add library information
-            add_library_info_to_db(args.database, project, args.pinery, args.lims_info, donors_to_update, 'Libraries')
-            print('added libraries')
-            # add sample information
-            add_samples_info_to_db(args.database, project, args.pinery, 'Samples', donors_to_update, args.samples_info)
-            print('added samples') 
-            # add workflow input
-            add_workflow_inputs_to_db(args.database, args.fpr, project, donors_to_update, 'Workflow_Inputs')
-            print('added workflow inputs')
-            # add calculate contamination info
-            add_contamination_info(args.database, args.calcontaqc_db, donors_to_update, table = 'Calculate_Contamination')
-            print('added call-ready contamination')
-            # add file QC info
-            add_fileQC_info_to_db(args.database, project, args.nabu, args.fpr, donors_to_update, 'FilesQC')
-            print('added filesqc')
-            # add workflow information
-            add_workflows_info_to_db(args.fpr, args.database, project, donors_to_update, 'Workflows', 'Parents', 'Children', 'Files', 'Workflow_Inputs')
-            print('added workflows')
-            # add WGS blocks
-            expected_WGS_workflows = sorted(['mutect2', 'variantEffectPredictor', 'delly', 'varscan', 'sequenza', 'mavis']) 
-            add_blocks_to_db(args.database, project, expected_WGS_workflows, 'WGS_blocks', 'WGS', donors_to_update)
-            print('added wgs blocks')  
-            # add WT blocks
-            expected_WT_workflows = sorted(['arriba', 'rsem', 'starfusion', 'mavis'])
-            add_blocks_to_db(args.database, project, expected_WT_workflows, 'WT_blocks', 'WT', donors_to_update)
-            print('added WT blocks')  
-            # update the checksums for donors
-            add_checksums_info_to_db(args.database, project, donors_to_update, 'Checksums')
-            print('added checksums')
+            start = time.time()
+            donors_to_update = donors_info_to_update(args.database, fpr_data, project, 'Checksums')
+            print('donors to update:', len(donors_to_update))
+            if donors_to_update:
+                # add project information    
+                add_project_info_to_db(args.database, args.pinery, project, lims_info, 'Projects')
+                print('added projects')
+                # add file info
+                add_file_info_to_db(args.database, project, fpr_data, donors_to_update, 'Files')
+                print('added files')
+                # add library information
+                add_library_info_to_db(args.database, project, args.pinery, lims_info, donors_to_update, 'Libraries')
+                print('added libraries')
+                # add sample information
+                add_samples_info_to_db(args.database, project, args.pinery, 'Samples', donors_to_update, samples_info)
+                print('added samples') 
+                # add workflow input
+                add_workflow_inputs_to_db(args.database, wf_input, project, donors_to_update, 'Workflow_Inputs')
+                print('added workflow inputs')
+                # add calculate contamination info
+                add_contamination_info(args.database, args.calcontaqc_db, donors_to_update, table = 'Calculate_Contamination')
+                print('added call-ready contamination')
+                # add file QC info
+                add_fileQC_info_to_db(args.database, project, args.nabu, matched_ids, donors_to_update, 'FilesQC')
+                print('added filesqc')
+                # add workflow information
+                # get workflow information for the current project
+                workflows = get_workflow_information(fpr_data, donors_to_update, project, args.database, 'Files', 'Workflow_Inputs')
+                add_workflows_to_db(fpr_data, workflows, args.database, project, donors_to_update, 'Workflows')
+                print('added workflows')
+                # add workflow relationships
+                add_workflows_relationships_to_db(fpr_data, workflows, parents, args.database, project, donors_to_update, 'Parents')
+                print('added workflow relationships')
+                # add WGS blocks
+                expected_WGS_workflows = sorted(['mutect2', 'variantEffectPredictor', 'delly', 'varscan', 'sequenza', 'mavis']) 
+                add_blocks_to_db(args.database, project, expected_WGS_workflows, 'WGS_blocks', 'WGS', donors_to_update)
+                print('added wgs blocks')  
+                # add WT blocks
+                expected_WT_workflows = sorted(['arriba', 'rsem', 'starfusion', 'mavis'])
+                add_blocks_to_db(args.database, project, expected_WT_workflows, 'WT_blocks', 'WT', donors_to_update)
+                print('added WT blocks')  
+                # update the checksums for donors
+                add_checksums_info_to_db(args.database, project, donors_to_update, 'Checksums')
+                print('added checksums')
+                end = time.time()
+                print('updated project {0} in {1} seconds'.format(project, end - start))
+                print('----')
         except:
             print('could not add data for {0}'.format(project))
+            print(print(traceback.format_exc()))
+            print('----')
     
     
     
 if __name__ == '__main__':
-
-    
-    # create top-level parser
-    parent_parser = argparse.ArgumentParser(prog = 'prov_reporter_db_filler.py', description='Script to add data to the Provenance Reporter database', add_help=False)
-    parent_parser.add_argument('-f', '--fpr', dest='fpr', default = '/scratch2/groups/gsi/production/vidarr/vidarr_files_report_latest.tsv.gz', help='Path to the File Provenance Report. Default is /scratch2/groups/gsi/production/vidarr/vidarr_files_report_latest.tsv.gz')
-    parent_parser.add_argument('-n', '--nabu', dest='nabu', default='https://nabu-prod.gsi.oicr.on.ca', help='URL of the Nabu API. Default is https://nabu-prod.gsi.oicr.on.ca')
-    parent_parser.add_argument('-p', '--pinery', dest = 'pinery', default = 'http://pinery.gsi.oicr.on.ca', help = 'Pinery API. Default is http://pinery.gsi.oicr.on.ca')
-    parent_parser.add_argument('-cq', '--calcontaqc', dest = 'calcontaqc_db', default = '/scratch2/groups/gsi/production/qcetl_v1/calculatecontamination/latest', help = 'Path to the merged rnaseq calculateContamination database. Default is /scratch2/groups/gsi/production/qcetl_v1/calculatecontamination/latest')
-                               
-    main_parser = argparse.ArgumentParser(prog = 'prov_reporter_db_filler.py', description = 'Add data to the Provenance Reporter database')
-    subparsers = main_parser.add_subparsers(title='sub-commands', description='valid sub-commands', dest= 'subparser_name', help = 'sub-commands help')
-    
-    # add project info  
-    project_parser = subparsers.add_parser('add_project', help="Add project information to the Provenance Reporter database", parents = [parent_parser])
-    project_parser.add_argument('-pr', '--project', dest='project', help='Name of the project of interest', required = True)
-    project_parser.add_argument('-d', '--database', dest='database', help='Path to the database file', required=True)
-    project_parser.add_argument('-l', '--lims', dest='lims_info', help='Path to json file with lims info', required=True)
-    project_parser.add_argument('-s', '--samples', dest='samples_info', help='Path to json file with samples info', required=True)
-    project_parser.set_defaults(func=add_info)
- 
-    # launch jobs to fill db with all projects info
-    fill_parser = subparsers.add_parser('fill_db', help="Run jobs to fill database with information about all active projects.", parents = [parent_parser])
-    fill_parser.add_argument('-wd', '--workingdir', dest='workingdir', help='Name of the directory where qsubs scripts are written', required = True)
-    fill_parser.add_argument('-m', '--memory', dest='mem', default=20, help='Memory allocated to jobs')
-    fill_parser.add_argument('-md', '--merged_database', dest='merged_database', help='Path to the merged database', required = True)
-    fill_parser.add_argument('-rt', '--run_time', dest='run_time', default=5, help='Run time in hours')
-    fill_parser.set_defaults(func=launch_jobs)
-
-    # collect lims information from pinery
-    fill_parser = subparsers.add_parser('collect_lims', help="Collect lims information from Pinery.", parents = [parent_parser])
-    fill_parser.add_argument('-l', '--lims', dest='lims_info', help='Path to json file with lims info', required = True)
-    fill_parser.set_defaults(func=collect_lims_info)
-
-    # collect sample information from pinery
-    fill_parser = subparsers.add_parser('collect_samples', help="Collect sample information from Pinery.", parents = [parent_parser])
-    fill_parser.add_argument('-s', '--samples', dest='samples_info', help='Path to json file with sample info', required = True)
-    fill_parser.set_defaults(func=collect_parent_sample_info)
-
-    # launch job to merge the project dbs 
-    merge_parser = subparsers.add_parser('merge', help="Run job to merge the project databases", parents=[parent_parser])
-    merge_parser.add_argument('-m', '--memory', dest='mem', default=20, help='Memory allocated to jobs')
-    merge_parser.add_argument('-rt', '--run_time', dest='run_time', default=5, help='Run time in hours')
-    merge_parser.add_argument('-jn', '--job_names', dest='job_names', help='Names of the jobs launched to fill the database')
-    merge_parser.add_argument('-wd', '--workingdir', dest='workingdir', help='Name of the directory where qsubs scripts are written', required = True)
-    merge_parser.add_argument('-md', '--merged_database', dest='merged_database', help='Path to the merged database', required = True)
-    merge_parser.set_defaults(func=merge)
-
-    # generate the waterzooi database 
-    db_build_parser = subparsers.add_parser('build_db', help="Generate the waterzooi database without qsubing", parents=[parent_parser])
-    db_build_parser.add_argument('-db', '--database', dest='database', help='Path to the waterzooi database', required=True)    
-    db_build_parser.add_argument('-l', '--lims_info', dest='lims_info', help='Path to json with lims information', required=True) 
-    db_build_parser.add_argument('-s', '--samples_info', dest='samples_info', help='Path to json with samples information', required=True) 
-    db_build_parser.set_defaults(func=generate_database)
+    parser = argparse.ArgumentParser(prog = 'waterzooiDataCollector.py', description='Script to add data to the waterzooi database')
+    parser.add_argument('-f', '--fpr', dest='fpr', default = '/scratch2/groups/gsi/production/vidarr/vidarr_files_report_latest.tsv.gz', help='Path to the File Provenance Report. Default is /scratch2/groups/gsi/production/vidarr/vidarr_files_report_latest.tsv.gz')
+    parser.add_argument('-n', '--nabu', dest='nabu', default='https://nabu-prod.gsi.oicr.on.ca', help='URL of the Nabu API. Default is https://nabu-prod.gsi.oicr.on.ca')
+    parser.add_argument('-p', '--pinery', dest = 'pinery', default = 'http://pinery.gsi.oicr.on.ca', help = 'Pinery API. Default is http://pinery.gsi.oicr.on.ca')
+    parser.add_argument('-cq', '--calcontaqc', dest = 'calcontaqc_db', default = '/scratch2/groups/gsi/production/qcetl_v1/calculatecontamination/latest', help = 'Path to the merged rnaseq calculateContamination database. Default is /scratch2/groups/gsi/production/qcetl_v1/calculatecontamination/latest')
+    parser.add_argument('-db', '--database', dest='database', help='Path to the waterzooi database', required=True)    
+    parser.set_defaults(func=generate_database)
  
     # get arguments from the command line
-    args = main_parser.parse_args()
- 
+    args = parser.parse_args()
     args.func(args)
     
 
