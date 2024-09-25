@@ -814,6 +814,25 @@ def remove_donors_without_cerberus_data(provenance_data):
     return provenance_data
 
 
+def remove_donors_without_pinery_data(provenance_data):
+    '''
+    (list) -> list
+    
+    Returns the list of donor data removing any donors that do not have project
+    information from pinery
+    
+    Parameters
+    ----------
+    - provenance_data (list): List of dictionaries, each representing the data of a single donor
+    '''
+
+    to_remove = [i for i in provenance_data if len(i['pinery_project_data']) == 0]
+    if to_remove:
+        for i in to_remove:
+            provenance_data.remove(i)
+    return provenance_data
+
+
 def compute_md5(d):
     '''
     (dict) -> str
@@ -2458,9 +2477,12 @@ def generate_database(database, provenance_data_file, calcontaqc_db):
     # remove data from inactive projects
     provenance_data = remove_data_from_inactive_projects(provenance_data)
     print('removed inactive projects')
+    # remove donors lacking cerberus or pinery data
     provenance_data = remove_donors_without_cerberus_data(provenance_data)
     print('removed donors without cerberus data')
-
+    provenance_data = remove_donors_without_pinery_data(provenance_data)
+    print('removed donors without pinery data')
+    
     # collect the md5sum of each donor's data
     md5sums = compute_donor_md5sum(provenance_data)
     print('computed md5sums')
