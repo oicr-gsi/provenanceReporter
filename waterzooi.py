@@ -415,7 +415,7 @@ def exome(project_name):
             headers={"Content-disposition": "attachment; filename={0}.EX.json".format(project_name)})
 
     else:
-        return render_template('Exome.html',
+        return render_template('exome.html',
                            routes = routes,
                            project=project,
                            samples=samples,

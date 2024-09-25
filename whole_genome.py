@@ -508,7 +508,7 @@ def get_WGTS_blocks_info(project_name, case, database, table):
     - project_name (str): Name of project of interest
     - case (str): Donor id 
     - database (str): Path to the sqlite database
-    - table (str): Table with block information: WGS_blocks or WT_blocks
+    - table (str): Table with block information: WGS_blocks, WT_blocks or EX_blocks
     '''
     
     conn = connect_to_db(database)
