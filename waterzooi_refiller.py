@@ -352,7 +352,11 @@ def add_project_info_to_db(database, provenance_data, library_table = 'Libraries
     conn = connect_to_db(database)
        
     for project in project_info:
-        pipeline = pipelines[project]
+        # check that pipeline is defined
+        if project in pipelines:
+            pipeline = pipelines[project]
+        else:
+            pipeline = 'NA'
         last_updated = time.strftime('%Y-%m-%d_%H:%M', time.localtime(time.time()))
         samples = len(project_info[project])
         # get the library types
