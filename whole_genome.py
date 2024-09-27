@@ -749,8 +749,7 @@ def review_wgs_blocks(blocks, selected_workflows):
                     break
                 else:
                     if blocks[case][samples][anchor]['clean'] and \
-                      blocks[case][samples][anchor]['complete'] and \
-                      blocks[case][samples][anchor]['release_status']:
+                      blocks[case][samples][anchor]['complete']:
                           D[case][samples] = 'ready'
                           break
                     else:
