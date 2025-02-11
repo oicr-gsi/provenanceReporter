@@ -212,15 +212,17 @@ def insert_data(database, table, data, column_names):
     - data (list): List of data to be inserted
     - column_names (list): List of table column names
     '''
-       
-
-    # connect to db
-    conn = sqlite3.connect(database)
-    # add data
-    vals = '(' + ','.join(['?'] * len(data[0])) + ')'
-    conn.executemany('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), vals), data)
-    conn.commit()
-    conn.close()
+    
+    
+    if data:
+        print('inserting data in {0}'.format(table))
+        # connect to db
+        conn = sqlite3.connect(database)
+        # add data
+        vals = '(' + ','.join(['?'] * len(data[0])) + ')'
+        conn.executemany('INSERT INTO {0} {1} VALUES {2}'.format(table, tuple(column_names), vals), data)
+        conn.commit()
+        conn.close()
 
 
 
@@ -2542,7 +2544,7 @@ def generate_database(database, provenance_data_file, calcontaqc_db):
     add_WGS_blocks_to_db(database, provenance_data, donors_to_update, 'EX_blocks',
                              expected_EX_workflows, qc_workflows, library_type = 'EX',
                              platform = 'novaseq')
-    print('added WGS blocks to database')
+    print('added EX blocks to database')
     
     
     # add WT blocks
@@ -2550,7 +2552,7 @@ def generate_database(database, provenance_data_file, calcontaqc_db):
     add_WT_blocks_to_db(database, provenance_data, donors_to_update, 'WT_blocks',
                             expected_WT_workflows, qc_workflows, library_type = 'WT',
                             platform = 'novaseq')
-    print('added WGS blocks to database')
+    print('added WT blocks to database')
     
     # update the checksums for donors
     add_checksums_info_to_db(database, donors_to_update, 'Checksums')
