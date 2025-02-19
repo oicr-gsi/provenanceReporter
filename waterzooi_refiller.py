@@ -712,8 +712,57 @@ def add_WGS_blocks_to_db(database, provenance_data, donors_to_update, table,
         
         # add data
         insert_data(database, table, newdata, column_names)
-        
 
+
+
+def check_workflow_environment(blocks):
+    '''
+    (dict) -> dict
+    
+    Returns a dictionary with the environment of each anchor workflow in blocks
+    
+    Parameters
+    ----------
+    - blocks (dict): Dictionary with analysis workflows grouped by sample pairs and blocks 
+    '''
+    
+    D = {}
+    for sample in blocks:
+        for anchor in blocks[sample]:
+            workflows = anchor.split('.')
+            for workflow in workflows:
+                workflow_id = os.path.basename(workflow)
+                environment = os.path.dirname(workflow)
+                if workflow_id in D:
+                    D[workflow_id].append(environment)
+                else:
+                    D[workflow_id] = [environment]
+                D[workflow_id] = list(set(D[workflow_id]))
+    return D
+
+
+def is_anchor_stale(blocks):
+    '''
+    (dict) -> bool
+    
+    Returns True if any of the anchor workflows exists in multiple environments (ie, indicating stale records)
+    
+    Parameters
+    ----------
+    - blocks (dict): Dictionary with analysis workflows grouped by sample pairs and blocks 
+    '''
+    
+    stale = False
+    
+    # get the environment of each anchor workflow
+    environments = check_workflow_environment(blocks)
+    # check if the anchor workflows have multiple environments
+    for workflow in environments:
+        if len(environments[workflow]) > 1:
+            stale = True
+    
+    return stale
+    
 
 def add_WT_blocks_to_db(database, provenance_data, donors_to_update, table,
                         expected_workflows, qc_workflows, library_type = 'WT', platform = 'novaseq'):
@@ -746,23 +795,26 @@ def add_WT_blocks_to_db(database, provenance_data, donors_to_update, table,
     
         for donor_data in provenance_data:
             donor = donor_data['donor']
+            
             # check if donor needs to be updated
             if donor in donors_to_update and donors_to_update[donor] != 'delete':
                 blocks = find_donor_WT_blocks(donor_data, library_type, platform, expected_workflows, qc_workflows)
-                for samples in blocks:
-                    for block in blocks[samples]:
-                        L = [blocks[samples][block]['project_id'],
-                             blocks[samples][block]['case_id'],
-                             samples,
-                             '.'.join(list(map(lambda x: os.path.basename(x), block.split('.')))),
-                             ';'.join(list(map(lambda x: os.path.basename(x), blocks[samples][block]['workflows']))),
-                             blocks[samples][block]['name'],
-                             blocks[samples][block]['date'],
-                             blocks[samples][block]['complete'],
-                             blocks[samples][block]['clean'],
-                             blocks[samples][block]['network']]
-                        newdata.append(L)
-        
+                # proceed if the anchor workflows have a unique environment (ie, no stale record)
+                if is_anchor_stale(blocks) == False:
+                    for samples in blocks:
+                        for block in blocks[samples]:
+                            L = [blocks[samples][block]['project_id'],
+                                blocks[samples][block]['case_id'],
+                                samples,
+                                '.'.join(list(map(lambda x: os.path.basename(x), block.split('.')))),
+                                ';'.join(list(map(lambda x: os.path.basename(x), blocks[samples][block]['workflows']))),
+                                blocks[samples][block]['name'],
+                                blocks[samples][block]['date'],
+                                blocks[samples][block]['complete'],
+                                blocks[samples][block]['clean'],
+                                blocks[samples][block]['network']]
+                            newdata.append(L)
+                                    
         # add data
         insert_data(database, table, newdata, column_names)
     
@@ -2524,7 +2576,7 @@ def generate_database(database, provenance_data_file, calcontaqc_db):
     add_samples_info_to_db(database, provenance_data, donors_to_update, 'Samples')
     print('added sample information to database')
     
-    # add WGS blocks
+    # # add WGS blocks
     expected_WGS_workflows = sorted(['mutect2', 'variantEffectPredictor', 'delly', 'varscan', 'sequenza', 'mavis']) 
     qc_workflows = ('wgsmetrics', 'insertsizemetrics', 'bamqc', 'calculatecontamination',
                               'callability', 'fastqc', 'crosscheckfingerprintscollector',
@@ -2535,15 +2587,15 @@ def generate_database(database, provenance_data_file, calcontaqc_db):
                               'rnaseqqc_lane_level', 'rnaseqqc_call_ready', 'calculatecontamination')
                               
     add_WGS_blocks_to_db(database, provenance_data, donors_to_update, 'WGS_blocks',
-                             expected_WGS_workflows, qc_workflows, library_type = 'WG',
-                             platform = 'novaseq')
+                              expected_WGS_workflows, qc_workflows, library_type = 'WG',
+                              platform = 'novaseq')
     print('added WGS blocks to database')
     
     # add EX blocks
     expected_EX_workflows = sorted(['mutect2', 'variantEffectPredictor', 'varscan', 'sequenza']) 
     add_WGS_blocks_to_db(database, provenance_data, donors_to_update, 'EX_blocks',
-                             expected_EX_workflows, qc_workflows, library_type = 'EX',
-                             platform = 'novaseq')
+                              expected_EX_workflows, qc_workflows, library_type = 'EX',
+                              platform = 'novaseq')
     print('added EX blocks to database')
     
     
