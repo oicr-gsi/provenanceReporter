@@ -14,7 +14,12 @@ from generate_assays import generate_templates, list_qc_workflows, extract_assay
     is_sequencing_workflow
 from db_helper import connect_to_db, define_columns, initiate_db, insert_multiple_records, \
     delete_unique_record, delete_multiple_records
-from data_helper import load_data, clean_up_workflows, is_case_info_complete
+from data_helper import load_data, clean_up_workflows, is_case_info_complete, is_signoff_complete, \
+    map_lims_to_tests, map_tests_to_samples, map_workflows_to_lims, complete_expected_workflows, \
+    identify_missing_workflows, map_samples_to_lims, sort_lims_by_samples, \
+    get_assay_expected_workflows, get_production_workflows, identify_workflows_with_missing_data, \
+    check_workflow_relationships, map_expected_production_workflows, is_data_complete, no_extra_data, \
+    identify_extra_workflows, reformat_pipeline_workflows    
 from commons import get_cases_md5sum, find_sequencing_attributes, get_donor_name, \
     compute_md5, case_to_update    
     
@@ -1631,7 +1636,167 @@ def get_moh_assay(assay_name):
 
     
 
-def generate_cache(provenance_data_file, assay_config_file, pinery, database, table='templates'):
+# def generate_cache(provenance_data_file, assay_config_file, pinery, database, table='templates'):
+#     '''
+#     (str, str, str, str, str, str) -> None 
+    
+#     Generates sqlite database with templates and review for all projects and cases in the
+#     provenance data file
+    
+#     Parameters
+#     ----------
+#     - provenance_data_file (str): Path to the file with production data extracted from Shesmu
+#     - assay_config_file (str): Path to the assay config file
+#     - pinery (str): URL to Pinery assay endpoint
+#     - database (str): Path to the sqlite database
+#     - table (str): Table in database storing the analysis data
+#     '''
+    
+    
+#     # define fastq generating workflows
+#     fastq_workflows = ['bcl2fastq', 'fileimportforanalysis', 'fileimport', 'import_fastq']
+#     # define lane lavel workflows
+#     data_workflows = ['bwamem', 'bwamem2', 'star_lane_level', 'bwameth']
+    
+    
+#     # list QC workflows
+#     assay_configurations = extract_assay_workflows(assay_config_file)
+#     # make a list of QC workflows
+#     qc_workflows = list_qc_workflows(assay_configurations)
+      
+#     # create database if file doesn't exist
+#     if os.path.isfile(database) == False:
+#         initiate_db(database, 'analysis_review', ['templates'])
+#     print('initiated database')    
+    
+#     # collect the recorded md5sums of the donor data from the database
+#     recorded_md5sums = get_cases_md5sum(database, table = 'templates')
+#     print('pulled md5sums from database')
+    
+#     # load data from file
+#     provenance_data = load_data(provenance_data_file)
+#     print('loaded data')
+    
+#     # generate assays
+#     assays = generate_templates(assay_configurations, qc_workflows, pinery)
+        
+#     # track all cases in production
+#     P = []
+          
+#     for case_data in provenance_data:
+#         case_id = case_data['case']
+        
+#         print(case_id)
+        
+#         P.append(case_id)
+#         assay = {}
+#         # check that no information is missing
+#         if is_case_info_complete(case_data):
+#             # record all case templates
+#             L = []
+#             # remove workflows that do not belong to the case
+#             case_data = clean_up_workflows(case_data)
+#             # compute the md5sum of the case info
+#             md5sum = compute_md5(case_data)
+#             # determine if case needs to be updated
+#             donor = get_donor_name(case_data)
+#             assay_name = case_data['assay']        
+            
+#             print(assay_name)
+            
+#             if case_to_update(recorded_md5sums, case_id, md5sum):
+#                 # open connection to database
+#                 conn = connect_to_db(database)
+#                 # delete case info from table
+#                 delete_unique_record(case_id, conn, database, 'templates', 'case_id')
+#                 conn.close()
+                                
+                            
+#                 ## temporary hack to use manually defined MOH assays
+#                 if is_moh_case(case_data):
+#                     assay = get_moh_assay(assay_name)
+#                 else:
+#                     if assay_name in assays:
+#                         assay = assays[assay_name]
+                     
+#                 if assay:
+#                     # get all the workflow information
+#                     workflow_info = extract_workflow_information(case_data)
+#                     # get the anchor workflows and their expected samples
+#                     anchor_workflows = extract_anchor_samples(assay)
+#                     # get workflows of all samples for the case
+#                     samples_workflows = collect_sample_workflows(case_data)
+#                     # map samples to each workflow
+#                     workflows_to_samples = map_samples_to_workflows(samples_workflows)
+#                     # find the children of each workflow
+#                     parent_to_children_workflows = collect_workflow_relationships(case_data)
+#                     # find the parents of each workflow
+#                     child_to_parents_workflows = get_downstream_workflows(parent_to_children_workflows)
+#                     anchor_samples = get_anchor_samples(samples_workflows, anchor_workflows)
+#                     # group anchor workflows
+#                     groups = group_anchor_workflows(anchor_samples)
+                    
+#                     for i in range(len(case_data['project_info'])):
+#                         deliverables = case_data['project_info'][i]['deliverables']
+#                         project_id = case_data['project_info'][i]['project']
+#                         # fill the templates for each group
+#                         templates = []
+#                         # check deliverables
+#                         if 'pipeline' in deliverables.lower():
+#                             for group in groups:
+#                                 connected = find_related_workflows(groups, group, parent_to_children_workflows, workflow_info, fastq_workflows, workflows_to_samples)
+#                                 # remove QC workflows
+#                                 connected = [i for i in connected if workflow_info[i] not in qc_workflows]
+#                                 template = fill_group_template(assay, connected, workflow_info, workflows_to_samples, child_to_parents_workflows, fastq_workflows, data_workflows)
+#                                 templates.append(template)
+#                         else:
+#                             # make groups of samples
+#                             samples = group_samples(case_data, workflows_to_samples)
+#                             for sample_group in samples:
+#                                 # fill template with samples, sequence and alignments only
+#                                 template = fill_seq_template(sample_group, assay, workflow_info, workflows_to_samples, child_to_parents_workflows, fastq_workflows, data_workflows)
+#                                 templates.append(template)
+                                
+#                         # evaluate templates
+#                         for template in templates:
+#                             if 'pipeline' in deliverables.lower():
+#                                 valid, error = evaluate_assay(template, assay, case_data, True)
+#                             else:
+#                                 valid, error = evaluate_assay(template, assay, case_data, False)
+#                             L.append([case_id, donor, project_id, assay_name, json.dumps(template), str(int(valid)), error, md5sum])
+                                     
+#                 else:
+#                     for i in case_data['project_info']:
+#                         project_id = i['project']
+#                         L.append([case_id, donor, project_id, assay_name, json.dumps({}), str(0), 'no_assay', md5sum])
+    
+#             if L:
+#                 # connect to database
+#                 conn = connect_to_db(database)
+#                 # insert records
+#                 insert_multiple_records(L, conn, database, 'templates', define_columns('analysis_review')['templates']['names'])
+#                 # close database
+#                 conn.close()
+                
+                
+    
+    
+#     # delete data for donors not in the provenance report
+#     if P:
+#         # make a list of cases in database that are not in production
+#         conn = connect_to_db(database)
+#         data = conn.execute('SELECT case_id FROM templates').fetchall()
+#         all_cases = [i['case_id'] for i in data]
+#         to_remove = [i for i in all_cases if i not in P]
+#         if to_remove:
+#             delete_multiple_records(to_remove, conn, database, 'templates', 'case_id')
+#         conn.close()
+
+
+
+
+
+def review_data(provenance_data_file, assay_config_file, pinery, database, table='templates'):
     '''
     (str, str, str, str, str, str) -> None 
     
@@ -1648,17 +1813,100 @@ def generate_cache(provenance_data_file, assay_config_file, pinery, database, ta
     '''
     
     
-    # define fastq generating workflows
-    fastq_workflows = ['bcl2fastq', 'fileimportforanalysis', 'fileimport', 'import_fastq']
-    # define lane lavel workflows
-    data_workflows = ['bwamem', 'bwamem2', 'star_lane_level', 'bwameth']
+    #assays.json : list of assays/version and assigned pipelines/versions
+    #pipelines.json : list of pipelines/versions with expected workflows and associated information
     
     
-    # list QC workflows
-    assay_configurations = extract_assay_workflows(assay_config_file)
-    # make a list of QC workflows
-    qc_workflows = list_qc_workflows(assay_configurations)
-      
+    infile = open('assays.json')
+    assays = json.load(infile)
+    infile.close()
+    
+    infile = open('pipelines.json')
+    pipelines = json.load(infile)
+    infile.close()
+    
+    
+    
+    
+    
+    
+    # assays = {'WGTS':
+    #           {'2.0':
+    #            {'standard':{
+    #             'bcl2fastq': {'tests': 'Tumour WG,Normal WG,Tumour WT',
+    #                           'level': 'lane',
+    #                           'parents': '',
+    #                           'deliverables': 'fastq'},
+    #             'bwamem2': {'tests': 'Tumour WG,Normal WG',
+    #                         'level': 'lane',
+    #                         'parents': 'bcl2fastq',
+    #                         'deliverables': 'bam,bai'},
+    #             'bamMergePreprocessing_by_sample': {'tests': 'Tumour WG,Normal WG',
+    #                        'level': 'merge',
+    #                        'parents': 'bwamem2',
+    #                        'deliverables': 'bam,bai'},
+    #             'mutect2_matched': {'tests': 'Tumour WG|Normal WG',
+    #                       'level': 'merge',
+    #                       'parents': 'bamMergePreprocessing_by_sample',
+    #                       'deliverables': 'vcf'},
+    #             'variantEffectPredictor_matched': {'tests': 'Tumour WG|Normal WG',
+    #                      'level': 'merge',
+    #                      'parents': 'mutect2_matched',
+    #                      'deliverables': 'vcf,maf'},
+    #             'delly_matched': {'tests': 'Tumour WG|Normal WG',
+    #                     'level': 'merge',
+    #                     'parents': 'bamMergePreprocessing_by_sample',
+    #                     'deliverables': 'all'},
+    #             'mavis': {'tests': 'Tumour WG|Normal WG|Tumour WT',
+    #                     'level': 'merge',
+    #                     'parents': 'bamMergePreprocessing_by_sample,delly_matched',
+    #                     'deliverables': 'all'},
+    #             'gridss': {'tests': 'Tumour WG|Normal WG',
+    #                     'level': 'merge',
+    #                     'parents': 'bamMergePreprocessing_by_sample',
+    #                     'deliverables': 'all'},
+    #             'purple': {'tests': 'Tumour WG|Normal WG',
+    #                     'level': 'merge',
+    #                     'parents': 'mutect2_matched,gridss',
+    #                     'deliverables': 'all'},
+    #             'hrDetect': {'tests': 'Tumour WG|Normal WG',
+    #                     'level': 'merge',
+    #                     'parents': 'mutect2_matched, purple',
+    #                     'deliverables': 'all'},
+    #             'msisensor': {'tests': 'Tumour WG|Normal WG',
+    #                     'level': 'merge',
+    #                     'parents': None,
+    #                     'deliverables': 'all'},
+    #             'rsem': {'tests': 'Tumour WT',
+    #                     'level': 'merge',
+    #                     'parents': 'star_call_ready',
+    #                     'deliverables': 'all'},
+    #             'star_call_ready': {'tests': 'Tumour WT',
+    #                     'level': 'merge',
+    #                     'parents': 'bcl2fastq',
+    #                     'deliverables': 'all'},
+    #             'arriba': {'tests': 'Tumour WT',
+    #                     'level': 'merge',
+    #                     'parents': 'star_call_ready',
+    #                     'deliverables': 'all'},
+    #             'starfusion': {'tests': 'Tumour WT',
+    #                     'level': 'merge',
+    #                     'parents': 'star_call_ready',
+    #                     'deliverables': 'all'}}}}}
+            
+
+    
+    
+    
+    
+    
+    
+    
+    
+    # load production data
+    provenance_data = load_data(provenance_data_file)
+    print('loaded data')
+    
     # create database if file doesn't exist
     if os.path.isfile(database) == False:
         initiate_db(database, 'analysis_review', ['templates'])
@@ -1668,114 +1916,255 @@ def generate_cache(provenance_data_file, assay_config_file, pinery, database, ta
     recorded_md5sums = get_cases_md5sum(database, table = 'templates')
     print('pulled md5sums from database')
     
-    # load data from file
-    provenance_data = load_data(provenance_data_file)
-    print('loaded data')
+    # list all workflows
+    assay_configurations = extract_assay_workflows(assay_config_file)
     
-    # generate assays
-    assays = generate_templates(assay_configurations, qc_workflows, pinery)
+    # make a list of QC workflows
+    qc_workflows = list_qc_workflows(assay_configurations)
         
+    
+    
+    # extract assays and pipeline
+    
+    # load assays
+    
+    # map case data to assay
+    
+    # map case to assay version
+    
+    # map case to pipeline ?
+    
+    
+    
+    
     # track all cases in production
     P = []
           
+    
+    
+    
     for case_data in provenance_data:
+        # record data to insert
+        L = []
         case_id = case_data['case']
+        
+        
         
         print(case_id)
         
+        
         P.append(case_id)
-        assay = {}
-        # check that no information is missing
-        if is_case_info_complete(case_data):
-            # record all case templates
-            L = []
-            # remove workflows that do not belong to the case
-            case_data = clean_up_workflows(case_data)
-            # compute the md5sum of the case info
-            md5sum = compute_md5(case_data)
-            # determine if case needs to be updated
-            donor = get_donor_name(case_data)
-            assay_name = case_data['assay']        
+        # compute the md5sum of the case info
+        md5sum = compute_md5(case_data)
+        # check that case needs to be updated
+        if case_to_update(recorded_md5sums, case_id, md5sum):
+            # md5sums differ or case id not in analysis review cache
+            # remove case id from database
+            conn = connect_to_db(database)
+            delete_unique_record(case_id, conn, database, 'templates', 'case_id')
+            conn.close()
             
-            print(assay_name)
+            # check that assay and version are defined in the assay config
+            # get the assay name and version for the case
+            assay_name = case_data['assay'].split('_')
+            version = assay_name[-1]
+            assay_version = 'v' + version
+            assay_name = '_'.join(assay_name[:-1])
             
-            if case_to_update(recorded_md5sums, case_id, md5sum):
-                # open connection to database
-                conn = connect_to_db(database)
-                # delete case info from table
-                delete_unique_record(case_id, conn, database, 'templates', 'case_id')
-                conn.close()
-                                
-                            
-                ## temporary hack to use manually defined MOH assays
-                if is_moh_case(case_data):
-                    assay = get_moh_assay(assay_name)
-                else:
+            # case data may be incomplete - check project and deliverables can be retrieved  
+            try:
+                project_ids = [case_data['project_info'][i]['project'] for i in range(len(case_data['project_info']))]
+            except:
+                project_ids = []
+            
+            try:
+                donor = get_donor_name(case_data)
+            except:
+                donor = ''
+        
+            # check that case data is complete (all sections in the case dictionary are complete)
+            if is_case_info_complete(case_data):
+                # review analysis only if signoff is complete
+                if is_signoff_complete(case_data):
+                                   
                     if assay_name in assays:
-                        assay = assays[assay_name]
-                     
-                if assay:
-                    # get all the workflow information
-                    workflow_info = extract_workflow_information(case_data)
-                    # get the anchor workflows and their expected samples
-                    anchor_workflows = extract_anchor_samples(assay)
-                    # get workflows of all samples for the case
-                    samples_workflows = collect_sample_workflows(case_data)
-                    # map samples to each workflow
-                    workflows_to_samples = map_samples_to_workflows(samples_workflows)
-                    # find the children of each workflow
-                    parent_to_children_workflows = collect_workflow_relationships(case_data)
-                    # find the parents of each workflow
-                    child_to_parents_workflows = get_downstream_workflows(parent_to_children_workflows)
-                    anchor_samples = get_anchor_samples(samples_workflows, anchor_workflows)
-                    # group anchor workflows
-                    groups = group_anchor_workflows(anchor_samples)
+                        if assay_version in assays[assay_name]:
+                            # get all pipelines for that assay
+                            pipeline_names = list(assays[assay_name][assay_version].keys())
+                            
+                            
+                            ### remove pwg for now
+                            
+                            while 'pwg' in pipeline_names:
+                                pipeline_names.remove('pwg')
+                            
+                            while 'tarseq' in pipeline_names:
+                                pipeline_names.remove('tarseq')
+                            
+                            while 'wt' in pipeline_names:
+                                pipeline_names.remove('wt')
+                            
+                            
+                            while 'swg' in pipeline_names:
+                                pipeline_names.remove('swg')
+                            
+                            
+                            
+                            #### PIPELINE VERSION WILL NEED TO BE SPECIFIED
+                            #### TAKING PIPELINE VERSION V1.0 FOR DEVPT
+                              
+                            pipeline_version = 'v1.0'
+                            
+                            # extract case data
+                            # map tests to lims ids
+                            tests_limsids = map_lims_to_tests(case_data)
+                            # map tests to samples
+                            tests_samples = map_tests_to_samples(case_data, tests_limsids)
+                            # map samples to lims
+                            samples_lims = map_samples_to_lims(case_data)
+                            # sort lims ids by sample for each test (ie. if multiple samples per test exist)                            
+                            tests_limsids = sort_lims_by_samples(tests_samples, samples_lims)
+                            # collect all worfklows for the assay
+                            # get all the workflow information
+                            workflow_info = extract_workflow_information(case_data)
+                            # map all samples to each workflow
+                            # get workflows of all samples for the case
+                            samples_workflows = collect_sample_workflows(case_data)
+                            # map each workflow to its limsIds
+                            workflow_lims = map_workflows_to_lims(case_data)
+                            # find the parent-children worklow relationships
+                            parent_to_children_workflows = collect_workflow_relationships(case_data)
                     
-                    for i in range(len(case_data['project_info'])):
-                        deliverables = case_data['project_info'][i]['deliverables']
-                        project_id = case_data['project_info'][i]['project']
-                        # fill the templates for each group
-                        templates = []
-                        # check deliverables
-                        if 'pipeline' in deliverables.lower():
-                            for group in groups:
-                                connected = find_related_workflows(groups, group, parent_to_children_workflows, workflow_info, fastq_workflows, workflows_to_samples)
-                                # remove QC workflows
-                                connected = [i for i in connected if workflow_info[i] not in qc_workflows]
-                                template = fill_group_template(assay, connected, workflow_info, workflows_to_samples, child_to_parents_workflows, fastq_workflows, data_workflows)
-                                templates.append(template)
-                        else:
-                            # make groups of samples
-                            samples = group_samples(case_data, workflows_to_samples)
-                            for sample_group in samples:
-                                # fill template with samples, sequence and alignments only
-                                template = fill_seq_template(sample_group, assay, workflow_info, workflows_to_samples, child_to_parents_workflows, fastq_workflows, data_workflows)
-                                templates.append(template)
+                            # make a list of case workflows for each pipeline
+                            pipeline_workflows = [reformat_pipeline_workflows(pipelines[i][pipeline_version]) for i in pipeline_names]
+                    
+                            # collect and evaluate data for each pipeline
+                            case_analysis = {}
+                            for i in range(len(pipeline_workflows)):
+                                                             
+                    
+                
+                                ###### need to store case_analysis for each peipleine {pipeline: case_analysis}    
+                                ###### need to evaluate valid for all pipeline
+                
                                 
-                        # evaluate templates
-                        for template in templates:
-                            if 'pipeline' in deliverables.lower():
-                                valid, error = evaluate_assay(template, assay, case_data, True)
-                            else:
-                                valid, error = evaluate_assay(template, assay, case_data, False)
-                            L.append([case_id, donor, project_id, assay_name, json.dumps(template), str(int(valid)), error, md5sum])
-                                     
+                
+                
+                                # did all expected workflows in config ran?
+                                if complete_expected_workflows(workflow_info, pipeline_workflows[i]):
+                                    # get expected lims for each workflow based on the assay and the case
+                                    
+                                    
+                                    #### need to update the function
+                                    
+                                    
+                                    #expected_workflow_lims = get_assay_expected_workflows(assays, assay, version, pipeline, tests_samples, samples_lims)
+                                    
+                                    expected_workflow_lims = get_assay_expected_workflows(pipeline_workflows[i], tests_samples, samples_lims)
+                                    
+                                    
+                                    # get lims, samples and run ids for each workflow seen in production
+                                    production_workflows = get_production_workflows(samples_workflows, workflow_lims)
+                                    # did all the expected workflows ran for all tests (check lims)?
+                                    try:
+                                        pipeline_analysis = map_expected_production_workflows(expected_workflow_lims, production_workflows)
+                                    except Exception as error:
+                                        pipeline_analysis = {}
+                                        valid = 0
+                                         
+                                
+                                
+                                    # check if missing data (workflows and parents)
+                                    if is_data_complete(pipeline_analysis, expected_workflow_lims):
+                                        # check if some workflows have extra iterations matching the required lims
+                                        if no_extra_data(pipeline_analysis, expected_workflow_lims):
+                                            # check inegrity of the workflow relationships
+                                            if check_workflow_relationships(pipeline_analysis, parent_to_children_workflows, workflow_info):
+                                                # data passed all the checks
+                                                valid = 1
+                                                error = '' 
+                                            else:
+                                                error = '[DATA ISSUES]: some workflows have the wrong parent'
+                                                valid = 0
+                                        else:
+                                            extra_workflows = identify_extra_workflows(pipeline_analysis, expected_workflow_lims)
+                                            error = '[EXTRA WORKFLOWS]: Workflows have unexpected multiple runs {0}'.format(','.join(extra_workflows)) 
+                                            valid = 0
+                                    else:
+                                        missing = identify_workflows_with_missing_data(pipeline_analysis, expected_workflow_lims)
+                                        error = '[INCOMPLETE DATA]: Workflows are missing {0}'.format(','.join(sorted(list(set(missing)))))
+                                        valid = 0
+                                else:
+                                    # get the missing workflows
+                                    missing_workflows = identify_missing_workflows(workflow_info, pipeline_workflows[i])
+                                    error = '[MISSING WORKFLOWS]: missing {0}'.format(','.join(sorted(missing_workflows)))
+                                    valid = 0
+                                    pipeline_analysis = {}
+                                
+                                case_analysis[pipeline_names[i]] = {'pipeline_analysis': pipeline_analysis,
+                                                                    'error': error,
+                                                                    'valid': valid}
+                        
+                        else:
+                            error = '[ASSAY VERSION]: version not matching {0} in assay config'.format(assay_name)
+                            valid = 0
+                            case_analysis = {}
+                    else:
+                        error = '[ASSAY]: assay {0} not in assay config'.format(assay_name)
+                        valid = 0
+                        case_analysis = {}
+                
                 else:
-                    for i in case_data['project_info']:
-                        project_id = i['project']
-                        L.append([case_id, donor, project_id, assay_name, json.dumps({}), str(0), 'no_assay', md5sum])
-    
+                    error = '[INCOMPLETE SEQUENCING]: some tests have incomplete sequencing'
+                    valid = 0
+                    case_analysis = {}
+            else:
+                error = '[INCOMPLETE CASE]: case is missing some data'
+                valid = 0
+                case_analysis = {}
+        
+        
+            # the case may be in multiple projects. record data for each project the case belongs to 
+            
+            if case_analysis:
+                if project_ids:
+                    for project in project_ids:
+                        error = ';'.join(sorted([case_analysis[i]['error'] for i in case_analysis]))
+                        valid = int(all([case_analysis[i]['valid'] for i in case_analysis]))
+                        L.append([case_id, donor, project, assay_name, json.dumps(case_analysis), str(valid), error, md5sum])
+                else:
+                    error = ';'.join(sorted([case_analysis[i]['error'] for i in case_analysis]))
+                    valid = int(all([case_analysis[i]['valid'] for i in case_analysis]))
+                    L.append([case_id, donor, 'NA', assay_name, json.dumps(case_analysis), str(valid), error, md5sum])
+            
+            else:
+                
+                
+                
+                ##### need to be adjusted
+                
+                if pipeline_names == []:
+                    error = 'NA'
+                    valid = 0
+                    
+                    
+                if project_ids:
+                    for project in project_ids:
+                        L.append([case_id, donor, project, assay_name, json.dumps(case_analysis), str(valid), error, md5sum])
+                else:
+                    L.append([case_id, donor, 'NA', assay_name, json.dumps(case_analysis), str(valid), error, md5sum])
+                            
+            
+            
             if L:
-                # connect to database
+                
+                # print('L')
+                # print(L)
+                
                 conn = connect_to_db(database)
-                # insert records
                 insert_multiple_records(L, conn, database, 'templates', define_columns('analysis_review')['templates']['names'])
-                # close database
                 conn.close()
                 
-                
-    
-    
     # delete data for donors not in the provenance report
     if P:
         # make a list of cases in database that are not in production
@@ -1787,7 +2176,7 @@ def generate_cache(provenance_data_file, assay_config_file, pinery, database, ta
             delete_multiple_records(to_remove, conn, database, 'templates', 'case_id')
         conn.close()
 
-
+       
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(prog = 'analysis_review.py', description='Script to generate the analyais review cache')
     parser.add_argument('-pv', '--provenance', dest = 'provenance', default = '/scratch2/groups/gsi/production/pr_refill_v2/provenance_reporter.json',
@@ -1801,6 +2190,7 @@ if __name__ == '__main__':
     # get arguments from the command line
     args = parser.parse_args()
     # generate sqlite cache
-    generate_cache(args.provenance, args.assay_config, args.pinery, args.analysis_db, table='templates')
+    #generate_cache(args.provenance, args.assay_config, args.pinery, args.analysis_db, table='templates')
+    review_data(args.provenance, args.assay_config, args.pinery, args.analysis_db, table='templates')
 
        

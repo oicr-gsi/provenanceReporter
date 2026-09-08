@@ -155,6 +155,10 @@ def get_donor_name(case_data):
     '''
 
     donor = list(set([i['donor'] for i in case_data['sample_info']]))
+    
+    if len(donor) != 1:
+        print('donor', donor)
+    
     assert len(donor) == 1
     donor = donor[0]
 
