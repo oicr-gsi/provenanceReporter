@@ -220,16 +220,221 @@ def map_expected_workflows_to_runid(workflow_info, case_workflows):
     - case_workflows (list): List of expected workflows from the assay
     '''
     
+    
+    sequencing_workflows = ['casava', 'bcl2fastq', 'fileimportforanalysis', 'fileimport', 'import_fastq']
+    gridss_workflows = ['gridss_matched', 'gridss'] 
+      
     # map the workflow run ids of production workflows to the expected workflows
     D = {}
     for workflow in case_workflows:
+        # collect run ids of all expected workflows
         D[workflow] = []
         for wfrunid in workflow_info:
-            if workflow_info[wfrunid] == workflow:
-                D[workflow].append(wfrunid)
+            # sequencing workflows may be defined as bcl2fastq in the assay but the actual
+            # sequencing workflow may differ
+            # check if a run id exists for an alternative sequencing workflow
+            if workflow in sequencing_workflows:
+                for key in sequencing_workflows:
+                    if key == workflow_info[wfrunid]:
+                        if key not in D:
+                            D[key] = []
+                        D[key].append(wfrunid)
+            # gridss is labeled gridss_matched in the assay
+            # but the actual name may differ based on different naming schemes
+            # for research and clinical - check if a run id exists for any gridss workflow
+            elif workflow in gridss_workflows:
+                for key in gridss_workflows:
+                    if key == workflow_info[wfrunid]:
+                        if key not in D:
+                            D[key] = []
+                        D[key].append(wfrunid)
+            else:
+                if workflow_info[wfrunid] == workflow:
+                    D[workflow].append(wfrunid)
+        
+    # remove empty gridds_matched and bcl2fastq workflows if an alternative workflow was found
+    for i in sequencing_workflows:
+        if i != 'bcl2fastq' and i in D and len(D[i]) != 0 and len(D['bcl2fastq']) == 0:
+            if 'bcl2fastq' in D:
+                del D['bcl2fastq']
+    if 'gridss' in D and len(D['gridss']) != 0 and 'gridss_matched' in D and len(D['gridss_matched']) == 0:
+        del D['gridss_matched']
+            
+    return D
+
+
+
+
+
+# def get_assay_expected_workflows(pipeline_workflows, tests_samples, samples_lims):
+#     '''
+#     (dict, dict, dict) -> dict
     
-    return D    
+#     Returns a dictionary with expected workflows and corresponding lims according to the defined assays, pipeline
+#     and case information
     
+#     Parameters
+#     ----------
+#     - pipeline_workflows (dict): Dictionary with pipeline workflows
+#     - tests_samples (dict): Dictionary with all the samples mapping each test
+#     - samples_limns (dict): Dictionary with the lims mapping each assay 
+#     '''
+       
+#     workflows = {}
+
+#     # loop over workflows in pipeline
+#     for workflow in pipeline_workflows:
+#         # get the expected tests for each workflow from the assay definition
+#         level = pipeline_workflows[workflow]['level']
+#         # collect the expected lims for each workflow depending on the case information
+#         if level == 'lane':
+#             # each lims id of each test should have a separate workflow run id
+#             tests = pipeline_workflows[workflow]['tests'].split(',')
+#             # get the parent workflows
+#             parents = pipeline_workflows[workflow]['parent_workflows']
+#             if parents:
+#                 parents = list(map(lambda x: x.strip(), parents.split(',')))
+#             # collect the limsids for each test using case data
+#             for test in tests:
+#                 # get the sample id - each test can have multiple samples
+#                 for sampleid in tests_samples[test]:
+#                     # get the corresponding lims 
+#                     limsids = samples_lims[sampleid]
+#                     for lims in limsids:
+#                         if workflow in workflows:
+#                             workflows[workflow].append({'workflow': workflow,'test': [test], 'sampleid': sampleid, 'limsids': lims, 'parents': parents, 'parent_workflows': []})
+#                         else:
+#                             workflows[workflow] = [{'workflow': workflow, 'test': [test], 'sampleid': sampleid, 'limsids': lims, 'parents': parents, 'parent_workflows': []}]
+        
+#         elif level == 'merge':
+#             # each workflow has a set of lims ids combined from each corresponding test
+            
+            
+#             ####### NEED TO IMPLEMENT THIS - WHICH WORKFLOW HAS 
+            
+            
+#             ## testIds can be both , and | separated
+#             ## if the tests are , separated, then each is a test_set, which will have their own workflow run
+#             ## within a test_set, testIds are | separated, then each workflow will have limids from all of the test, FOR each test with that
+
+            
+#             # test_sets=assay[pipeline][wf]['testIds'].split(",")
+#             # #print("test_sets:",test_sets)
+#             # for test_set in test_sets:
+#             #     ### each test in the test_Set might be represented multiple times in the case, and each needs to be accounted fror in combing the data
+#             #     TestIds=test_set.split("|")
+
+
+            
+            
+
+#             if ',' in pipeline_workflows[workflow]['tests']:
+#                 tests = pipeline_workflows[workflow]['tests'].split(',')  
+#                 # get the parent workflows
+#                 parents = pipeline_workflows[workflow]['parent_workflows']
+#                 if parents:
+#                     parents = list(map(lambda x: x.strip(), parents.split(',')))
+#                 # collect the limsids for each test using case data
+#                 for test in tests:
+#                     # get the sample id - each test can have multiple samples
+#                     for sampleid in tests_samples[test]:
+#                         # get the corresponding lims 
+#                         limsids = samples_lims[sampleid]
+#                         # the workflow has all the lims
+#                         limsids = ','.join(sorted(list(limsids)))
+#                         if workflow in workflows:
+#                             workflows[workflow].append({'workflow': workflow, 'test': [test], 'sampleid': sampleid, 'limsids': limsids, 'parents': parents, 'parent_workflows': []})
+#                         else:
+#                             workflows[workflow] = [{'workflow': workflow, 'test': [test], 'sampleid': sampleid, 'limsids': limsids, 'parents': parents, 'parent_workflows': []}]
+                
+
+#             elif '|' in pipeline_workflows[workflow]['tests']:
+#                 tests = pipeline_workflows[workflow]['tests'].split('|')
+#                 # get the parent workflows
+#                 parents = pipeline_workflows[workflow]['parent_workflows']
+#                 if parents:
+#                     parents = list(map(lambda x: x.strip(), parents.split(',')))
+#                 # collect the limsids for each test using case data
+#                 # get the expected combinations of lims for each combination of test samples
+#                 L = []
+#                 S = []
+#                 for test in tests:
+#                     l = []
+#                     s = []
+#                     # get the sample id - each test can have multiple samples
+#                     for sampleid in tests_samples[test]:
+#                         # get the corresponding lims 
+#                         limsids = samples_lims[sampleid]
+#                         l.append(limsids)
+#                         s.append(sampleid)
+#                     L.append(l)
+#                     S.append(s)
+                
+#                 combined_lims = list(itertools.product(*L))
+#                 combined_samples = list(itertools.product(*S))
+                
+                
+#                 # merge and sort each set of lims for each set of combined tests 
+#                 for i in range(len(combined_lims)):
+#                     merged_lims = []
+#                     merged_samples = []
+#                     for j in combined_lims[i]:
+#                         merged_lims.extend(j)
+#                     for k in combined_samples[i]:
+#                         merged_samples.append(k)
+                    
+#                     merged_lims = ','.join(sorted(merged_lims))
+#                     merged_samples = ','.join(sorted(merged_samples))
+                               
+#                     if workflow in workflows:
+#                         workflows[workflow].append({'workflow': workflow, 'test': tests, 'sampleid': merged_samples, 'limsids': merged_lims, 'parents': parents, 'parent_workflows': []})
+#                     else:
+#                         workflows[workflow] = [{'workflow': workflow, 'test': tests, 'sampleid': merged_samples, 'limsids': merged_lims, 'parents': parents, 'parent_workflows': []}]
+           
+#     # add parent workflow information 
+#     for workflow in workflows:
+#         for d in workflows[workflow]:
+#             if d['parents']:
+#                 # find the corresponding parents
+#                 for parent in d['parents']:
+#                     for k in workflows[parent]:
+#                         # check that all parent samples are in the children samples
+#                         # check that all parent tests are in the children tests
+#                         # check that all parent lims are in the children lims
+#                         if set(k['sampleid'].split(',')).issubset(set(d['sampleid'].split(','))) and \
+#                            set(k['test']).issubset(set(d['test'])) and \
+#                            set(k['limsids'].split(',')).issubset(set(d['limsids'].split(','))):
+#                            d['parent_workflows'].append(k)       
+                        
+#     return workflows        
+    
+
+
+def map_assay_test_to_test_case(assay_test, case_tests):
+    '''
+    
+    
+    '''
+    
+    
+    L = []
+    
+    test_type, library_type = assay_test.split(':')
+    
+    for test in case_tests:
+        if test.startswith(test_type) and library_type in test:
+            L.append(test)
+    L = list(set(L))
+    
+    assert len(L) == 1
+
+    return L[0]
+    
+
+
+
+
+
 
 def get_assay_expected_workflows(pipeline_workflows, tests_samples, samples_lims):
     '''
@@ -255,79 +460,56 @@ def get_assay_expected_workflows(pipeline_workflows, tests_samples, samples_lims
         if level == 'lane':
             # each lims id of each test should have a separate workflow run id
             tests = pipeline_workflows[workflow]['tests'].split(',')
-            # get the parent workflows
-            parents = pipeline_workflows[workflow]['parent_workflows']
-            if parents:
-                parents = list(map(lambda x: x.strip(), parents.split(',')))
             # collect the limsids for each test using case data
             for test in tests:
+                # find the corresponding test in case data
+                case_test = map_assay_test_to_test_case(test, tests_samples)
                 # get the sample id - each test can have multiple samples
-                for sampleid in tests_samples[test]:
+                for sampleid in tests_samples[case_test]:
                     # get the corresponding lims 
                     limsids = samples_lims[sampleid]
                     for lims in limsids:
                         if workflow in workflows:
-                            workflows[workflow].append({'workflow': workflow,'test': [test], 'sampleid': sampleid, 'limsids': lims, 'parents': parents, 'parent_workflows': []})
+                            workflows[workflow].append({'workflow': workflow,'test': [case_test], 'sampleid': sampleid, 'limsids': lims, 'parents': [], 'parent_workflows': []})
                         else:
-                            workflows[workflow] = [{'workflow': workflow, 'test': [test], 'sampleid': sampleid, 'limsids': lims, 'parents': parents, 'parent_workflows': []}]
+                            workflows[workflow] = [{'workflow': workflow, 'test': [case_test], 'sampleid': sampleid, 'limsids': lims, 'parents': [], 'parent_workflows': []}]
         
         elif level == 'merge':
-            # each workflow has a set of lims ids combined from each corresponding test
-            
-            
-            ####### NEED TO IMPLEMENT THIS - WHICH WORKFLOW HAS 
-            
-            
-            ## testIds can be both , and | separated
-            ## if the tests are , separated, then each is a test_set, which will have their own workflow run
-            ## within a test_set, testIds are | separated, then each workflow will have limids from all of the test, FOR each test with that
-
-            
-            # test_sets=assay[pipeline][wf]['testIds'].split(",")
-            # #print("test_sets:",test_sets)
-            # for test_set in test_sets:
-            #     ### each test in the test_Set might be represented multiple times in the case, and each needs to be accounted fror in combing the data
-            #     TestIds=test_set.split("|")
-
-
-            
-            
-
             if ',' in pipeline_workflows[workflow]['tests']:
                 tests = pipeline_workflows[workflow]['tests'].split(',')  
-                # get the parent workflows
-                parents = pipeline_workflows[workflow]['parent_workflows']
-                if parents:
-                    parents = list(map(lambda x: x.strip(), parents.split(',')))
                 # collect the limsids for each test using case data
                 for test in tests:
+                    # find the corresponding test in case data
+                    case_test = map_assay_test_to_test_case(test, tests_samples)
                     # get the sample id - each test can have multiple samples
-                    for sampleid in tests_samples[test]:
+                    for sampleid in tests_samples[case_test]:
                         # get the corresponding lims 
                         limsids = samples_lims[sampleid]
                         # the workflow has all the lims
                         limsids = ','.join(sorted(list(limsids)))
                         if workflow in workflows:
-                            workflows[workflow].append({'workflow': workflow, 'test': [test], 'sampleid': sampleid, 'limsids': limsids, 'parents': parents, 'parent_workflows': []})
+                            workflows[workflow].append({'workflow': workflow, 'test': [case_test], 'sampleid': sampleid, 'limsids': limsids, 'parents': [], 'parent_workflows': []})
                         else:
-                            workflows[workflow] = [{'workflow': workflow, 'test': [test], 'sampleid': sampleid, 'limsids': limsids, 'parents': parents, 'parent_workflows': []}]
+                            workflows[workflow] = [{'workflow': workflow, 'test': [case_test], 'sampleid': sampleid, 'limsids': limsids, 'parents': [], 'parent_workflows': []}]
                 
-
             elif '|' in pipeline_workflows[workflow]['tests']:
                 tests = pipeline_workflows[workflow]['tests'].split('|')
-                # get the parent workflows
-                parents = pipeline_workflows[workflow]['parent_workflows']
-                if parents:
-                    parents = list(map(lambda x: x.strip(), parents.split(',')))
                 # collect the limsids for each test using case data
                 # get the expected combinations of lims for each combination of test samples
                 L = []
                 S = []
+                
+                case_tests = []
+                
                 for test in tests:
+                    # find the corresponding test in case data
+                    case_test = map_assay_test_to_test_case(test, tests_samples)
+                    case_tests.append(case_test)
+                    
                     l = []
                     s = []
                     # get the sample id - each test can have multiple samples
-                    for sampleid in tests_samples[test]:
+                    for sampleid in tests_samples[case_test]:
                         # get the corresponding lims 
                         limsids = samples_lims[sampleid]
                         l.append(limsids)
@@ -352,27 +534,12 @@ def get_assay_expected_workflows(pipeline_workflows, tests_samples, samples_lims
                     merged_samples = ','.join(sorted(merged_samples))
                                
                     if workflow in workflows:
-                        workflows[workflow].append({'workflow': workflow, 'test': tests, 'sampleid': merged_samples, 'limsids': merged_lims, 'parents': parents, 'parent_workflows': []})
+                        workflows[workflow].append({'workflow': workflow, 'test': case_tests, 'sampleid': merged_samples, 'limsids': merged_lims, 'parents': [], 'parent_workflows': []})
                     else:
-                        workflows[workflow] = [{'workflow': workflow, 'test': tests, 'sampleid': merged_samples, 'limsids': merged_lims, 'parents': parents, 'parent_workflows': []}]
+                        workflows[workflow] = [{'workflow': workflow, 'test': case_tests, 'sampleid': merged_samples, 'limsids': merged_lims, 'parents': [], 'parent_workflows': []}]
            
-    # add parent workflow information 
-    for workflow in workflows:
-        for d in workflows[workflow]:
-            if d['parents']:
-                # find the corresponding parents
-                for parent in d['parents']:
-                    for k in workflows[parent]:
-                        # check that all parent samples are in the children samples
-                        # check that all parent tests are in the children tests
-                        # check that all parent lims are in the children lims
-                        if set(k['sampleid'].split(',')).issubset(set(d['sampleid'].split(','))) and \
-                           set(k['test']).issubset(set(d['test'])) and \
-                           set(k['limsids'].split(',')).issubset(set(d['limsids'].split(','))):
-                           d['parent_workflows'].append(k)       
-                        
     return workflows        
-    
+
 
 def get_production_workflows(samples_workflows, workflow_lims):
     '''
@@ -424,7 +591,13 @@ def find_production_workflow(production_workflows, d):
     - d (dict): Dictionary with expected workflow information based on assay and case info
     '''
     
+    # for sequencing workflows, the assay may indicate bcl2fastq but the 
+    # sequencing workflows may be diferent if data is injected
     sequencing_workflows = ['casava', 'bcl2fastq', 'fileimportforanalysis', 'fileimport', 'import_fastq']
+    
+    # gridss_matched is always indicated in the assays but the actual workflow
+    # could be gridss or gridss_matched (same workflow but different names in research and clinical)
+    gridss_workflows = ['gridss_matched', 'gridss']
 
     data = {'workflow': None, 'limsids': None, 'wfrunid': None, 'tests': None, 'samples': None, 'parents': []}
     workflow = d['workflow']
@@ -432,22 +605,7 @@ def find_production_workflow(production_workflows, d):
     expected_samples = d['sampleid']
     test = d['test']
     #  find the workflow in production with the expected limsids and samples
-    if workflow not in sequencing_workflows:
-        if workflow in production_workflows:
-            for wfrunid in production_workflows[workflow]:
-                limsids = production_workflows[workflow][wfrunid]['limsids']
-                samples = production_workflows[workflow][wfrunid]['samples']
-                if expected_samples == samples and expected_lims == limsids:
-                    ### check that only 1 wfrunids match the requirement
-                    assert data['wfrunid'] is None 
-                    # update data collector
-                    data['limsids'] = limsids
-                    data['samples'] = samples
-                    data['wfrunid'] = wfrunid
-                    data['tests'] = test
-                    data['workflow'] = workflow
-     
-    else:
+    if workflow in sequencing_workflows:
         # find the actual sequencing workflow as it may differ from assay
         for key in sequencing_workflows:
             if key in production_workflows:
@@ -463,12 +621,39 @@ def find_production_workflow(production_workflows, d):
                         data['wfrunid'] = wfrunid
                         data['tests'] = test
                         data['workflow'] = key
+    elif workflow in gridss_workflows:
+        # find the gridss workflow as it may differ from assay
+        for key in gridss_workflows:
+            if key in production_workflows:
+                for wfrunid in production_workflows[key]:
+                    limsids = production_workflows[key][wfrunid]['limsids']
+                    samples = production_workflows[key][wfrunid]['samples']
+                    if expected_samples == samples and expected_lims == limsids:
+                        ### check that only 1 wfrunids match the requirement
+                        assert data['wfrunid'] is None 
+                        # update data collector
+                        data['limsids'] = limsids
+                        data['samples'] = samples
+                        data['wfrunid'] = wfrunid
+                        data['tests'] = test
+                        data['workflow'] = key
+    else:
+        if workflow in production_workflows:
+            for wfrunid in production_workflows[workflow]:
+                limsids = production_workflows[workflow][wfrunid]['limsids']
+                samples = production_workflows[workflow][wfrunid]['samples']
+                if expected_samples == samples and expected_lims == limsids:
+                    ### check that only 1 wfrunids match the requirement
+                    assert data['wfrunid'] is None 
+                    # update data collector
+                    data['limsids'] = limsids
+                    data['samples'] = samples
+                    data['wfrunid'] = wfrunid
+                    data['tests'] = test
+                    data['workflow'] = workflow
+     
     return data         
     
-
-
-
-
 
     
 def map_expected_production_workflows(expected_workflow_lims, production_workflows):
@@ -486,63 +671,27 @@ def map_expected_production_workflows(expected_workflow_lims, production_workflo
 
     D = {}
         
-    sequencing_workflows = ['casava', 'bcl2fastq', 'fileimportforanalysis', 'fileimport', 'import_fastq']
-        
-    # for sequencing workflows, the assay may indicate bcl2fastq but the 
-    # sequencing workflows may be diferent if data is injected
-        
     for workflow in expected_workflow_lims:
         D[workflow] = []
         for d in expected_workflow_lims[workflow]:
             data = find_production_workflow(production_workflows, d)
-            # find the parent workflows
-            if d['parents']:
-                for k in d['parent_workflows']:
-                    # map expected parents to workflows in production
-                    parent_workflows = find_production_workflow(production_workflows, k)
-                    # update parent if parent workflow found                                    
-                    if parent_workflows['wfrunid'] is not None:
-                        parent_workflows = {i:j for i,j in parent_workflows.items() if i != 'parents'}
-                        data['parents'].append(parent_workflows)
             D[workflow].append(data)
-            
             
     return D            
      
-
-
-
-
-
        
-            
 def is_incomplete_workflow_run(d):
     '''
     (dict) -> bool
     
-    Returns True is all keys in d have been populated with data
-    
-    Parameters
-    ----------
-    - d (dict): Dictionary with workflow run id information in case_analysis
-    '''
+    Returns True is any key in d is missing values (expect parents)
         
-    # analysis is incomplete if any workflow in assay has missing information
-    return any(map(lambda x: x is None or len(x) == 0, list(d.values())))
-    
-    
-def is_incomplete_sequencing_workflow_run(d):
-    '''
-    (dict) -> bool
-    
-    Returns True is all keys in d have been populated with data
-    
     Parameters
     ----------
     - d (dict): Dictionary with workflow run id information in case_analysis
     '''
     
-    # analysis is incomplete if any workflow in assay has missing information expect parents
+    # exclude parents 
     vals = [d[i] for i in d.keys() if i != 'parents']
     return any(map(lambda x: x is None or len(x) == 0, vals))
  
@@ -559,34 +708,21 @@ def is_data_complete(cases_analysis, expected_workflow_lims):
     - expected_workflow_lims (dict): Dictionary with expected workflow and lims from assay and case info
     '''
         
-    sequencing_workflows = ['casava', 'bcl2fastq', 'fileimportforanalysis', 'fileimport', 'import_fastq']
-            
     complete = True
         
     if cases_analysis.keys() != expected_workflow_lims.keys():
         complete = False
     
-    # check if there are extra workflows
     for workflow in cases_analysis:
         if len(cases_analysis[workflow]) < len(expected_workflow_lims[workflow]):
             complete = False
     
     # check that all workflows have been identified
     for workflow in cases_analysis:
-        # check if workflow if sequencing workflow (not expecting parents)
-        if workflow not in sequencing_workflows:
-            for d in cases_analysis[workflow]:
-                # analysis is incomplete if any workflow in assay has missing information
-                if is_incomplete_workflow_run(d):
-                    complete = False
-                # check if parents are defined
-                for parent in d['parents']:
-                    if is_incomplete_workflow_run(parent):
-                        complete = False
-        else:
-            for d in cases_analysis[workflow]:
-                if is_incomplete_sequencing_workflow_run(d):
-                    complete = False
+        for d in cases_analysis[workflow]:
+            # analysis is incomplete if any workflow in assay has missing information
+            if is_incomplete_workflow_run(d):
+                complete = False
                 
     return complete
                 
@@ -605,8 +741,6 @@ def identify_workflows_with_missing_data(cases_analysis, expected_workflow_lims)
     - expected_workflow_lims (dict): Dictionary with expected workflow and lims from assay and case info
     '''
 
-    sequencing_workflows = ['casava', 'bcl2fastq', 'fileimportforanalysis', 'fileimport', 'import_fastq']
-            
     missing = [workflow for workflow in cases_analysis if workflow not in expected_workflow_lims]
         
     # check if there are missing iterations
@@ -617,22 +751,11 @@ def identify_workflows_with_missing_data(cases_analysis, expected_workflow_lims)
                 
     # check that all workflows have been identified
     for workflow in cases_analysis:
-        # check if workflow if sequencing workflow (not expecting parents)
-        if workflow not in sequencing_workflows:
-            for d in cases_analysis[workflow]:
-                # analysis is incomplete if any workflow in assay has missing information
-                if is_incomplete_workflow_run(d):
-                    missing.append(workflow)
-                # check if parents are defined
-                for parent in d['parents']:
-                    if is_incomplete_workflow_run(parent):
-                        missing.append(workflow)
-        else:
-            for d in cases_analysis[workflow]:
-                if is_incomplete_sequencing_workflow_run(d):
-                    missing.append(workflow)
-                
-                    
+        for d in cases_analysis[workflow]:
+            # analysis is incomplete if any workflow in assay has missing information
+            if is_incomplete_workflow_run(d):
+                missing.append(workflow)
+                       
     missing = list(set(missing))
 
     return missing                    
@@ -676,7 +799,7 @@ def identify_extra_workflows(cases_analysis, expected_workflow_lims):
     - expected_workflow_lims (dict): Dictionary with expected workflow and lims from assay and case info
     '''
     
-    no_extra = []
+    extra = []
        
     # check if there are extra workflows
     for workflow in cases_analysis:
@@ -686,6 +809,29 @@ def identify_extra_workflows(cases_analysis, expected_workflow_lims):
     extra = list(set(extra))
     
     return extra
+    
+    
+    
+def add_parent_workflows(case_analysis, parent_to_children_workflows):
+    '''
+    (dict, dict) -> dict
+    
+    Add the parent workflow run ids to each analysis workflow in case_analysis
+    
+    Parameters
+    ----------
+    - cases_analysis (dict): Dictionary with case production data
+    - parent_to_children_workflows (dict): Dictionary with parent-children workflow relationships
+    '''
+    
+    for workflow in case_analysis:
+        for d in case_analysis[workflow]:
+            wfrunid = d['wfrunid']
+            for parent in parent_to_children_workflows:
+                if wfrunid in parent_to_children_workflows[parent]:
+                    d['parents'].append(parent)
+            
+    return case_analysis    
     
     
 
@@ -713,7 +859,6 @@ def complete_expected_workflows(workflow_info, case_workflows):
     
     return complete
    
-
 
 def identify_missing_workflows(workflow_info, case_workflows):
     '''

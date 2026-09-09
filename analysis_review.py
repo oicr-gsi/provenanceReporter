@@ -19,7 +19,7 @@ from data_helper import load_data, clean_up_workflows, is_case_info_complete, is
     identify_missing_workflows, map_samples_to_lims, sort_lims_by_samples, \
     get_assay_expected_workflows, get_production_workflows, identify_workflows_with_missing_data, \
     check_workflow_relationships, map_expected_production_workflows, is_data_complete, no_extra_data, \
-    identify_extra_workflows, reformat_pipeline_workflows    
+    identify_extra_workflows, reformat_pipeline_workflows, add_parent_workflows    
 from commons import get_cases_md5sum, find_sequencing_attributes, get_donor_name, \
     compute_md5, case_to_update    
     
@@ -1796,9 +1796,9 @@ def get_moh_assay(assay_name):
 
 
 
-def review_data(provenance_data_file, assay_config_file, pinery, database, table='templates'):
+def review_data(provenance_data_file, assay_file, pipeline_file, database, table='templates'):
     '''
-    (str, str, str, str, str, str) -> None 
+    (str, str, str, str, str) -> None 
     
     Generates sqlite database with templates and review for all projects and cases in the
     provenance data file
@@ -1806,102 +1806,23 @@ def review_data(provenance_data_file, assay_config_file, pinery, database, table
     Parameters
     ----------
     - provenance_data_file (str): Path to the file with production data extracted from Shesmu
-    - assay_config_file (str): Path to the assay config file
-    - pinery (str): URL to Pinery assay endpoint
+    - assay_file (str): Path to the json file mapping assays and pipelines
+    - pipeline_file (str): Path to the json file mapping workflows and pipelines
     - database (str): Path to the sqlite database
     - table (str): Table in database storing the analysis data
     '''
-    
     
     #assays.json : list of assays/version and assigned pipelines/versions
     #pipelines.json : list of pipelines/versions with expected workflows and associated information
     
     
-    infile = open('assays.json')
+    infile = open(assay_file)
     assays = json.load(infile)
     infile.close()
     
-    infile = open('pipelines.json')
+    infile = open(pipeline_file)
     pipelines = json.load(infile)
     infile.close()
-    
-    
-    
-    
-    
-    
-    # assays = {'WGTS':
-    #           {'2.0':
-    #            {'standard':{
-    #             'bcl2fastq': {'tests': 'Tumour WG,Normal WG,Tumour WT',
-    #                           'level': 'lane',
-    #                           'parents': '',
-    #                           'deliverables': 'fastq'},
-    #             'bwamem2': {'tests': 'Tumour WG,Normal WG',
-    #                         'level': 'lane',
-    #                         'parents': 'bcl2fastq',
-    #                         'deliverables': 'bam,bai'},
-    #             'bamMergePreprocessing_by_sample': {'tests': 'Tumour WG,Normal WG',
-    #                        'level': 'merge',
-    #                        'parents': 'bwamem2',
-    #                        'deliverables': 'bam,bai'},
-    #             'mutect2_matched': {'tests': 'Tumour WG|Normal WG',
-    #                       'level': 'merge',
-    #                       'parents': 'bamMergePreprocessing_by_sample',
-    #                       'deliverables': 'vcf'},
-    #             'variantEffectPredictor_matched': {'tests': 'Tumour WG|Normal WG',
-    #                      'level': 'merge',
-    #                      'parents': 'mutect2_matched',
-    #                      'deliverables': 'vcf,maf'},
-    #             'delly_matched': {'tests': 'Tumour WG|Normal WG',
-    #                     'level': 'merge',
-    #                     'parents': 'bamMergePreprocessing_by_sample',
-    #                     'deliverables': 'all'},
-    #             'mavis': {'tests': 'Tumour WG|Normal WG|Tumour WT',
-    #                     'level': 'merge',
-    #                     'parents': 'bamMergePreprocessing_by_sample,delly_matched',
-    #                     'deliverables': 'all'},
-    #             'gridss': {'tests': 'Tumour WG|Normal WG',
-    #                     'level': 'merge',
-    #                     'parents': 'bamMergePreprocessing_by_sample',
-    #                     'deliverables': 'all'},
-    #             'purple': {'tests': 'Tumour WG|Normal WG',
-    #                     'level': 'merge',
-    #                     'parents': 'mutect2_matched,gridss',
-    #                     'deliverables': 'all'},
-    #             'hrDetect': {'tests': 'Tumour WG|Normal WG',
-    #                     'level': 'merge',
-    #                     'parents': 'mutect2_matched, purple',
-    #                     'deliverables': 'all'},
-    #             'msisensor': {'tests': 'Tumour WG|Normal WG',
-    #                     'level': 'merge',
-    #                     'parents': None,
-    #                     'deliverables': 'all'},
-    #             'rsem': {'tests': 'Tumour WT',
-    #                     'level': 'merge',
-    #                     'parents': 'star_call_ready',
-    #                     'deliverables': 'all'},
-    #             'star_call_ready': {'tests': 'Tumour WT',
-    #                     'level': 'merge',
-    #                     'parents': 'bcl2fastq',
-    #                     'deliverables': 'all'},
-    #             'arriba': {'tests': 'Tumour WT',
-    #                     'level': 'merge',
-    #                     'parents': 'star_call_ready',
-    #                     'deliverables': 'all'},
-    #             'starfusion': {'tests': 'Tumour WT',
-    #                     'level': 'merge',
-    #                     'parents': 'star_call_ready',
-    #                     'deliverables': 'all'}}}}}
-            
-
-    
-    
-    
-    
-    
-    
-    
     
     # load production data
     provenance_data = load_data(provenance_data_file)
@@ -1916,30 +1837,28 @@ def review_data(provenance_data_file, assay_config_file, pinery, database, table
     recorded_md5sums = get_cases_md5sum(database, table = 'templates')
     print('pulled md5sums from database')
     
-    # list all workflows
-    assay_configurations = extract_assay_workflows(assay_config_file)
-    
-    # make a list of QC workflows
-    qc_workflows = list_qc_workflows(assay_configurations)
-        
-    
-    
-    # extract assays and pipeline
-    
-    # load assays
-    
-    # map case data to assay
-    
-    # map case to assay version
-    
-    # map case to pipeline ?
-    
-    
-    
-    
     # track all cases in production
     P = []
           
+    
+    
+    
+    # make a list of problematic cases to explore later
+    
+    exclude_cases = ['R5523_a141_GTNBP_0001_Bn_P',
+                     'R5526_a120_BDWGTS_0198_Ut_M',
+                     'R5526_a120_BIODIVA_0025_Om_M',
+                     'R5526_a120_BIODIVA_0149_Om_M',
+                     'R5526_a120_BIODIVA_0174_Ae_M',
+                     'R5526_a120_BIODIVA_0200_So_M',
+                     'R5526_a120_BIODIVA_0226_Ov_P',
+                     'R5526_a120_BIODIVA_0286_nn_M',
+                     'R5526_a120_BIODIVA_0392_Ov_P']
+    
+    # 'R5523_a141_GTNBP_0001_Bn_P': multiple workflow runs with same lims
+    # 'R5526_a120_BDWGTS_0198_Ut_M': tests labeled WG in case data, normal ? tumor?
+    # 'R5526_a120_BIODIVA_0025_Om_M': tests labeled WG in case data, normal ? tumor?
+    # 'R5526_a120_BIODIVA_0149_Om_M':  tests labeled WG in case data, normal ? tumor?
     
     
     
@@ -1948,7 +1867,8 @@ def review_data(provenance_data_file, assay_config_file, pinery, database, table
         L = []
         case_id = case_data['case']
         
-        
+        if case_id in exclude_cases:
+            continue
         
         print(case_id)
         
@@ -1971,6 +1891,10 @@ def review_data(provenance_data_file, assay_config_file, pinery, database, table
             assay_version = 'v' + version
             assay_name = '_'.join(assay_name[:-1])
             
+            # collect and evaluate data for each pipeline
+            case_analysis = {}
+            pipeline_analysis = {}            
+                       
             # case data may be incomplete - check project and deliverables can be retrieved  
             try:
                 project_ids = [case_data['project_info'][i]['project'] for i in range(len(case_data['project_info']))]
@@ -1982,38 +1906,29 @@ def review_data(provenance_data_file, assay_config_file, pinery, database, table
             except:
                 donor = ''
         
+        
+            ### exclude biodiva and hbseq projects for now
+            # issue witrh test --> WG
+            
+            
+            if 'BIODIVA' in project_ids or 'HBSEQ' in project_ids:
+                continue
+            
+            
+        
+        
             # check that case data is complete (all sections in the case dictionary are complete)
             if is_case_info_complete(case_data):
+                
+                
                 # review analysis only if signoff is complete
                 if is_signoff_complete(case_data):
+                    
                                    
                     if assay_name in assays:
+                        
                         if assay_version in assays[assay_name]:
-                            # get all pipelines for that assay
-                            pipeline_names = list(assays[assay_name][assay_version].keys())
                             
-                            
-                            ### remove pwg for now
-                            
-                            while 'pwg' in pipeline_names:
-                                pipeline_names.remove('pwg')
-                            
-                            while 'tarseq' in pipeline_names:
-                                pipeline_names.remove('tarseq')
-                            
-                            while 'wt' in pipeline_names:
-                                pipeline_names.remove('wt')
-                            
-                            
-                            while 'swg' in pipeline_names:
-                                pipeline_names.remove('swg')
-                            
-                            
-                            
-                            #### PIPELINE VERSION WILL NEED TO BE SPECIFIED
-                            #### TAKING PIPELINE VERSION V1.0 FOR DEVPT
-                              
-                            pipeline_version = 'v1.0'
                             
                             # extract case data
                             # map tests to lims ids
@@ -2035,132 +1950,95 @@ def review_data(provenance_data_file, assay_config_file, pinery, database, table
                             # find the parent-children worklow relationships
                             parent_to_children_workflows = collect_workflow_relationships(case_data)
                     
-                            # make a list of case workflows for each pipeline
-                            pipeline_workflows = [reformat_pipeline_workflows(pipelines[i][pipeline_version]) for i in pipeline_names]
-                    
-                            # collect and evaluate data for each pipeline
-                            case_analysis = {}
-                            for i in range(len(pipeline_workflows)):
-                                                             
-                    
-                
-                                ###### need to store case_analysis for each peipleine {pipeline: case_analysis}    
-                                ###### need to evaluate valid for all pipeline
-                
+                            for pipeline_name in assays[assay_name][assay_version]:
                                 
-                
-                
+                                
+                                
+                                
+                                
+                                pipeline_version = assays[assay_name][assay_version][pipeline_name]
+                                # get the pipeline expected worflows 
+                                pipeline_workflows = reformat_pipeline_workflows(pipelines[pipeline_name][pipeline_version])
+                    
+                                
                                 # did all expected workflows in config ran?
-                                if complete_expected_workflows(workflow_info, pipeline_workflows[i]):
+                                if complete_expected_workflows(workflow_info, pipeline_workflows):
+                                    
+                                    
+                                    
                                     # get expected lims for each workflow based on the assay and the case
-                                    
-                                    
-                                    #### need to update the function
-                                    
-                                    
-                                    #expected_workflow_lims = get_assay_expected_workflows(assays, assay, version, pipeline, tests_samples, samples_lims)
-                                    
-                                    expected_workflow_lims = get_assay_expected_workflows(pipeline_workflows[i], tests_samples, samples_lims)
-                                    
-                                    
+                                    expected_workflow_lims = get_assay_expected_workflows(pipeline_workflows, tests_samples, samples_lims)
                                     # get lims, samples and run ids for each workflow seen in production
                                     production_workflows = get_production_workflows(samples_workflows, workflow_lims)
                                     # did all the expected workflows ran for all tests (check lims)?
-                                    try:
-                                        pipeline_analysis = map_expected_production_workflows(expected_workflow_lims, production_workflows)
-                                    except Exception as error:
-                                        pipeline_analysis = {}
-                                        valid = 0
-                                         
-                                
-                                
+                                    pipeline_analysis = map_expected_production_workflows(expected_workflow_lims, production_workflows)
                                     # check if missing data (workflows and parents)
                                     if is_data_complete(pipeline_analysis, expected_workflow_lims):
+                                        
+                                        
                                         # check if some workflows have extra iterations matching the required lims
                                         if no_extra_data(pipeline_analysis, expected_workflow_lims):
-                                            # check inegrity of the workflow relationships
-                                            if check_workflow_relationships(pipeline_analysis, parent_to_children_workflows, workflow_info):
-                                                # data passed all the checks
-                                                valid = 1
-                                                error = '' 
-                                            else:
-                                                error = '[DATA ISSUES]: some workflows have the wrong parent'
-                                                valid = 0
+                                            
+                                                
+                                            
+                                            # add parent workflows
+                                            pipeline_analysis = add_parent_workflows(pipeline_analysis, parent_to_children_workflows)
+                                            # data passed all the checks
+                                            valid = 1
+                                            error = ''
+                                            
                                         else:
                                             extra_workflows = identify_extra_workflows(pipeline_analysis, expected_workflow_lims)
                                             error = '[EXTRA WORKFLOWS]: Workflows have unexpected multiple runs {0}'.format(','.join(extra_workflows)) 
                                             valid = 0
+                                        
                                     else:
                                         missing = identify_workflows_with_missing_data(pipeline_analysis, expected_workflow_lims)
                                         error = '[INCOMPLETE DATA]: Workflows are missing {0}'.format(','.join(sorted(list(set(missing)))))
                                         valid = 0
+                               
                                 else:
                                     # get the missing workflows
-                                    missing_workflows = identify_missing_workflows(workflow_info, pipeline_workflows[i])
+                                    missing_workflows = identify_missing_workflows(workflow_info, pipeline_workflows)
                                     error = '[MISSING WORKFLOWS]: missing {0}'.format(','.join(sorted(missing_workflows)))
                                     valid = 0
                                     pipeline_analysis = {}
                                 
-                                case_analysis[pipeline_names[i]] = {'pipeline_analysis': pipeline_analysis,
-                                                                    'error': error,
-                                                                    'valid': valid}
-                        
+                                
+                                case_analysis[pipeline_name] = {'pipeline_analysis': pipeline_analysis,
+                                                                        'error': error,
+                                                                        'valid': valid}
                         else:
                             error = '[ASSAY VERSION]: version not matching {0} in assay config'.format(assay_name)
                             valid = 0
-                            case_analysis = {}
                     else:
                         error = '[ASSAY]: assay {0} not in assay config'.format(assay_name)
                         valid = 0
-                        case_analysis = {}
-                
+                                       
                 else:
                     error = '[INCOMPLETE SEQUENCING]: some tests have incomplete sequencing'
                     valid = 0
-                    case_analysis = {}
+                    
             else:
                 error = '[INCOMPLETE CASE]: case is missing some data'
                 valid = 0
-                case_analysis = {}
-        
-        
+                
             # the case may be in multiple projects. record data for each project the case belongs to 
-            
-            if case_analysis:
-                if project_ids:
-                    for project in project_ids:
+            if project_ids:
+                for project in project_ids:
+                    if case_analysis:
                         error = ';'.join(sorted([case_analysis[i]['error'] for i in case_analysis]))
                         valid = int(all([case_analysis[i]['valid'] for i in case_analysis]))
                         L.append([case_id, donor, project, assay_name, json.dumps(case_analysis), str(valid), error, md5sum])
-                else:
-                    error = ';'.join(sorted([case_analysis[i]['error'] for i in case_analysis]))
-                    valid = int(all([case_analysis[i]['valid'] for i in case_analysis]))
-                    L.append([case_id, donor, 'NA', assay_name, json.dumps(case_analysis), str(valid), error, md5sum])
-            
+                    else:
+                        valid = 0
+                        L.append([case_id, donor, project, assay_name, json.dumps({}), str(valid), error, md5sum])
             else:
-                
-                
-                
-                ##### need to be adjusted
-                
-                if pipeline_names == []:
-                    error = 'NA'
-                    valid = 0
-                    
-                    
-                if project_ids:
-                    for project in project_ids:
-                        L.append([case_id, donor, project, assay_name, json.dumps(case_analysis), str(valid), error, md5sum])
-                else:
-                    L.append([case_id, donor, 'NA', assay_name, json.dumps(case_analysis), str(valid), error, md5sum])
+                assert len(case_analysis) == 0
+                valid = 0
+                L.append([case_id, donor, 'NA', assay_name, json.dumps(case_analysis), str(valid), error, md5sum])
                             
-            
-            
             if L:
-                
-                # print('L')
-                # print(L)
-                
                 conn = connect_to_db(database)
                 insert_multiple_records(L, conn, database, 'templates', define_columns('analysis_review')['templates']['names'])
                 conn.close()
@@ -2191,6 +2069,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
     # generate sqlite cache
     #generate_cache(args.provenance, args.assay_config, args.pinery, args.analysis_db, table='templates')
-    review_data(args.provenance, args.assay_config, args.pinery, args.analysis_db, table='templates')
+    #review_data(args.provenance, args.assay_config, args.pinery, args.analysis_db, table='templates')
 
        
